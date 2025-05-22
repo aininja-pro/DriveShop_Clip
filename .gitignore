@@ -1,0 +1,52 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.python-version
+venv/
+env/
+ENV/
+
+# Logs
+*.log
+logs/
+
+# Data files (except fixtures)
+data/*
+!data/fixtures/
+
+# Docker
+.dockerignore
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Generated data files
+data/*.csv
+!data/media_sources.csv
+!data/fixtures/Loans_without_Clips.csv 

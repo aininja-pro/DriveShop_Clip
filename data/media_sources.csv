@@ -1,0 +1,14 @@
+domain,name,js_mode,notes
+www.motortrend.com,MotorTrend,true,Heavy JavaScript site with dynamic content loading
+www.caranddriver.com,Car and Driver,true,Reviews load via JavaScript
+www.autoblog.com,AutoBlog,false,Basic content is accessible without JavaScript
+www.edmunds.com,Edmunds,true,Dynamic content site
+www.tfltruck.com,TFL Truck,false,Basic content is accessible without JavaScript
+www.kbb.com,Kelley Blue Book,true,Price data loads dynamically
+www.carfax.com,Carfax,true,Vehicle history data loads via API calls
+www.automobilemag.com,Automobile Magazine,false,Article content loads without JavaScript
+www.jalopnik.com,Jalopnik,false,Basic article content is static
+www.roadandtrack.com,Road & Track,true,Image galleries and some content load dynamically
+www.thedrive.com,The Drive,false,Article content is accessible without JavaScript
+www.cnet.com,CNET,true,Review sections load dynamically
+www.youtube.com,YouTube,true,Video content requires JavaScript 

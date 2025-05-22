@@ -1,0 +1,30 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+flowchart TD
+  A[Start] --> B[Upload daily CSV]
+  B --> C[Parse CSV extract loans and URLs]
+  C --> D[Media Monitoring]
+  D --> E[Web Crawling]
+  E --> F1[Level1 Scrapy]
+  F1 --> F2[Level2 HeadersCookie]
+  F2 --> F3{js_mode true or prior levels failed}
+  F3 -->|Yes| F4[Headless Browser]
+  F3 -->|No| G[Return crawl results]
+  D --> H[YouTube Processing]
+  H --> H1[Resolve channel ID and RSS]
+  H1 --> H2[Fetch videos and transcripts]
+  H2 --> G
+  G --> I[AI Analysis with GPT]
+  I --> J[Store analysis results]
+  J --> K[Streamlit Review]
+  K --> L{Approved?}
+  L -->|Yes| M[Append to approved_clips.csv]
+  L -->|No| N[Flag for manual review]
+  M --> O[Send Slack notification]
+  N --> O
+  O --> P[End]

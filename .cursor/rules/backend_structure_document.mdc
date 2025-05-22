@@ -1,0 +1,172 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Backend Structure Document
+
+This document outlines the backend architecture, data handling, hosting environment, infrastructure components, and operational practices for the DriveShop Clip Tracking MVP. It is written in everyday language to ensure clarity for non-technical readers.
+
+## 1. Backend Architecture
+
+### Overview
+- We use a **modular, clean architecture** in Python. Each major task is its own module, which makes code easier to read, test, and maintain.
+- The main modules are:
+  - **Ingest Module**: Reads the daily loan file and directs each URL to the correct handler.
+  - **Website Crawler**: Uses Scrapy (and escalates to Selenium/Playwright if needed) to scrape web pages for mentions.
+  - **YouTube Handler**: Pulls video feeds via RSS, retrieves transcripts, and packages content for analysis.
+  - **GPT Analysis**: Sends page or transcript text to OpenAI’s GPT-4 Turbo for relevance, sentiment, and brand messaging scores.
+  - **Output Writer**: Saves results into structured CSV files.
+  - **Streamlit Dashboard**: Provides a simple web interface for reviewers to upload files, view matches, and approve clips.
+
+### Design Patterns and Frameworks
+- **Dependency Injection**: Each module receives its configuration and dependencies from a central driver, making testing and swapping components simple.
+- **Factory Pattern**: We use a factory to choose between the website crawler or YouTube handler based on the URL type.
+- **Observer Pattern**: For sending notifications (e.g., Slack messages) after key events.
+- **Frameworks and Libraries**:
+  - Scrapy (crawling)
+  - Selenium / Playwright (headless rendering)
+  - youtube-transcript-api (YouTube transcripts)
+  - OpenAI API (GPT-4)
+  - Streamlit (review UI)
+  - Docker (containerization)
+
+### Scalability, Maintainability, Performance
+- **Scalability**: Modules run inside Docker containers. We can spin up multiple workers for crawling or GPT calls if volume grows.
+- **Maintainability**: Clear repo layout (`src/ingest`, `src/crawler`, `src/analysis`, etc.) and PEP-8–compliant code with type hints and unit tests.
+- **Performance**: Tiered crawling ensures we only use heavy rendering when needed. We cache repeated requests and limit GPT calls to the most promising content.
+
+## 2. Database Management
+
+### Storage Approach
+- For the MVP, we do **not** use a traditional database. Instead, we store data in **flat CSV files**.
+- This choice speeds up development and keeps the system lightweight.
+
+### Data Files
+- **Input**: `Loans_without_Clips.xlsx` (daily list of open loans)
+- **Intermediate/Output**:
+  - `loan_results.csv` (all matched clips with metadata and AI tags)
+  - `approved_clips.csv` (clips reviewers have approved)
+
+### Access and Management
+- The backend reads and writes these CSVs using Python’s built-in CSV libraries.
+- Files live on the Docker container’s local filesystem (persisted via mounted volumes), ensuring data survives container restarts.
+- For production, these CSVs can be moved to an S3 bucket or simple cloud storage for backup and sharing.
+
+## 3. Database Schema (CSV File Formats)
+
+All schemas are presented in a human-readable column list.
+
+### 3.1 Loans_without_Clips.xlsx (Input)
+- WO # (string)
+- Model (string)
+- To (string, media personality or source name)
+- Model Short Name (string)
+- Links (comma-separated URLs)
+
+### 3.2 loan_results.csv (Processed Matches)
+- WO #
+- Model
+- Source Name
+- URL
+- Content Type ("article" or "video")
+- Title / Headline
+- Publication Date
+- Snippet (short excerpt where model is mentioned)
+- GPT Relevance Score (0–1)
+- GPT Sentiment (positive/neutral/negative)
+- Brand Message Pull-Through (boolean)
+- Analysis Timestamp
+
+### 3.3 approved_clips.csv (Reviewer-Approved)
+- WO #
+- Model
+- Source Name
+- URL
+- Title / Headline
+- Approved By (optional reviewer name)
+- Approval Timestamp
+- Notes (optional reviewer comments)
+
+## 4. API Design and Endpoints
+
+Although the MVP primarily uses a Streamlit UI, we expose simple internal endpoints to facilitate the dashboard workflow.
+
+### 4.1 RESTful Endpoints
+- **POST /upload-loans**
+  - Purpose: Accepts an uploaded `Loans_without_Clips.xlsx` file.
+  - Input: Multipart file.
+  - Output: 202 Accepted.
+
+- **GET /loans**
+  - Purpose: Returns the current list of loans and any matched clips.
+  - Output: JSON array of loan objects with result metadata.
+
+- **POST /approve-clip**
+  - Purpose: Marks a specific clip as approved.
+  - Input: JSON with WO # and URL.
+  - Output: 200 OK with updated clip data.
+
+- **GET /results**
+  - Purpose: Fetches all processed matches (before or after approval).
+  - Output: JSON array of result objects.
+
+### 4.2 External Integrations
+- **OpenAI API**: GPT-4 Turbo calls via HTTPS.
+- **Slack Webhook**: POST notifications for nightly completion and errors.
+
+## 5. Hosting Solutions
+
+### 5.1 Environment
+- **Cloud Provider**: AWS
+- **Compute**: Single EC2 instance running Docker containers
+- **Scheduling**: EC2 cron job triggers the nightly run of the ingest-and-analysis pipeline.
+
+### 5.2 Benefits
+- **Reliability**: EC2’s SLA and AWS networking ensure high uptime.
+- **Scalability**: We can switch to ECS or add more EC2 instances behind a load balancer as usage grows.
+- **Cost-Effectiveness**: A single small/medium instance handles ~200 URL scans per night at minimal cost.
+
+## 6. Infrastructure Components
+
+- **Docker**: Containerizes each module for isolation and consistent behavior.
+- **Cron**: Schedules the nightly pipeline run inside the EC2 container.
+- **Slack Webhook**: Delivers success or failure notifications.
+- **Streamlit**: Runs on an internal port (e.g., 8501) for reviewers.
+- **File Volumes**: Docker-mounted directories persist CSV files across restarts.
+
+These components work together to deliver a reliable nightly process and a simple review UI.
+
+## 7. Security Measures
+
+- **Streamlit Access Control**: Protected by a single password prompt stored as an environment variable.
+- **Network Restrictions**: EC2 security group allows only internal IPs (or VPN) to reach the Streamlit port.
+- **Environment Variables**: Secrets (OpenAI key, Slack webhook URL, Streamlit password) are never committed to code and are injected at runtime.
+- **Encrypted In-Transit**: All external API calls (OpenAI, Slack) use HTTPS.
+- **Container Isolation**: Backend modules run in separate containers, limiting the blast radius of any vulnerability.
+
+## 8. Monitoring and Maintenance
+
+- **Logging**:
+  - Application logs (info, warning, error) printed to stdout/stderr collected by Docker.
+  - Errors trigger Slack alerts with diagnostic details.
+- **Health Checks**:
+  - Simple script to verify API endpoints respond and CSV files are updated.
+  - Can be run as a cron or CloudWatch script.
+- **Maintenance Strategy**:
+  - Regular dependency updates via `pip` and Docker image rebuilds.
+  - Automated tests run locally and in CI before merging changes.
+  - Backup CSV files to S3 weekly.
+
+## 9. Conclusion and Overall Backend Summary
+
+This backend is designed to be **modular**, **lightweight**, and **easy to run**. By relying on flat CSV files, Docker containers, and a single EC2 host, we accelerate development and reduce operational overhead. Key advantages include:
+
+- Clear separation of concerns across modules (ingest, crawl, analyze, output, review).
+- A simple yet powerful review interface via Streamlit.
+- Easily extensible architecture ready for future scaling (e.g., adding a real database, autoscaling workers).
+- Continuous feedback loops through Slack notifications and health checks.
+
+Together, these components ensure DriveShop’s Clip Tracking MVP meets its goals of nightly monitoring, AI-enriched analysis, and efficient human review, all while remaining maintainable and cost-effective.

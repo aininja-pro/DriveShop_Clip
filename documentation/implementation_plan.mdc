@@ -1,0 +1,135 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Implementation plan
+
+## Phase 1: Environment Setup
+
+1.  **Prevalidation**: Check if the current directory contains project files (e.g., `README.md`, `src/`) to avoid reinitializing an existing repo (Project Overview: Code Structure and Deliverables).
+2.  **Initialize Git**: If no `.git` folder exists, run `git init` in the project root to version-control the code (Project Overview: Code Structure and Deliverables).
+3.  **Install Python**: Ensure Python 3.11.4 is installed (Tech Stack: Language).\
+    **Validation**: Run `python3 --version` and confirm output `3.11.4`.
+4.  **Create Virtual Environment**: Run `python3 -m venv venv` in project root (Tech Stack: Language).
+5.  **Activate Virtual Environment**: Run `source venv/bin/activate` (macOS/Linux) or `venv\\Scripts\\activate` (Windows) (Tech Stack: Language).
+6.  **Create **`requirements.txt`: List exact dependencies:
+
+`scrapy==2.8.0 selenium==4.12.0 playwright==1.31.1 youtube-transcript-api==0.4.4 streamlit==1.25.0 openai==0.27.0 slack-sdk==3.19.0 schedule==1.1.0 `(Tech Stack: Web Crawling + YouTube Handling + AI Analysis + UI + Notifications)
+
+1.  **Install Dependencies**: Run `pip install -r requirements.txt` (Tech Stack: Web Crawling + AI Analysis + UI).
+2.  **Freeze Installed Versions**: Run `pip freeze > requirements.txt` to lock versions (Tech Stack: Web Crawling + AI Analysis + UI).
+3.  **Create Directory Structure**:
+
+`├── src/ │ ├── ingest/ │ ├── crawler/ │ ├── utils/ │ ├── analysis/ │ └── dashboard/ ├── data/fixtures/ ├── infra/cron/ ├── .github/workflows/ └── README.md `(Project Overview: Code Structure and Deliverables)
+
+1.  **Add Sample Fixture**: Copy provided `Loans_without_Clips.csv` into `data/fixtures/Loans_without_Clips.csv` for testing (Code Structure: Sample Fixture).
+2.  **Create **`.env.example` in project root with placeholders:
+
+`OPENAI_API_KEY=your_openai_key SLACK_WEBHOOK_URL=your_slack_webhook STREAMLIT_PASSWORD=your_dashboard_password `(Key Considerations: Security)
+
+1.  **Configure Cursor Metrics**: Create `.cursor/` directory and add `cursor_metrics.md` in project root; refer to `cursor_project_rules.mdc` for metric guidelines (Code Structure and Deliverables: IDE).
+
+## Phase 2: Frontend Development (Streamlit Dashboard)
+
+1.  **Scaffold Dashboard App**: Create `src/dashboard/app.py` with a password prompt reading `STREAMLIT_PASSWORD` from `.env` (Detailed Requirements and Configuration: Streamlit Dashboard).
+2.  **Add File Uploader**: In `app.py`, implement `st.file_uploader` to accept `Loans_without_Clips.csv` for ad-hoc runs (Detailed Requirements and Configuration: Streamlit Dashboard).
+3.  **Display Loan Results**: After processing, load `approved_clips.csv` into a `pandas` DataFrame and render via `st.dataframe` with approve/reject radio buttons (Detailed Requirements and Configuration: Streamlit Dashboard).
+4.  **Trigger Processing from UI**: Add a button in `app.py` that calls the ingest pipeline when clicked (Detailed Requirements and Configuration: Streamlit Dashboard).
+5.  **Environment Variables Loading**: Use `python-dotenv` in `app.py` to load `.env` values (Key Considerations: Security).
+6.  **Validation**: Run `streamlit run src/dashboard/app.py --server.port 8501` and confirm the dashboard loads with password prompt (Detailed Requirements and Configuration: Streamlit Dashboard).
+
+## Phase 3: Backend Development
+
+1.  **Initialize Scrapy Project**: Run `scrapy startproject crawler src/crawler` to scaffold crawler module (Tech Stack: Web Crawling).
+2.  **Configure Scrapy Settings**: In `src/crawler/crawler/settings.py`, set:
+
+`DOWNLOAD_DELAY = 2 CONCURRENT_REQUESTS_PER_DOMAIN = 1 USER_AGENT = 'DriveShopMediaMonitorBot/1.0' `(Detailed Requirements and Configuration: Web Crawler Escalation Strategy)
+
+1.  **Implement Basic Spider**: Create `src/crawler/loan_spider.py` that reads URLs from `data/fixtures/Loans_without_Clips.csv` and yields `scrapy.Request` objects (Project Overview: Input).
+
+2.  **Escalation Utility**: In `src/utils/escalation.py`, implement a function that selects Level 1–3 crawling based on a `js_mode` flag (Detailed Requirements and Configuration: Web Crawler Escalation Strategy).
+
+3.  **Browser Crawler**: Create `src/utils/browser_crawler.py` using Playwright for Level 3 JS rendering (Tech Stack: Selenium or Playwright).
+
+4.  **RSS Shortcut Handler**: In `src/utils/rss_handler.py`, implement RSS feed parsing to bypass crawling if `rss_url` is present (Detailed Requirements and Configuration: Web Crawler Escalation Strategy).
+
+5.  **YouTube Transcript Retrieval**: Implement `src/utils/youtube_handler.py` using `youtube_transcript_api` to fetch transcripts (Tech Stack: YouTube Handling).
+
+6.  **GPT Analysis Module**: Create `src/analysis/gpt_analysis.py` that sends scraped content to OpenAI GPT-4 Turbo, extracts relevance, sentiment, summary, and pull-through (Tech Stack: AI Analysis).
+
+7.  **Implement Retry & Backoff**: In `gpt_analysis.py`, add exponential backoff (up to 3 retries) for network or API errors (Key Considerations: Error Handling).
+
+8.  **Rate Limiter**: Add `src/utils/rate_limiter.py` to throttle requests to target domains and OpenAI (Key Considerations: Rate Limiting).
+
+9.  **Slack Notifications**: In `src/utils/notifications.py`, implement `send_slack_message(text)` using `slack_sdk.WebClient` with `SLACK_WEBHOOK_URL` (Tech Stack: Notifications).
+
+10. **Ingestion Orchestrator**: Create `src/ingest/ingest.py` to:
+
+    1.  Load `Loans_without_Clips.csv`.
+    2.  Kick off crawler with escalation logic.
+    3.  Run GPT analysis.
+    4.  Save `loan_results.csv` and filter approved into `approved_clips.csv`.
+    5.  Send Slack notification on completion or error. (Project Overview: Output)
+
+11. **Logging Configuration**: In `src/utils/logger.py`, configure Python `logging` with timestamps, levels, and file/console handlers (Key Considerations: Logging).
+
+12. **Unit & Integration Tests**: Add tests under `/tests` for ingestion, crawler escalation, GPT analysis, and Slack notifications (Key Considerations: Testability).
+
+13. **Validation**: Run `pytest --maxfail=1 --disable-warnings -q` and confirm all tests pass (Key Considerations: Testability).
+
+## Phase 4: Integration
+
+1.  **Dockerfile**: In project root, create `Dockerfile` using `python:3.11.4-slim`:
+
+`FROM python:3.11.4-slim WORKDIR /app COPY requirements.txt ./ RUN pip install --no-cache-dir -r requirements.txt COPY . . CMD ["sh", "-c", "streamlit run src/dashboard/app.py --server.port 8501"] `(Tech Stack: Deployment)
+
+1.  **docker-compose.yml**: Define services:
+
+`version: '3.8' services: app: build: . ports: - '8501:8501' env_file: .env cron: image: app command: sh infra/cron/nightly_job.sh env_file: .env `(Tech Stack: Deployment + Scheduling)
+
+1.  **Validation**: Run `docker-compose up --build -d` and verify the dashboard at `http://localhost:8501` and cron container runs without errors (Project Overview: Deployment).
+
+## Phase 5: Deployment
+
+1.  **Provision EC2 Instance**: Launch an AWS EC2 `t3.small` in `us-east-1`, with Security Group allowing ports 22 (SSH) and 8501 (Streamlit) (Tech Stack: Deployment).
+2.  **Install Docker & Compose on EC2**: SSH in and run:
+
+`sudo apt update && sudo apt install -y docker.io docker-compose sudo usermod -aG docker $USER `(Tech Stack: Deployment)
+
+1.  **Clone & Deploy**: On EC2, run:
+
+`git clone <repo-url> app cd app docker-compose up -d `(Project Overview: Deployment)
+
+1.  **Persist Environment Variables**: Securely store `.env` on EC2 (chmod 600) containing `OPENAI_API_KEY`, `SLACK_WEBHOOK_URL`, `STREAMLIT_PASSWORD` (Key Considerations: Security).
+2.  **Nightly Cron Job**: Create `infra/cron/nightly_job.sh`:
+
+`#!/bin/sh cd /app docker-compose run --rm cron `Then run `crontab -e` and add:
+
+`0 2 * * * /app/infra/cron/nightly_job.sh `(Detailed Requirements and Configuration: Scheduling)
+
+1.  **Validation**: After 2 AM, confirm Slack receives a success message and `approved_clips.csv` is updated (Key Considerations: Logging).
+
+## CI/CD and Documentation
+
+1.  **GitHub Actions Workflow**: Create `.github/workflows/ci.yml`:
+
+`name: CI on: [push] jobs: build: runs-on: ubuntu-latest steps: - uses: actions/checkout@v3 - name: Setup Python uses: actions/setup-python@v4 with: python-version: '3.11' - run: pip install -r requirements.txt - run: pytest --maxfail=1 --disable-warnings -q `(Project Overview: Deployment)
+
+1.  **Validation**: Push to `main` and ensure the GitHub Actions pipeline passes (Key Considerations: Testability).
+
+2.  **Document README**: Update `README.md` with sections:
+
+    *   Project Overview
+    *   Setup & Installation
+    *   Running Locally (dashboard & crawler)
+    *   Docker & Deployment
+    *   Cron Scheduling
+    *   Environment Variables
+    *   AWS EC2 Deployment (Code Structure and Deliverables: Repo Layout)
+
+3.  **Validation**: Review `README.md` in a Markdown preview tool to confirm clarity and completeness (Code Structure and Deliverables: Repo Layout).
+
+*Total steps: 46*

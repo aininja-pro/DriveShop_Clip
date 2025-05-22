@@ -1,0 +1,240 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Clip Tracking MVP for DriveShop
+
+This repository contains the source code and configurations for the Clip Tracking MVP, an AI-enhanced media monitoring tool to detect and tag earned media coverage for loaned vehicles.
+
+---
+
+## Repository Layout
+
+```
+├── src/
+│   ├── ingest/                # Ingestion driver and CSV parsers
+│   │   └── driver.py
+│   ├── crawler/               # Web crawling modules
+│   │   ├── base_crawler.py    # Abstract interface
+│   │   ├── scrapy_crawler.py  # Level 1 & 2 crawls (Scrapy)
+│   │   ├── browser_crawler.py # Level 3 crawls (Selenium/Playwright)
+│   │   └── rss_crawler.py     # RSS feed fetcher
+│   ├── analysis/              # AI enrichment & scoring
+│   │   ├── ai_analysis.py     # GPT-4 Turbo calls & backoff logic
+│   │   └── sentiment.py       # Sentiment & relevance scoring utilities
+│   ├── utils/                 # Config, logging, I/O, retry helpers
+│   │   ├── config.py          # .env loading & typed settings
+│   │   ├── logger.py          # Structured logging setup
+│   │   ├── backoff.py         # Exponential backoff decorator
+│   │   └── file_io.py         # CSV read/write helpers
+│   ├── dashboard/             # Streamlit review UI
+│   │   └── app.py             # Main dashboard application
+│   └── notifications/         # Slack notification helper
+│       └── slack.py           # Slack webhook wrapper
+├── tests/
+│   └── fixtures/
+│       └── Loans_without_Clips.csv  # Sample input fixture
+├── data/                      # (Generated) crawled content & intermediate CSVs
+├── Dockerfile                 # Container build definition
+├── docker-compose.yml         # Optional local dev services
+├── .env.example               # Example environment variables
+├── requirements.txt           # Python dependencies (lock with pip-compile)
+└── README.md                  # This file
+```
+
+---
+
+## tests/fixtures/Loans_without_Clips.csv
+
+```
+WO #,Model,To,Model Short Name,Links
+1001,Toyota Camry,John Doe,Camry,https://example.com/article1;https://youtu.be/abc123
+1002,Honda Civic,Jane Smith,Civic,https://example.org/news;https://youtube.com/watch?v=def456
+```
+
+- **Separator:** Comma
+- **Links:** Semicolon-delimited URLs per record
+
+---
+
+## Prerequisites
+
+- Python 3.9+
+- Docker & Docker Compose (for containerized runs)
+- AWS credentials (if deploying to EC2)
+- Slack incoming webhook URL (for notifications)
+- OpenAI API key
+
+---
+
+## Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-org/clip-tracking-mvp.git
+   cd clip-tracking-mvp
+   ```
+
+2. Copy and populate environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env to set:
+   #   - OPENAI_API_KEY
+   #   - SLACK_WEBHOOK_URL
+   #   - STREAMLIT_PASSWORD
+   #   - Other AWS / config values
+   ```
+
+3. Build & install dependencies:
+   ```bash
+   # Option 1: Local venv
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+
+   # Option 2: Docker
+   docker build -t clip-tracking-mvp .
+   ```
+
+---
+
+## 1. Crawling & Ingestion
+
+The ingestion driver reads the input CSV, kicks off the crawler, and writes intermediate results.
+
+```bash
+# Example local run against test fixture
+python -m src.ingest.driver \
+  --input tests/fixtures/Loans_without_Clips.csv \
+  --output data/crawled_loans.csv
+```
+
+Options:
+- `--input`: Path to loans CSV
+- `--output`: Path for crawler output (links + page text)
+- `--config`: Optional path to override crawling settings
+
+Under the hood, the driver will:
+1. Parse each loan record and split URLs
+2. For each URL, attempt Level 1 (Scrapy)
+3. If configured or failed, escalate to Level 2 (enhanced headers)
+4. If still failing or `js_mode=true`, use Level 3 (Headless browser)
+5. Write a row per loan-URL with fetched text or transcript
+
+Retry and backoff are built into network & GPT calls.
+
+---
+
+## 2. AI Tagging & Analysis
+
+Once crawling completes, run the AI enrichment pipeline:
+
+```bash
+python -m src.analysis.ai_analysis \
+  --input data/crawled_loans.csv \
+  --output data/analysis_results.csv
+```
+
+This will:
+- Call OpenAI GPT-4 Turbo for relevance, sentiment, summary, message alignment
+- Throttle requests to respect rate limits
+- Append fields:
+  - `relevance_score`
+  - `sentiment_label`
+  - `summary`
+  - `brand_alignment`
+
+---
+
+## 3. Human Review Dashboard
+
+Start the Streamlit app for manual validation and approval:
+
+```bash
+export STREAMLIT_PASSWORD="$STREAMLIT_PASSWORD"
+streamlit run src/dashboard/app.py --server.port 8501
+```
+
+Access via `http://localhost:8501` (or internal network IP).
+
+Features:
+- Upload a new `Loans_without_Clips.csv` to reprocess ad hoc
+- View AI-scored clip candidates
+- Approve or flag each match
+- Download approved clips as CSV or JSON
+
+**Security:**
+- Password protected via `.env` variable
+- Should be deployed behind a secure VPC or VPN in production
+
+---
+
+## 4. Exporting Approved Clips
+
+From the dashboard, click **Download Approved** to export:
+- `approved_clips.csv`
+- `approved_clips.json`
+
+These outputs adhere to the FMS ingestion schema.
+
+---
+
+## 5. Scheduled Nightly Run
+
+Use `cron` or AWS EventBridge to schedule the full pipeline:
+
+```cron
+# Runs at 2:00 AM daily
+0 2 * * * cd /path/to/clip-tracking-mvp && \
+  . /path/to/.venv/bin/activate && \
+  python -m src.ingest.driver --input /data/Loans_without_Clips.csv --output /data/crawled_loans.csv && \
+  python -m src.analysis.ai_analysis --input /data/crawled_loans.csv --output /data/analysis_results.csv && \
+  # Optionally call a script to automatically mark approvals or notify Slack
+```
+
+Add a post-job script to notify Slack:
+```bash
+python -c "from src.notifications.slack import notify; notify('Nightly job completed successfully')"
+```
+
+---
+
+## 6. Notifications
+
+The pipeline sends Slack messages on:
+- Successful nightly run
+- Any uncaught errors or fatal failures
+
+Configuration:
+- `SLACK_WEBHOOK_URL` in `.env`
+
+---
+
+## Security & Secrets Management
+
+- **Do not** commit sensitive credentials.
+- Use `.env` for local testing and AWS Parameter Store or Secrets Manager in production.
+- Ensure Streamlit and any admin endpoints are access-controlled.
+- All network I/O is retried with exponential backoff.
+
+---
+
+## Testing
+
+- Unit tests in `tests/`
+- Fixtures in `tests/fixtures/`
+- Run:
+  ```bash
+  pytest --maxfail=1 --disable-warnings -q
+  ```
+
+---
+
+For questions or contributions, please open an issue or submit a pull request.
+
+---
+
+©2024 DriveShop Technology Team. All rights reserved.

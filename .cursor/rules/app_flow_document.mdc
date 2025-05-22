@@ -1,0 +1,46 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# App Flow Document
+
+## Onboarding and Sign-In/Sign-Up
+When a reviewer first opens the dashboard URL in their browser, they encounter a simple password prompt. This prompt is backed by a shared environment variable that the ops team manages. The user types in the password and clicks enter. If the password matches the value in the environment variable, the system grants access and redirects the user to the main dashboard. If the password is incorrect, an inline error message appears and the user remains on the login screen. There is no self-service sign-up or password recovery within the app. Any password rotation or reset is handled outside the interface by updating the environment configuration and restarting the Streamlit service.
+
+## Main Dashboard or Home Page
+After successful authentication, the reviewer lands on the dashboard home page. The header at the top displays the application title “DriveShop Clip Tracking Dashboard.” Directly beneath the header is a file upload section where the reviewer can drag and drop or click to select the daily Loans_without_Clips.xlsx file. Below the upload area sits the pending loans table placeholder, which remains empty until a file is processed. A horizontal toolbar above the table contains a button labeled “Export Approved Clips” and a refresh icon to manually reload the table. If a nightly job has run since the last visit, a colored banner appears across the top of the content area summarizing the latest run’s results.
+
+## Detailed Feature Flows and Page Transitions
+
+### Manual File Upload and Ingestion
+When the reviewer selects a Loans_without_Clips.xlsx file, a progress spinner appears in place of the upload section. The system parses the spreadsheet in the background, extracting work order numbers, vehicle models, media sources, and URL lists. Upon successful ingestion, a success notification banner replaces the spinner, and the pending loans table populates with any loans that still require clip matches.
+
+### Viewing and Filtering Pending Loans
+The table lists each pending loan in its own row, showing the work order number, vehicle model, media source, and the count of candidate URLs. Above the table, a search field allows the reviewer to filter by media source or keyword. Clicking the refresh icon reruns the table query to ensure the latest data from a scheduled run appears.
+
+### Inspecting Individual Loan Details
+When the reviewer clicks on a loan row, the table expands that row into a detail panel. This panel shows the AI-extracted summary of the first clip found, the sentiment score, and a brand messaging alignment score. It also displays the original URL and, in the case of videos, a link to view the transcript. The reviewer scrolls through the transcript or article snippet directly in the panel.
+
+### Approving or Flagging Clips
+Beneath the clip details, two large buttons allow the reviewer to approve the match or flag it for further QA. Clicking Approve moves the loan out of the pending table and into the approved queue; clicking Flag highlights the row in red for prioritized re-review. Each action triggers an immediate Slack notification summarizing the loan number and action taken. After the action, the reviewer returns to the main table view automatically.
+
+### Automatic Nightly Processing
+Independently of the UI, a scheduled cron job runs each night on the AWS EC2 instance. This job ingests the daily Loans_without_Clips.xlsx from a defined S3 bucket or local path, escalates through the three-level crawling strategy as needed, retrieves YouTube feeds and transcripts, and passes content to the GPT-4-Turbo model for relevance, sentiment, and messaging analysis. When the reviewer next visits the dashboard, the nightly summary banner shows the date, number of loans processed, and clips found.
+
+### Exporting Approved Clips
+Once the reviewer has approved matches for the day, they click the "Export Approved Clips" button in the top toolbar. A modal dialog appears asking for confirmation to generate the approved_clips.csv file. After confirmation, the system writes the CSV, triggers the browser download, and marks those loans as completed so they do not reappear. A confirmation banner and optional Slack notification inform the reviewer that the export succeeded.
+
+### Ad Hoc Reprocessing
+At any time, the reviewer may upload a new or updated Loans_without_Clips.xlsx file in the upload section. This manual upload bypasses the nightly schedule and triggers an immediate one-time ingestion and analysis run for that file only, following the same flows for pending loans, inspection, and approval.
+
+## Settings and Account Management
+There is no user account interface within the dashboard. Access control relies on the static password prompt. To change the password, the ops team updates the environment variable and redeploys the Docker container. Notification settings such as the Slack webhook URL and toggle flags live in the .env file and cannot be adjusted through the UI. Any update to these settings also requires a container restart. After making changes, the user simply reloads the dashboard to pick up the new configuration.
+
+## Error States and Alternate Paths
+If the reviewer uploads a file with the wrong format or missing columns, the parser immediately displays a red error banner describing the missing data and prompts the reviewer to upload a valid file. During crawling or GPT analysis, if a request fails or times out, the system automatically escalates through Level 1 to Level 3 scraping strategies. If all levels fail for a given URL, an error entry appears in the loan’s detail panel and a Slack alert notifies the team of the failure. Network connectivity issues surface as a modal overlay advising the user to check their connection and retry. If generating or downloading the export file fails, the UI shows an inline alert and allows the reviewer to retry the export once the underlying issue is resolved.
+
+## Conclusion and Overall App Journey
+From the initial password prompt to the final CSV export, the reviewer’s journey is straightforward. Each morning they visit the dashboard to see newly matched clips from the automated nightly job. They inspect those matches, approve or flag as needed, and then generate the approved_clips.csv file for handoff to the Fleet Management System. At any point, they can manually upload a spreadsheet for immediate processing, and failures are handled with clear on-screen messages and Slack alerts. This flow ensures a smooth handoff between AI-powered media discovery and human review without losing sight of operational simplicity and accountability.

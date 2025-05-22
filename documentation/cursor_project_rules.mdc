@@ -1,0 +1,117 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Project Overview
+
+* **Type:** Clip Tracking MVP (AI-enhanced media monitoring tool)
+* **Description:** Detects and tags earned media coverage from known media partners (vehicle loans), using daily CSV input and AI enrichment.
+* **Primary Goal:** For each loan in the daily feed, find the first relevant media clip, extract relevance, sentiment, summary, and message pull-through via GPT, and output one structured row per loan.
+
+## Project Structure
+
+### Framework-Specific Routing
+
+* **Directory Rules:**
+  * `streamlit_app.py`: Single entrypoint for the Streamlit dashboard. No additional routing folders.
+
+### Core Directories
+
+* **Versioned Structure:**
+  * `crawler/`: Scrapy spiders and escalation logic (basic → headers → headless)
+  * `analysis/`: GPT-4 Turbo integration modules for relevance, sentiment, summary, messaging
+  * `dashboard/`: Streamlit UI components and upload/approve workflows
+  * `data/`: Input (`Loans_without_Clips.xlsx`) and output CSVs (`loan_results.csv`, `approved_clips.csv`)
+  * `scripts/`: Cron and manual-trigger scripts (`run_pipeline.py`, `cron_job.sh`)
+  * `notify/`: Slack webhook notifier module
+  * `utils/`: Shared helpers (CSV reader/writer, logger)
+  * `docker/`: Dockerfile and related deployment configs
+
+### Key Files
+
+* **Stack-Versioned Patterns:**
+  * `crawler/spiders/loan_spider.py`: Scrapy spider configuration for loan URLs
+  * `crawler/handlers/headless_crawler.py`: Selenium/Playwright escalation handler
+  * `analysis/gpt_client.py`: OpenAI GPT-4 Turbo request wrappers with rate-limit handling
+  * `dashboard/streamlit_app.py`: Streamlit dashboard for upload/approve/export
+  * `scripts/run_pipeline.py`: Orchestrator that calls crawler → analysis → writer
+  * `docker/Dockerfile`: Multi-stage build for Python 3.x environment
+  * `requirements.txt`: Pinned dependencies
+  * `cron_job.sh`: Nightly scheduler script
+
+## Tech Stack Rules
+
+* **Version Enforcement:**
+  * `python@3.x`: Use 3.9+; enforce with `.python-version` or Docker base image
+  * `scrapy@2.x`: Define spiders under `crawler/spiders`, configure `crawler/settings.py`
+  * `youtube-transcript-api@0.x`: Cache transcripts, handle missing data
+  * `selenium@4.x` or `playwright@1.x`: Headless mode, fallback logic in `crawler/handlers`
+  * `openai@0.x`: Use `gpt-4-turbo`, implement exponential backoff
+  * `streamlit@1.x`: Protect dashboard via `st.secrets` for password
+  * `docker@20.x`: Pin images, use multi-stage builds
+  * `aws-sdk` (CLI via Docker): Use IAM roles for EC2 pulls
+
+## PRD Compliance
+
+* **Non-Negotiable:**
+  * "Flat CSV files for easy QA": No database—persist all data to `data/*.csv`
+  * "Nightly cron job with manual upload option": Implement `cron_job.sh` and Streamlit upload in `dashboard/streamlit_app.py`
+  * "Slack notifications for success/failure": All workflows must call `notify/slack_notifier.py`
+
+## App Flow Integration
+
+* **Stack-Aligned Flow:**
+  * Scheduler Script → `scripts/run_pipeline.py` runs crawler → analysis → writes `loan_results.csv`
+  * Streamlit Upload → `dashboard/streamlit_app.py` reads `loan_results.csv`, presents table, approve/flag, then writes `approved_clips.csv`
+  * Slack Webhook → `notify/slack_notifier.py` posts status after both nightly and manual runs
+
+## Best Practices
+
+* Python
+  * Use venv/`requirements.txt`; adhere to PEP 8 with type hints
+  * Modularize code into packages; write unit tests in `tests/`
+* Scrapy
+  * Keep spiders in `crawler/spiders/`; centralize settings in `crawler/settings.py`
+  * Implement download delays and auto-throttle
+* youtube-transcript-api
+  * Gracefully handle missing transcripts; cache JSON locally
+* Selenium/Playwright
+  * Use headless mode with randomized UA; implement retry/fallback in handler
+* OpenAI GPT
+  * Batch requests; handle rate limits and errors explicitly
+* Streamlit
+  * Secure with `st.secrets`; use `st.cache_data` for CSV loads
+* Docker
+  * Multi-stage builds; pin base images to SHA digests
+* AWS EC2
+  * Use least-privilege IAM roles; automate deployments via scripts
+* Slack Webhook
+  * Standardize JSON payload; implement retry with exponential backoff
+* Cron
+  * Schedule in UTC; log to rotating files
+* CSV Files
+  * Schema validation on load; consistent naming (`loan_results.csv`, `approved_clips.csv`)
+
+## Rules
+
+* Derive folder/file patterns **directly** from the specified tech-stack versions.
+* Enforce single-file Streamlit entry: no mixed multi-page routing.
+* Implement tiered web crawler escalation: Scrapy → headers/cookies → headless.
+* Never introduce a database layer—persist strictly in CSVs for MVP.
+
+## Rules Metrics
+
+Before starting development, create `cursor_metrics.md` in the project root:
+
+# Rules Metrics
+
+## Usage
+
+The number of times each rule is used as context
+
+* rule-name.mdc: 5
+* another-rule.mdc: 2
+* ...other rules

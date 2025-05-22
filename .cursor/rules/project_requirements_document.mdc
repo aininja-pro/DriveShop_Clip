@@ -1,0 +1,156 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Project Requirements Document
+
+**Clip Tracking MVP for DriveShop**
+
+## 1. Project Overview
+
+We are building an AI-enhanced media monitoring tool that processes a daily feed of open vehicle loans and automatically finds the first mention (“clip”) of each loaned make/model on known media outlets and YouTube channels. By combining a modular web crawler with GPT-4 Turbo analysis, the system will detect relevant article or video content, extract sentiment, summaries, and brand message alignment, then present the results in a simple Streamlit dashboard for human review.
+
+This MVP solves the manual, time-consuming process of scanning dozens of websites and channels each day. Success means:
+
+*   Ingesting ~60 loans/day with 2–4 URLs each
+*   Finding at most one clip per loan per night
+*   Tagging each clip with relevance, sentiment, summary, and brand alignment via GPT-4 Turbo
+*   Allowing a reviewer to approve/flag clips in Streamlit
+*   Exporting approved clips as a CSV ready for DriveShop’s Fleet Management System
+
+## 2. In-Scope vs. Out-of-Scope
+
+### In-Scope (Phase 1 MVP)
+
+*   **Loan Ingestion Module:** Parse daily `Loans_without_Clips.xlsx` (flat CSV) for WO #, model, source, and URLs.
+
+*   **Media Discovery & Crawling:**
+
+    *   Predefined selectors for known domains
+    *   Automatic “discovery” for unknown/homepage links by following `reviews`, `blog`, or `news` links
+
+*   **YouTube Handler:**
+
+    *   Resolve handles or URLs to channel IDs
+    *   Fetch latest 5 videos via RSS (`feeds/videos.xml`)
+    *   Retrieve transcripts with `youtube-transcript-api`
+
+*   **Tiered Escalation Strategy:**
+
+    1.  Scrapy with 2 s delay, 1 concurrent request
+    2.  Enhanced headers/cookies
+    3.  Headless rendering (Selenium/Playwright) for 403s or JS-heavy pages
+
+*   **GPT Analysis:** Use OpenAI GPT-4 Turbo to score relevance, extract sentiment, summary, and brand message pull-through
+
+*   **Streamlit Review UI:**
+
+    *   Upload or manual trigger for ad hoc CSV processing
+    *   Table of pending loans, detail panel with clip preview
+    *   Approve or flag clips
+    *   Export `approved_clips.csv`
+
+*   **Scheduling & Notifications:**
+
+    *   Nightly cron job in Docker on AWS EC2
+    *   Slack webhook alerts for success/failure
+
+*   **Data Persistence:** Flat CSVs for input, intermediate results (`loan_results.csv`), and exports
+
+### Out-of-Scope (Phase 1)
+
+*   API integration to push data directly into FMS
+*   Relational database or Airtable storage
+*   Multi-language content handling (English only)
+*   Role-based login, SSO/OAuth
+*   Email notifications
+*   Advanced UI theming or mobile app
+
+## 3. User Flow
+
+When a reviewer visits the Streamlit dashboard, they see an **Upload** section to drag-and-drop `Loans_without_Clips.xlsx`. Once uploaded, a progress spinner shows ingestion of each loan and its URLs. When parsing completes, the dashboard auto-navigates to a **Pending Loans** table displaying Work Order, Model, Source, and Candidate URL count.
+
+Clicking a row expands a detail panel: it shows the first matched clip’s thumbnail or excerpt, GPT-generated summary, sentiment score, and brand alignment flag. Underneath, “Approve” and “Flag” buttons let the reviewer confirm or mark for QA. Approvals move the loan to the approved queue and trigger a Slack notification. Each morning, after the scheduled nightly run, new matches appear with a banner summarizing that run. Finally, clicking **Export** generates `approved_clips.csv`, formatted for DriveShop’s FMS import.
+
+## 4. Core Features
+
+*   **Loan Data Ingestion:** Read daily CSV, normalize rows, handle missing/generic URLs.
+
+*   **Media Discovery & Crawler:**
+
+    *   Known domains via Scrapy + selector config
+    *   Discovery logic for unknown sites
+
+*   **YouTube Channel Handling:** RSS feed parsing; transcript retrieval
+
+*   **Tiered Escalation:** Automatic switch from lightweight Scrapy to headless rendering when blocked
+
+*   **AI-Enriched Analysis:** GPT-4 Turbo calls for relevance, sentiment, summary, brand messaging
+
+*   **Streamlit Dashboard:** File upload, table view, detail panel, approve/flag actions, export button
+
+*   **Scheduler & Manual Trigger:** Cron for nightly runs; manual CSV upload for ad-hoc processing
+
+*   **Notifications:** Slack webhook for success and error messages
+
+*   **Output Writer:** Write structured rows to `loan_results.csv` and `approved_clips.csv`
+
+*   **Lightweight Persistence:** All data in flat CSVs for easy QA
+
+## 5. Tech Stack & Tools
+
+*   **Language & Frameworks:** Python 3.x, Scrapy (web crawler), Streamlit (dashboard)
+*   **Media & Transcripts:** `youtube-transcript-api`, Selenium or Playwright (headless browser)
+*   **AI Model:** OpenAI GPT-4 Turbo via the OpenAI API
+*   **Deployment:** Docker containers on AWS EC2, cron scheduler
+*   **Notifications:** Slack webhook (configurable via `.env`)
+*   **File Format:** Flat CSV/Excel for input and output
+*   **IDE/Integration:** Cursor for AI-powered coding suggestions
+
+## 6. Non-Functional Requirements
+
+*   **Performance:**
+
+    *   Handle ~100–200 URL scans/night
+    *   Complete nightly run within 2 hours
+
+*   **Reliability:** Retry with exponential backoff for network or GPT errors
+
+*   **Security:**
+
+    *   Protect Streamlit UI with password via environment variable
+    *   Store secrets (API keys, Slack webhook) in `.env`
+
+*   **Compliance & Code Quality:**
+
+    *   PEP-8 style, type hints, unit tests for core modules
+    *   Logging of all major steps and errors
+
+*   **Usability:**
+
+    *   Clear progress indicators in UI
+    *   Default Streamlit theme
+
+## 7. Constraints & Assumptions
+
+*   **Infrastructure:** Single AWS EC2 instance running Docker
+*   **AI Limits:** GPT-4 Turbo rate limits and cost ~$0.01–$0.03 per call; ~100 calls/day
+*   **Data Source:** Daily `Loans_without_Clips.xlsx` is well-formed and delivered reliably
+*   **Language:** All content in English; no translation needed
+*   **Discovery Logic:** Keywords (`reviews`, `blog`, `news`) suffice to find relevant pages
+*   **Escalation Flags:** `media_sources.csv` may include `js_mode=true` for known JS sites
+
+## 8. Known Issues & Potential Pitfalls
+
+*   **Site Blocking (403):** Ensure tiered escalation triggers headless rendering after retries
+*   **Dynamic/JS-Heavy Pages:** Transient content may require careful timing in headless mode
+*   **Rate-Limiting:** Respect target domains and OpenAI rate limits; implement delays/backoff
+*   **CSV Inconsistencies:** Validate and normalize input rows; skip or flag malformed entries
+*   **Transcript Gaps:** Some videos may lack transcripts; fallback to metadata only
+*   **Slack Webhook Failures:** Log and retry notifications; allow manual health-check endpoint
+*   **Incomplete Discovery:** Discovery rules may miss deeply nested review pages; plan to refine selectors
+
+This PRD provides a clear, unambiguous blueprint for all subsequent technical documents, covering feature scope, user journey, core modules, technology choices, and critical constraints. It ensures that an AI or engineering team can move directly into detailed design, architecture, and implementation without further clarification.

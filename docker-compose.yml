@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    ports:
+      - '8501:8501'
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./src:/app/src
+    env_file:
+      - .env
+    restart: unless-stopped
+  
+  # Cron service is now optional and won't start by default
+  cron:
+    profiles:
+      - scheduled
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./src:/app/src
+    env_file:
+      - .env
+    command: sh infra/cron/nightly_job.sh 

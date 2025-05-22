@@ -1,0 +1,182 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Frontend Guideline Document
+
+This document outlines the frontend architecture, design principles, styling, components, and best practices for the DriveShop Clip Tracking MVP’s Streamlit dashboard. It’s written in plain language so anyone—technical or not—can understand how the frontend is set up and why.
+
+## 1. Frontend Architecture
+
+### Framework and Libraries
+- **Streamlit**: The core framework for building the dashboard UI in Python. It handles page rendering, widgets, and reruns on input changes.
+- **Streamlit-AgGrid (optional)**: For advanced, interactive tables if you need sorting or inline editing beyond basic Streamlit tables.
+- **st-session-state**: Built-in Streamlit feature (`st.session_state`) to persist data across user interactions.
+- **Custom Components (optional)**: If the built-in widgets fall short, you can write or import Streamlit Components (React + Python wrapper).
+
+### How It Supports Scalability, Maintainability, and Performance
+- **Modularity**: Separate Python modules for uploading, data processing, and review screens. Each page or feature lives in its own file under `/frontend`.
+- **Caching**: Use `@st.cache_data` or `@st.cache_resource` for expensive operations (e.g., loading large CSVs or calling GPT). This speeds up repeated interactions.
+- **Lightweight**: No heavy client-side framework (like React). Streamlit handles rerenders on the server, reducing JS bundle size and complexity.
+- **Environment Configuration**: All secrets and theming in a single `config.toml` and `.env`, making it easy to spin up new instances.
+
+## 2. Design Principles
+
+### Usability
+- **Clear Workflow**: Users see a step-by-step sidebar: Upload → Review Loans → Inspect Clips → Export.
+- **Minimal Steps**: Reduce clicks by combining related actions (e.g., inline approval buttons in the clip table).
+
+### Accessibility
+- **Keyboard Navigation**: Ensure widgets (buttons, tables) are reachable by tabbing.
+- **Labels & Alt Text**: Every file uploader and button has descriptive text (e.g., “Upload Loans CSV”).
+- **Color Contrast**: Text and backgrounds meet WCAG AA contrast ratios.
+
+### Responsiveness
+- **Automatic Layout**: Streamlit adapts to screen width. Use `st.columns()` and `st.expander()` sparingly for mobile-friendliness.
+- **Collapsible Sections**: Hide detailed clip info in expanders to prevent vertical scroll overload on small screens.
+
+## 3. Styling and Theming
+
+### Approach
+- Leverage Streamlit’s built-in theming via `config.toml`. Avoid custom CSS overrides unless absolutely necessary.
+
+### Theme Style
+- **Modern Flat Design**: Clean, minimal shadows, flat buttons, clear typography.
+- **Glassmorphism**: Light frosted panels only for callouts or notifications, not for main tables.
+
+### Color Palette
+- Primary Blue: `#0058A3` (DriveShop brand blue)  
+- Secondary Teal: `#00A896`  
+- Accent Yellow: `#FFE156`  
+- Neutral Dark Gray: `#2E2E2E`  
+- Light Gray Background: `#F5F5F5`
+
+### Fonts
+- **Primary Font**: “Open Sans”, sans-serif for body text.  
+- **Headings**: “Montserrat”, sans-serif, slightly bolder.
+
+Configure these in `config.toml`:
+```toml
+[theme]
+primaryColor = "#0058A3"
+backgroundColor = "#F5F5F5"
+secondaryBackgroundColor = "#FFFFFF"
+font = "sans serif"
+```
+
+## 4. Component Structure
+
+### Organization
+- `/frontend/
+  ├── pages/
+  │   ├── 1_upload.py       # Upload screen
+  │   ├── 2_review_loans.py # Loans table
+  │   └── 3_inspect_clips.py# Clip details & approval
+  ├── components/
+  │   ├── file_uploader.py  # Reusable upload widget
+  │   ├── clip_table.py     # Table renderer (AgGrid or st.dataframe)
+  │   └── nav_sidebar.py    # Sidebar menu
+  └── utils/
+      └── session_manager.py# Helpers for st.session_state
+```
+
+### Reusability
+- Common widgets (file uploader, table, nav) live under `components/` so any page can import them.
+- Utility functions for reading CSVs or exporting files in `utils/`.
+
+### Benefits of Component-Based Design
+- **Easier Maintenance**: Fix a bug in `clip_table.py` once, and all pages inherit the fix.
+- **Clear Ownership**: Each file has a single responsibility, making reviews and onboarding faster.
+
+## 5. State Management
+
+### Approach
+- Use `st.session_state` as the single source of truth for file data, loan results, and approval flags.
+
+### Patterns
+- **Initialization**: On first load, set default keys:
+  ```python
+  if 'loans_df' not in st.session_state:
+      st.session_state.loans_df = None
+  if 'clip_results' not in st.session_state:
+      st.session_state.clip_results = []
+  ```
+- **Updating State**: After upload, assign `st.session_state.loans_df = df` so every page sees it.
+- **Derived State**: Store filtered views (e.g., pending approvals) as transient variables, not in session state.
+
+### Sharing Data Across Pages
+- Every page script reads from `st.session_state`. No need to pass variables manually.
+
+## 6. Routing and Navigation
+
+### Streamlit Pages
+- Leverage Streamlit’s built-in multi-page support (files under `/pages`). Files are automatically given navigation tabs at the top.
+
+### Sidebar Navigation (Alternative)
+- For more control, build a custom sidebar in `components/nav_sidebar.py`:
+  ```python
+  import streamlit as st
+  choice = st.sidebar.radio(
+      "Go to",
+      ['Upload Loans', 'Review Loans', 'Inspect Clips']
+  )
+  ```
+- Conditionally import or run page code based on `choice`.
+
+## 7. Performance Optimization
+
+### Caching
+- Use `@st.cache_data` on functions that read or preprocess CSVs:
+  ```python
+  @st.cache_data(show_spinner=False)
+  def load_loans(file_path):
+      return pd.read_csv(file_path)
+  ```
+
+### Lazy Loading
+- Only load YouTube transcripts or GPT summaries when a user expands a clip’s detail panel.
+
+### Efficient Tables
+- For large datasets, use AgGrid with pagination. Or display only 20 rows at a time with manual slicing.
+
+### Asset Optimization
+- Avoid heavy images or logos. If needed, host static assets on S3 or a CDN.
+
+## 8. Testing and Quality Assurance
+
+### Unit Tests
+- **pytest** for helper functions in `/frontend/utils` and data-loading routines.
+- Mock file uploads and CSV reads.
+
+### Integration Tests
+- **Streamlit Testing Library** or **pytest-streamlit** to simulate user interactions:
+  - Uploading a CSV
+  - Clicking “Review” buttons
+  - Exporting CSV
+
+### End-to-End Tests
+- **Playwright** or **Selenium** scripts that:
+  1. Launch the app in Docker (via `docker-compose up`).
+  2. Programmatically upload a test CSV.
+  3. Verify that the expected rows appear in the table.
+
+### Linting & Formatting
+- **flake8** and **black** to enforce Python code style.
+- **isort** for import ordering.
+
+## 9. Conclusion and Overall Frontend Summary
+
+This guideline lays out a clear, modular Streamlit frontend:
+- **Architecture** built on Streamlit’s pages and components.
+- **Design Principles** that keep the interface usable, accessible, and responsive.
+- **Styling** via a modern flat theme, DriveShop colors, and clean typography.
+- **Components** organized for reuse and maintainability.
+- **State Management** centralized in `st.session_state` for smooth user flows.
+- **Navigation** either via built-in pages or a simple sidebar.
+- **Performance** boosted by caching and lazy loading.
+- **Testing** covering unit, integration, and E2E scenarios.
+
+By following these guidelines, the frontend will be easy to develop, scale, and maintain, while providing a smooth, intuitive experience for DriveShop users reviewing and approving media clips.

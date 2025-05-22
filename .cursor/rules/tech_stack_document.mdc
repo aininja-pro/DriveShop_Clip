@@ -1,0 +1,129 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Tech Stack Document
+
+This document explains the technology choices for the DriveShop Clip Tracking MVP in plain language. It outlines how each piece of the tech stack works together to deliver a reliable, easy-to-use system without assuming a technical background.
+
+## Frontend Technologies
+
+The frontend is everything the reviewer interacts with in their browser. For this project, we chose:
+
+- **Streamlit**  
+  A Python-based framework for building simple web apps. Streamlit handles file uploads, table displays, detail panels, buttons, and downloads. It lets us focus on functionality rather than low-level UI code.
+
+- **Default Streamlit Theme**  
+  We’re using Streamlit’s built-in styling so the dashboard looks clean out of the box. This keeps development quick and maintenance simple.
+
+Why these choices?
+
+- Streamlit requires no HTML/CSS/JavaScript expertise—everything is written in Python.  
+- Components like file upload, tables, and modals come ready-made.  
+- The default theme gives a professional look without extra work.
+
+## Backend Technologies
+
+The backend powers crawling, AI analysis, and data handling. Our stack includes:
+
+- **Python 3.x**  
+  The main programming language for all modules. It’s easy to read, widely used, and has rich libraries.
+
+- **Scrapy**  
+  A battle-tested web crawling framework that handles polite crawling (automatic delays and retries) and makes it simple to write custom spiders for known sites.
+
+- **youtube-transcript-api**  
+  A lightweight library to fetch YouTube video transcripts when available, so we can send full text to the AI.
+
+- **Selenium & Playwright**  
+  Headless browser tools used only when basic crawling fails (e.g., pages blocked or heavy on JavaScript). They render pages just like a real browser.
+
+- **OpenAI GPT-4 Turbo API**  
+  The AI engine that reads scraped text or transcripts and returns relevance, sentiment, summary, and brand alignment scores.
+
+- **Flat CSV Files**  
+  We read the daily loan data from a CSV/Excel file and write results and approved clips to CSV. This keeps storage lightweight and easy to inspect.
+
+- **Configuration & Utilities**  
+  Files like `media_sources.csv` tell the crawler when to skip to headless mode. Environment variables (via a `.env` file) hold secrets like API keys and the Slack webhook URL.
+
+All backend code follows a clean, modular layout with separate folders for ingestion, crawling, YouTube handling, AI analysis, and the Streamlit dashboard. This makes each piece testable and maintainable.
+
+## Infrastructure and Deployment
+
+To run the system consistently in development, testing, and production, we chose:
+
+- **Docker Containers**  
+  Encapsulate code, dependencies, and configuration so the environment is identical everywhere.
+
+- **AWS EC2**  
+  A virtual server in the cloud where we deploy Docker containers. EC2 gives us flexibility to scale up if we need more CPU or memory for crawling and AI calls.
+
+- **Cron Scheduler**  
+  A simple Linux-based scheduler inside the EC2 container that runs the nightly ingest & crawl job automatically.
+
+- **Git & GitHub**  
+  Version control for all code. We store the repository on GitHub, track changes, and collaborate safely.
+
+- **GitHub Actions (optional CI/CD)**  
+  Automates tests and lint checks on each code push and can build/deploy Docker images if we want continuous delivery.
+
+- **.env File**  
+  Holds configuration like the Streamlit password, OpenAI key, and Slack webhook. This file is never checked into Git to keep secrets safe.
+
+Together, these choices ensure the system is reliable, reproducible, and easy to update.
+
+## Third-Party Integrations
+
+We rely on a few external services to add functionality without building everything from scratch:
+
+- **OpenAI GPT-4 Turbo**  
+  Provides fast, accurate text analysis for relevance, sentiment, summaries, and brand messaging.
+
+- **Slack Webhook**  
+  Sends automated notifications when nightly runs succeed or fail, and when reviewers approve or flag clips.
+
+- **youtube-transcript-api**  
+  Pulls transcripts for YouTube videos so our AI can analyze the full text.
+
+These integrations let us focus on core features while leveraging best-in-class services for AI and notifications.
+
+## Security and Performance Considerations
+
+We built in safety and speed from day one:
+
+- **Streamlit Access Password**  
+  The dashboard prompts for a single password stored in `.env`. This keeps the tool internal without full user accounts.
+
+- **Secrets Management**  
+  API keys and the Slack webhook URL live in `.env`, not in code.
+
+- **Polite Crawling**  
+  Scrapy uses a 2-second delay and only one request at a time per domain, respecting site owners and reducing blocking risk.
+
+- **Tiered Escalation**  
+  We start with light requests, then add realistic headers and cookies, and only resort to headless browsers when necessary. This balances cost, speed, and reliability.
+
+- **Rate Limiting & Backoff**  
+  We watch OpenAI’s rate limits and retry on transient errors with exponential backoff.
+
+- **Logging & Alerts**  
+  Every major step and error is logged. Slack alerts let us know immediately if something goes wrong overnight.
+
+Together, these measures keep the system secure, fair to external sites, and performant under our expected load of ~100–200 URL scans per night.
+
+## Conclusion and Overall Tech Stack Summary
+
+This Clip Tracking MVP uses a lean, clearly organized set of technologies to meet DriveShop’s needs:
+
+- Frontend: Streamlit for a simple, password-protected dashboard.  
+- Backend: Python with Scrapy, youtube-transcript-api, Selenium/Playwright, and OpenAI GPT-4 Turbo.  
+- Persistence: Flat CSV files for easy QA and manual handoff.  
+- Infrastructure: Docker on AWS EC2 with cron, GitHub for version control, and optional CI/CD via GitHub Actions.  
+- Integrations: Slack for notifications and OpenAI for AI analysis.  
+- Security & Performance: Environment-based secrets, polite crawling defaults, tiered escalation, and retry logic.
+
+Each technology was chosen to keep the system modular, testable, and simple to operate. This stack lets us quickly iterate on the MVP while ensuring DriveShop reviewers have a smooth, reliable experience every day.
