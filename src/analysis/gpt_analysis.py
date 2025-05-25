@@ -68,7 +68,10 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
     is_html = bool(re.search(r'<html|<body|<div|<p>', content))
     if is_html and url:
         logger.info("Content appears to be HTML. Extracting article text...")
-        extracted_content = extract_article_content(content, url)
+        
+        # Create expected topic from vehicle make and model for quality checking
+        expected_topic = f"{make} {model}"
+        extracted_content = extract_article_content(content, url, expected_topic)
         
         # Check if extraction was successful
         if extracted_content:
