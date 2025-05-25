@@ -41,7 +41,7 @@ class CrawlingStrategy:
         """Load domain configuration from media_sources.csv if available."""
         try:
             project_root = Path(__file__).parent.parent.parent
-            config_file = os.path.join(project_root, 'data', 'fixtures', 'media_sources.csv')
+            config_file = os.path.join(project_root, 'data', 'media_sources.csv')
             
             if os.path.exists(config_file):
                 with open(config_file, 'r') as f:
@@ -50,14 +50,19 @@ class CrawlingStrategy:
                         domain = row.get('domain', '').strip()
                         js_mode = row.get('js_mode', '').lower()
                         force_js = row.get('force_js', '').lower() == 'true'
+                        rss_url = row.get('rss_url', '')
                         
-                        if domain and js_mode == 'true':
-                            self.js_likely_domains.add(domain)
-                            logger.info(f"Added {domain} to JS-likely domains")
+                        if domain:
+                            if js_mode == 'true':
+                                self.js_likely_domains.add(domain)
+                                logger.info(f"Added {domain} to JS-likely domains")
+                                
+                                if force_js:
+                                    self.force_js_domains.add(domain)
+                                    logger.info(f"Added {domain} to force-JS domains (will start at level 3)")
                             
-                            if force_js:
-                                self.force_js_domains.add(domain)
-                                logger.info(f"Added {domain} to force-JS domains (will start at level 3)")
+                            if rss_url:
+                                logger.info(f"Configured RSS feed for {domain}: {rss_url}")
         
         except Exception as e:
             logger.warning(f"Error loading media sources configuration: {e}")

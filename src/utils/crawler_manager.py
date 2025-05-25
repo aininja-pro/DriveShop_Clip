@@ -3,6 +3,8 @@ import re
 import time
 import requests
 import logging
+import csv
+from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse, urljoin
@@ -21,8 +23,8 @@ class CrawlerManager:
     
     Level 1: Basic requests with minimal headers
     Level 2: Enhanced headers and cookies
-    Level 3: Headless browser (Playwright)
-    Level 4: RSS feed shortcut (if available)
+    Level 3: RSS feed (if available)
+    Level 4: Headless browser (Playwright)
     """
     
     def __init__(self):
@@ -46,6 +48,45 @@ class CrawlerManager:
             'Cache-Control': 'max-age=0',
             'Referer': 'https://www.google.com/'
         }
+        self.media_sources = self._load_media_sources()
+        
+    def _load_media_sources(self) -> Dict[str, Dict[str, Any]]:
+        """Load media sources configuration from CSV."""
+        media_sources = {}
+        try:
+            project_root = Path(__file__).parent.parent.parent
+            config_file = os.path.join(project_root, 'data', 'media_sources.csv')
+            
+            if os.path.exists(config_file):
+                with open(config_file, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        domain = row.get('domain', '').strip()
+                        if domain:
+                            media_sources[domain] = row
+                            logger.debug(f"Loaded configuration for {domain}")
+            return media_sources
+        except Exception as e:
+            logger.warning(f"Error loading media sources: {e}")
+            return {}
+    
+    def _get_rss_url(self, url: str) -> Optional[str]:
+        """Get RSS URL for a domain if available."""
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.lower()
+        
+        # Strip 'www.' prefix if present
+        if domain.startswith('www.'):
+            domain = domain[4:]
+            
+        # Check if we have RSS URL for this domain
+        for media_domain, config in self.media_sources.items():
+            if media_domain.endswith(domain) or domain.endswith(media_domain):
+                rss_url = config.get('rss_url', '')
+                if rss_url:
+                    logger.info(f"Found RSS URL for {domain}: {rss_url}")
+                    return rss_url
+        return None
         
     def crawl(self, url: str, allow_escalation: bool = True, wait_time: int = 5, vehicle_make: str = None, vehicle_model: str = None) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
         """
@@ -145,16 +186,35 @@ class CrawlerManager:
                 logger.warning(f"Level 2 crawling failed and escalation is disabled: {error}")
                 return None, None, error, None
                 
-            logger.info(f"Level 2 failed, escalating to Level 3: {error}")
+            logger.info(f"Level 2 failed, checking for RSS feed (Level 3): {error}")
             current_level = 3
         
-        # Try Level 3 (Headless browser)
+        # Try Level 3 (RSS feed if available)
         if current_level == 3:
-            logger.info(f"Trying Level 3 (Headless browser) for {url}")
-            content, title, error = self._crawl_level3(url, wait_time=wait_time)
+            # Check if we have RSS feed URL for this domain
+            rss_url = self._get_rss_url(url)
+            
+            if rss_url:
+                logger.info(f"Trying Level 3 (RSS feed) for {url} via {rss_url}")
+                rss_content, rss_title, rss_error, found_url = self._crawl_level3_rss(rss_url, url, vehicle_make, vehicle_model)
+                
+                if rss_content and not rss_error:
+                    logger.info(f"Level 3 (RSS) crawling successful for {url}")
+                    return rss_content, rss_title, None, found_url
+                
+                logger.info(f"Level 3 (RSS) failed, escalating to Level 4 (Headless browser): {rss_error}")
+            else:
+                logger.info(f"No RSS feed configured for {url}, escalating directly to Level 4 (Headless browser)")
+            
+            current_level = 4
+        
+        # Try Level 4 (Headless browser)
+        if current_level == 4:
+            logger.info(f"Trying Level 4 (Headless browser) for {url}")
+            content, title, error = self._crawl_level4_headless(url, wait_time=wait_time)
             
             if content and not error:
-                logger.info(f"Level 3 crawling successful for {url}")
+                logger.info(f"Level 4 (Headless) crawling successful for {url}")
                 
                 # If this is a review index page and we have vehicle information, try to find relevant article links
                 if vehicle_make and vehicle_model and self._is_review_index_page(url):
@@ -179,17 +239,6 @@ class CrawlerManager:
                         logger.warning(f"None of the potential links contained relevant content about {vehicle_make} {vehicle_model}")
                 
                 return content, title, None, actual_url
-                
-            logger.info(f"Level 3 failed, trying RSS feed (Level 4) as last resort: {error}")
-        
-        # Try Level 4 (RSS feed) as a last resort
-        if self._is_potential_rss_site(url):
-            logger.info(f"Trying RSS feed (Level 4) for {url}")
-            rss_content, rss_title, rss_error = self._try_rss_feed(url)
-            if rss_content:
-                logger.info(f"Successfully fetched content via RSS feed (Level 4): {url}")
-                return rss_content, rss_title, None, actual_url
-            logger.info(f"RSS feed approach failed: {rss_error}")
         
         # If we reach here, all levels failed
         logger.error(f"All crawling levels failed for {url}")
@@ -410,9 +459,129 @@ class CrawlerManager:
             logger.error(f"Error in Level 2 crawling: {e}")
             return None, None, str(e)
     
-    def _crawl_level3(self, url: str, wait_time: int = 5) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    def _crawl_level3_rss(self, rss_url: str, original_url: str, vehicle_make: str = None, vehicle_model: str = None) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
         """
-        Level 3: Headless browser using Playwright.
+        Level 3: Fetch content via RSS feed.
+        
+        Args:
+            rss_url: RSS feed URL
+            original_url: Original article URL (for domain matching)
+            vehicle_make: Vehicle make to search for (optional)
+            vehicle_model: Vehicle model to search for (optional)
+            
+        Returns:
+            Tuple of (content, title, error, found_url)
+        """
+        try:
+            logger.info(f"Fetching RSS feed from {rss_url}")
+            
+            response = requests.get(
+                rss_url,
+                headers=self.headers_basic,
+                timeout=15,
+                allow_redirects=True
+            )
+            
+            if response.status_code != 200:
+                return None, None, f"RSS feed HTTP error: {response.status_code}", None
+                
+            # Check if it's a valid XML
+            if not response.content or not response.content.strip():
+                return None, None, "Empty RSS feed", None
+                
+            try:
+                # Parse the RSS feed
+                soup = BeautifulSoup(response.content, 'xml')
+                
+                # If vehicle info is provided, try to find matching articles
+                if vehicle_make and vehicle_model:
+                    logger.info(f"Searching RSS feed for {vehicle_make} {vehicle_model}")
+                    
+                    # Handle both RSS and Atom formats
+                    items = soup.find_all('item') or soup.find_all('entry')
+                    
+                    for item in items:
+                        # Get title and description
+                        title = item.find('title')
+                        title_text = title.text if title else ""
+                        
+                        # Get description or content
+                        description = item.find('description') or item.find('summary') or item.find('content')
+                        description_text = description.text if description else ""
+                        
+                        # Get link
+                        link = item.find('link')
+                        link_url = link.get('href') if link and link.get('href') else link.text if link else None
+                        
+                        # Check if the item mentions our vehicle
+                        if (vehicle_make.lower() in title_text.lower() or 
+                            vehicle_model.lower() in title_text.lower() or
+                            vehicle_make.lower() in description_text.lower() or
+                            vehicle_model.lower() in description_text.lower()):
+                            
+                            logger.info(f"Found matching RSS item: {title_text}")
+                            if link_url:
+                                logger.info(f"Article URL: {link_url}")
+                            
+                            # Combine content into an HTML-like structure
+                            html_content = f"<html><head><title>{title_text}</title></head><body>"
+                            html_content += f"<h1>{title_text}</h1>"
+                            html_content += f"<div>{description_text}</div>"
+                            if link_url:
+                                html_content += f"<p><a href='{link_url}'>Read Article</a></p>"
+                            html_content += "</body></html>"
+                            
+                            return html_content, title_text, None, link_url
+                            
+                    logger.warning(f"No matching items found in RSS feed for {vehicle_make} {vehicle_model}")
+                    return None, None, "No matching items in RSS feed", None
+                    
+                else:
+                    # Without vehicle info, just return the first item or a summary
+                    channel_title = soup.find('title')
+                    channel_title_text = channel_title.text if channel_title else "RSS Feed"
+                    
+                    items = soup.find_all('item') or soup.find_all('entry')
+                    first_link_url = None
+                    
+                    # Build an HTML overview of the RSS feed
+                    html_content = f"<html><head><title>{channel_title_text}</title></head><body>"
+                    html_content += f"<h1>{channel_title_text}</h1>"
+                    
+                    for item in items[:10]:  # Limit to first 10 items
+                        item_title = item.find('title')
+                        item_title_text = item_title.text if item_title else "Untitled"
+                        
+                        link = item.find('link')
+                        link_url = link.get('href') if link and link.get('href') else link.text if link else None
+                        
+                        if link_url and not first_link_url:
+                            first_link_url = link_url
+                            
+                        html_content += f"<h2>{item_title_text}</h2>"
+                        
+                        description = item.find('description') or item.find('summary') or item.find('content')
+                        if description:
+                            html_content += f"<div>{description.text}</div>"
+                        
+                        if link_url:
+                            html_content += f"<p><a href='{link_url}'>Read Article</a></p>"
+                    
+                    html_content += "</body></html>"
+                    
+                    return html_content, channel_title_text, None, first_link_url
+                    
+            except Exception as e:
+                logger.error(f"Error parsing RSS feed: {e}")
+                return None, None, f"RSS parsing error: {e}", None
+                
+        except Exception as e:
+            logger.error(f"Error fetching RSS feed: {e}")
+            return None, None, str(e), None
+    
+    def _crawl_level4_headless(self, url: str, wait_time: int = 5) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """
+        Level 4: Headless browser using Playwright.
         
         Args:
             url: URL to crawl
@@ -422,126 +591,6 @@ class CrawlerManager:
             Tuple of (content, title, error)
         """
         return self.browser_crawler.crawl(url, wait_time=wait_time, scroll=True)
-    
-    def _is_potential_rss_site(self, url: str) -> bool:
-        """
-        Check if a site might have RSS feeds.
-        
-        Args:
-            url: URL to check
-            
-        Returns:
-            True if the site might have RSS feeds
-        """
-        # Common domains that offer RSS feeds
-        rss_domains = [
-            'motortrend.com',
-            'caranddriver.com',
-            'jalopnik.com',
-            'autoblog.com',
-            'roadandtrack.com',
-            'thedrive.com'
-        ]
-        
-        # Check if the domain is in our list
-        parsed_url = urlparse(url)
-        domain = parsed_url.netloc.lower()
-        
-        if any(rss_domain in domain for rss_domain in rss_domains):
-            return True
-            
-        return False
-    
-    def _try_rss_feed(self, url: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        """
-        Level 4: Try to get content via RSS feed.
-        
-        Args:
-            url: URL to crawl
-            
-        Returns:
-            Tuple of (content, title, error)
-        """
-        try:
-            parsed_url = urlparse(url)
-            domain_root = f"{parsed_url.scheme}://{parsed_url.netloc}"
-            
-            # Common RSS feed paths
-            rss_paths = [
-                '/rss',
-                '/feed',
-                '/feeds/rss',
-                '/feeds',
-                '/rss.xml',
-                '/feed.xml',
-                '/atom.xml',
-                '/feeds/posts/default'
-            ]
-            
-            # Try each RSS path
-            for path in rss_paths:
-                rss_url = f"{domain_root}{path}"
-                logger.info(f"Trying RSS feed at {rss_url}")
-                
-                try:
-                    response = requests.get(rss_url, headers=self.headers_basic, timeout=10)
-                    
-                    if response.status_code == 200 and ('xml' in response.headers.get('Content-Type', '')):
-                        # Parse the RSS feed
-                        try:
-                            root = ET.fromstring(response.content)
-                            
-                            # Check if it's a valid RSS feed
-                            if root.tag.endswith('rss') or root.tag.endswith('feed'):
-                                logger.info(f"Found valid RSS feed at {rss_url}")
-                                
-                                # Construct an HTML-like document from the RSS items
-                                html_content = f"<html><head><title>RSS Feed from {domain_root}</title></head><body>"
-                                
-                                # Process each item/entry
-                                items = root.findall('.//item') or root.findall('.//{http://www.w3.org/2005/Atom}entry')
-                                
-                                for item in items:
-                                    # Extract title
-                                    title_elem = item.find('title') or item.find('.//{http://www.w3.org/2005/Atom}title')
-                                    title_text = title_elem.text if title_elem is not None else "No Title"
-                                    
-                                    # Extract description/content
-                                    desc_elem = (
-                                        item.find('description') or 
-                                        item.find('content:encoded') or 
-                                        item.find('.//{http://www.w3.org/2005/Atom}content')
-                                    )
-                                    desc_text = desc_elem.text if desc_elem is not None else "No Description"
-                                    
-                                    # Extract link
-                                    link_elem = item.find('link') or item.find('.//{http://www.w3.org/2005/Atom}link')
-                                    link_text = ""
-                                    if link_elem is not None:
-                                        link_text = link_elem.text if link_elem.text else link_elem.get('href', '')
-                                    
-                                    # Add to HTML document
-                                    html_content += f"<article><h2>{title_text}</h2><p>{desc_text}</p>"
-                                    if link_text:
-                                        html_content += f"<p><a href='{link_text}'>Read More</a></p>"
-                                    html_content += "</article><hr>"
-                                
-                                html_content += "</body></html>"
-                                
-                                return html_content, f"RSS Feed from {domain_root}", None
-                        except Exception as e:
-                            logger.warning(f"Error parsing RSS feed at {rss_url}: {e}")
-                            continue
-                except Exception as e:
-                    logger.warning(f"Error fetching RSS feed at {rss_url}: {e}")
-                    continue
-            
-            logger.info(f"No valid RSS feeds found for {domain_root}")
-            return None, None, "No valid RSS feeds found"
-            
-        except Exception as e:
-            logger.error(f"Error in RSS feed processing: {e}")
-            return None, None, str(e)
     
     def close(self):
         """Close any open resources."""

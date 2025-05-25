@@ -8,16 +8,16 @@ import time
 
 # Import local modules
 from src.utils.logger import setup_logger
-from src.utils.notifications import send_slack_message
+# from src.utils.notifications import send_slack_message  # Commented out to prevent hanging
 from src.utils.youtube_handler import get_channel_id, get_latest_videos, get_transcript, extract_video_id
 from src.utils.escalation import crawling_strategy
-from src.utils.crawler_manager import CrawlerManager
+from src.utils.enhanced_crawler_manager import EnhancedCrawlerManager
 from src.analysis.gpt_analysis import analyze_clip
 
 logger = setup_logger(__name__)
 
-# Initialize the crawler manager (it will be reused for all URLs)
-crawler_manager = CrawlerManager()
+# Initialize the enhanced crawler manager (it will be reused for all URLs)
+crawler_manager = EnhancedCrawlerManager()
 
 def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -74,9 +74,9 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
         # Check if required columns exist
         required_columns = ['WO #']
         
-        # Check for model columns (might be named differently)
+        # Check for model columns (prefer Model Short Name for cleaner searches)
         model_column = None
-        model_columns = ['Model', 'Model Short Name']
+        model_columns = ['Model Short Name', 'Model']  # Prefer Short Name first!
         for col in model_columns:
             if col in df.columns:
                 model_column = col
@@ -107,7 +107,7 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
         # Process each row
         for _, row in df.iterrows():
             loan = {
-                'work_order': str(row['WO #']),
+                'work_order': str(row['WO #']).replace(',', ''),  # Ensure string and remove any commas
                 'urls': []
             }
             
@@ -133,15 +133,23 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
             
             # Add URLs only from the main URL column - we don't want internal system URLs
             if pd.notna(row[url_column]) and row[url_column]:
-                # Handle multiple URLs in one cell (semicolon-separated)
-                if isinstance(row[url_column], str) and ';' in row[url_column]:
-                    for url in row[url_column].split(';'):
-                        if url.strip() and not url.strip().startswith('https://fms.driveshop.com/'):
-                            loan['urls'].append(url.strip())
+                url_text = str(row[url_column]).strip()
+                
+                # Handle multiple URLs in one cell (both comma and semicolon-separated)
+                if ',' in url_text or ';' in url_text:
+                    # Try comma first, then semicolon
+                    separator = ',' if ',' in url_text else ';'
+                    for url in url_text.split(separator):
+                        url = url.strip()
+                        # Skip empty URLs and internal system URLs
+                        if url and not url.startswith('https://fms.driveshop.com/'):
+                            loan['urls'].append(url)
+                            logger.debug(f"Added URL: {url}")
                 else:
-                    url = str(row[url_column]).strip()
-                    if url and not url.startswith('https://fms.driveshop.com/'):
-                        loan['urls'].append(url)
+                    # Single URL
+                    if url_text and not url_text.startswith('https://fms.driveshop.com/'):
+                        loan['urls'].append(url_text)
+                        logger.debug(f"Added single URL: {url_text}")
             
             # Add additional fields that might be helpful later
             for field in ['To', 'Affiliation', 'Office']:
@@ -265,42 +273,50 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         Dictionary with article content or None if not found
     """
     try:
-        # Use the crawler manager with automatic escalation
+        # Use the enhanced crawler manager with 5-tier escalation
         logger.info(f"Processing web URL: {url}")
         
         # Get make and model for finding relevant content
         make = loan.get('make', '')
         model = loan.get('model', '')
         
-        # Increase wait time to 15 seconds for JS-heavy sites and pass make/model
-        content, title, error, actual_url = crawler_manager.crawl(
-            url, 
-            wait_time=15,
-            vehicle_make=make,
-            vehicle_model=model
+        # Get person name for caching if available
+        person_name = loan.get('to', loan.get('affiliation', ''))
+        
+        # Use the new enhanced crawler with 5-tier escalation
+        result = crawler_manager.crawl_url(
+            url=url,
+            make=make,
+            model=model,
+            person_name=person_name
         )
         
-        if error:
-            logger.warning(f"Error crawling {url}: {error}")
+        if not result['success']:
+            error_msg = result.get('error', 'Unknown error')
+            logger.warning(f"Error crawling {url}: {error_msg} (Method: {result.get('tier_used', 'Unknown')})")
             return None
             
-        if not content:
+        if not result.get('content'):
             logger.warning(f"No content retrieved from {url}")
             return None
             
-        # Use the actual URL where content was found (might be different from input URL)
-        if not actual_url:
-            actual_url = url
-            
-        logger.info(f"Using content from URL: {actual_url}")
+        # Log which tier was successful
+        tier_used = result.get('tier_used', 'Unknown')
+        cached = result.get('cached', False)
+        final_url = result.get('url', url)  # May be different if Google Search found specific article
+        
+        cache_status = " (cached)" if cached else ""
+        logger.info(f"Successfully crawled {final_url} using {tier_used}{cache_status}")
             
         # Return the processed content
         return {
-            'url': actual_url,  # Use the actual URL where content was found
+            'url': final_url,  # Use the final URL (may be specific article found by Google Search)
             'original_url': url,  # Keep the original URL for reference
-            'content': content,
+            'content': result['content'],
             'content_type': 'article',
-            'title': title or url
+            'title': result.get('title', url),
+            'tier_used': tier_used,
+            'cached': cached
         }
         
     except Exception as e:
@@ -347,10 +363,10 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             logger.warning(f"No content found for URL: {url}")
             continue
             
-        # Analyze the clip - pass the URL for proper content extraction
-        clip_url = clip_data.get('url', url)
-        logger.info(f"Analyzing content from URL: {clip_url}")
-        analysis = analyze_clip(clip_data['content'], make, model, url=clip_url)
+        # Get the actual URL where content was found
+        actual_url = clip_data.get('url', url)
+        logger.info(f"Analyzing content from URL: {actual_url}")
+        analysis = analyze_clip(clip_data['content'], make, model, url=actual_url)
         
         # Check relevance
         relevance = analysis.get('relevance_score', 0)
@@ -363,13 +379,32 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             best_clip = {
                 'WO #': work_order,
                 'Model': model,
-                'Clip URL': clip_data['url'],  # Use the actual URL where content was found
+                'Clip URL': actual_url,  # Use the actual URL where content was found (could be from RSS feed)
                 'Links': url,  # Original link from the input file
                 'Relevance Score': relevance,
                 'Sentiment': analysis.get('sentiment', 'neutral'),
                 'Summary': analysis.get('summary', ''),
                 'Brand Alignment': analysis.get('brand_alignment', False),
-                'Processed Date': datetime.now().isoformat()
+                'Processed Date': datetime.now().isoformat(),
+                # Add comprehensive GPT analysis fields
+                'Overall Score': analysis.get('overall_score', 0),
+                'Overall Sentiment': analysis.get('overall_sentiment', 'neutral'),
+                'Recommendation': analysis.get('recommendation', ''),
+                'Key Mentions': str(analysis.get('key_mentions', [])),  # Convert array to string for CSV
+                # Aspect scores
+                'Performance Score': analysis.get('aspects', {}).get('performance', {}).get('score', 0),
+                'Performance Note': analysis.get('aspects', {}).get('performance', {}).get('note', ''),
+                'Design Score': analysis.get('aspects', {}).get('exterior_design', {}).get('score', 0),
+                'Design Note': analysis.get('aspects', {}).get('exterior_design', {}).get('note', ''),
+                'Interior Score': analysis.get('aspects', {}).get('interior_comfort', {}).get('score', 0),
+                'Interior Note': analysis.get('aspects', {}).get('interior_comfort', {}).get('note', ''),
+                'Technology Score': analysis.get('aspects', {}).get('technology', {}).get('score', 0),
+                'Technology Note': analysis.get('aspects', {}).get('technology', {}).get('note', ''),
+                'Value Score': analysis.get('aspects', {}).get('value', {}).get('score', 0),
+                'Value Note': analysis.get('aspects', {}).get('value', {}).get('note', ''),
+                # Pros and cons as pipe-separated strings for CSV compatibility
+                'Pros': ' | '.join(analysis.get('pros', [])),
+                'Cons': ' | '.join(analysis.get('cons', []))
             }
             
             # Add additional fields from loan if present
@@ -419,7 +454,10 @@ def save_results(results: List[Dict[str, Any]], output_file: str) -> bool:
                 writer = csv.writer(f)
                 writer.writerow(['WO #', 'Model', 'To', 'Affiliation', 'Clip URL', 'Links', 
                                 'Relevance Score', 'Sentiment', 'Summary', 'Brand Alignment', 
-                                'Processed Date'])
+                                'Processed Date', 'Overall Score', 'Overall Sentiment', 'Recommendation',
+                                'Key Mentions', 'Performance Score', 'Performance Note', 'Design Score',
+                                'Design Note', 'Interior Score', 'Interior Note', 'Technology Score',
+                                'Technology Note', 'Value Score', 'Value Note', 'Pros', 'Cons'])
             return True
         
         # Convert to DataFrame for easier CSV handling
@@ -458,7 +496,7 @@ def run_ingest(input_file: str, output_file: Optional[str] = None) -> bool:
         
         if not loans:
             logger.error(f"No loans data loaded from {input_file}")
-            send_slack_message(f"❌ Clip Tracking: Failed to load loans data from {input_file}")
+            # send_slack_message(f"❌ Clip Tracking: Failed to load loans data from {input_file}")
             return False
         
         # Process each loan
@@ -474,16 +512,16 @@ def run_ingest(input_file: str, output_file: Optional[str] = None) -> bool:
             message = (f"✅ Clip Tracking: Processed {len(loans)} loans, found {len(results)} clips "
                       f"in {elapsed_time:.1f} seconds")
             logger.info(message)
-            send_slack_message(message)
+            # send_slack_message(message)
             return True
         else:
-            send_slack_message(f"❌ Clip Tracking: Failed to save results to {output_file}")
+            # send_slack_message(f"❌ Clip Tracking: Failed to save results to {output_file}")
             return False
             
     except Exception as e:
         error_message = f"❌ Clip Tracking: Error during ingestion: {e}"
         logger.error(error_message)
-        send_slack_message(error_message)
+        # send_slack_message(error_message)
         return False
     finally:
         # Clean up resources

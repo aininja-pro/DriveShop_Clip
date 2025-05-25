@@ -1,14 +1,17 @@
-domain,name,js_mode,notes
-www.motortrend.com,MotorTrend,true,Heavy JavaScript site with dynamic content loading
-www.caranddriver.com,Car and Driver,true,Reviews load via JavaScript
-www.autoblog.com,AutoBlog,false,Basic content is accessible without JavaScript
-www.edmunds.com,Edmunds,true,Dynamic content site
-www.tfltruck.com,TFL Truck,false,Basic content is accessible without JavaScript
-www.kbb.com,Kelley Blue Book,true,Price data loads dynamically
-www.carfax.com,Carfax,true,Vehicle history data loads via API calls
-www.automobilemag.com,Automobile Magazine,false,Article content loads without JavaScript
-www.jalopnik.com,Jalopnik,false,Basic article content is static
-www.roadandtrack.com,Road & Track,true,Image galleries and some content load dynamically
-www.thedrive.com,The Drive,false,Article content is accessible without JavaScript
-www.cnet.com,CNET,true,Review sections load dynamically
-www.youtube.com,YouTube,true,Video content requires JavaScript 
+domain,name,js_mode,force_js,selector_title,selector_date,selector_content,active,rss_url,notes
+motortrend.com,MotorTrend,true,true,h1,span.date,article,true,,Always requires Playwright - no RSS feed available
+caranddriver.com,Car and Driver,true,false,h1.title,span.date,div.article-body,true,https://www.caranddriver.com/rss/all.xml,Reviews load via JavaScript but can escalate
+roadandtrack.com,Road & Track,true,false,h1,time,div.article-body,true,https://www.roadandtrack.com/rss/all.xml,Image galleries load dynamically
+jalopnik.com,Jalopnik,true,false,h1,time,div.js_post-content,true,https://jalopnik.com/rss,Often JS heavy but can try basic first
+thedrive.com,The Drive,true,false,h1,time,div.article-content,true,https://www.thedrive.com/feed,Modern site with JS loading
+autoblog.com,AutoBlog,false,false,h1,span.time,div.article-content,true,,Basic content accessible without JavaScript
+autoweek.com,Autoweek,false,false,h1,time,div.article-content,true,,Usually works with basic crawling
+edmunds.com,Edmunds,true,false,h1,div.publish-date,section.article-content,true,,Dynamic content site
+kbb.com,Kelley Blue Book,true,false,h1,div.publish-date,div.article-content,true,,Price data loads dynamically
+cnet.com,CNET,true,false,h1,time,div.article-main-body,true,,Review sections load dynamically
+youtube.com,YouTube,true,true,h1,span.date,div.content,true,,Video content requires JavaScript - handled separately
+www.carfax.com,Carfax,true,false,h1,div.date,div.article,true,,Vehicle history data loads via API calls
+www.automobilemag.com,Automobile Magazine,false,false,h1,time,div.content-article,true,,Article content loads without JavaScript
+www.tfltruck.com,TFL Truck,false,false,h1.entry-title,time.entry-date,div.entry-content,true,,Basic content is accessible without JavaScript
+www.cnet.com,CNET,true,false,h1,time,div.article-main-body,true,,Review sections load dynamically
+www.youtube.com,YouTube,true,false,h1,span.date,div.content,true,,Video content requires JavaScript,false 

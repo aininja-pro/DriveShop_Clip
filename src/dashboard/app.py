@@ -66,6 +66,63 @@ st.set_page_config(
 # Main application
 st.title("DriveShop Clip Tracking Dashboard")
 
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    /* Reduce font sizes for metrics */
+    .metric-container {
+        font-size: 0.8rem;
+    }
+    
+    /* Compact metric styling */
+    div[data-testid="metric-container"] {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        margin: 0.1rem 0;
+    }
+    
+    div[data-testid="metric-container"] > div {
+        font-size: 0.75rem;
+    }
+    
+    div[data-testid="metric-container"] > div:first-child {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #6c757d;
+    }
+    
+    /* Compact expander styling */
+    .streamlit-expanderHeader {
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    
+    /* Smaller buttons */
+    .stButton > button {
+        height: 2.5rem;
+        font-size: 0.85rem;
+    }
+    
+    /* Compact dataframe */
+    .dataframe {
+        font-size: 0.8rem;
+    }
+    
+    /* Reduce spacing in columns */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    
+    /* Make selectbox more compact */
+    .stSelectbox > div > div {
+        font-size: 0.85rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Debug section
 with st.expander("Debug Information", expanded=False):
     st.write("App is running")
@@ -80,6 +137,10 @@ with st.expander("Debug Information", expanded=False):
             st.write(f"Results file contains {len(df)} rows")
             st.write("Columns in results file:")
             st.write(df.columns.tolist())
+            
+            # Ensure WO # is treated as string to avoid comma formatting
+            if 'WO #' in df.columns:
+                df['WO #'] = df['WO #'].astype(str)
             
             # Show first row as an example
             if not df.empty:
@@ -133,6 +194,10 @@ with tab1:
         try:
             df = pd.read_csv(results_file)
             
+            # Ensure WO # is treated as string to avoid comma formatting
+            if 'WO #' in df.columns:
+                df['WO #'] = df['WO #'].astype(str)
+            
             if not df.empty:
                 # Display the data in a table - use columns that exist in the file
                 display_columns = ["WO #", "Model", "To", "Affiliation"]
@@ -163,71 +228,140 @@ with tab1:
                     if selected_wo:
                         selected_row = df[df["WO #"] == selected_wo].iloc[0]
                         
-                        col1, col2 = st.columns([1, 1])
+                        # Header section with key info
+                        st.markdown(f"### {selected_row.get('Model', 'Unknown Model')}")
                         
-                        with col1:
-                            st.subheader(f"{selected_row.get('Model', 'Unknown Model')}")
+                        # Basic info in a compact row
+                        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
+                        with info_col1:
+                            st.markdown(f"**Media Contact:** {selected_row.get('To', 'N/A')}")
+                        with info_col2:
+                            st.markdown(f"**Publication:** {selected_row.get('Affiliation', 'N/A')}")
+                        with info_col3:
+                            if 'Clip URL' in selected_row:
+                                st.markdown(f"**[📄 Review Link]({selected_row['Clip URL']})**")
+                        with info_col4:
+                            if 'Links' in selected_row:
+                                st.markdown(f"**[🔗 Original]({selected_row['Links']})**")
+                        
+                        st.divider()
+                        
+                        # Key scores in a prominent row
+                        score_col1, score_col2, score_col3, score_col4 = st.columns(4)
+                        with score_col1:
+                            overall_score = selected_row.get('Overall Score', 'N/A')
+                            st.metric("📊 Overall Score", f"{overall_score}/10" if overall_score != 'N/A' else 'N/A')
+                        with score_col2:
+                            relevance_score = selected_row.get('Relevance Score', 'N/A')
+                            st.metric("🎯 Relevance", f"{relevance_score}/10" if relevance_score != 'N/A' else 'N/A')
+                        with score_col3:
+                            sentiment = selected_row.get('Sentiment', 'N/A')
+                            sentiment_emoji = "😊" if sentiment == "positive" else "😐" if sentiment == "neutral" else "😞"
+                            st.metric("💭 Sentiment", f"{sentiment_emoji} {sentiment.title()}" if sentiment != 'N/A' else 'N/A')
+                        with score_col4:
+                            alignment = selected_row.get('Brand Alignment', False)
+                            st.metric("🎨 Brand Fit", "✅ Yes" if alignment else "❌ No")
+                        
+                        # Decision buttons in a prominent position
+                        st.markdown("#### 📋 Review Decision")
+                        decision_col1, decision_col2, decision_col3 = st.columns([1, 1, 2])
+                        with decision_col1:
+                            if st.button("✅ Approve Clip", key=f"approve_{selected_wo}", use_container_width=True):
+                                # Logic to move to approved list
+                                st.success(f"Clip for WO #{selected_wo} approved!")
+                                
+                                # Try to load or create approved clips file
+                                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                                
+                                if os.path.exists(approved_file):
+                                    approved_df = pd.read_csv(approved_file)
+                                    # Check if this WO is already in the approved list
+                                    if "WO #" in approved_df.columns and selected_wo not in approved_df["WO #"].values:
+                                        approved_df = pd.concat([approved_df, pd.DataFrame([selected_row])], ignore_index=True)
+                                else:
+                                    approved_df = pd.DataFrame([selected_row])
+                                
+                                # Save the updated approved clips
+                                approved_df.to_csv(approved_file, index=False)
+                                
+                                # Rerun the app to update the UI
+                                st.rerun()
+                        with decision_col2:
+                            if st.button("❌ Flag for Review", key=f"flag_{selected_wo}", use_container_width=True):
+                                st.warning(f"Clip for WO #{selected_wo} flagged for review")
+                        with decision_col3:
+                            rec = selected_row.get('Recommendation', '')
+                            if rec:
+                                if 'would recommend' in rec.lower():
+                                    st.info("🤖 **AI Recommendation:** 👍 Recommend")
+                                elif 'would not recommend' in rec.lower():
+                                    st.info("🤖 **AI Recommendation:** 👎 Not Recommend")
+                                else:
+                                    st.info("🤖 **AI Recommendation:** 🤔 Consider")
+                        
+                        # Detailed analysis in organized sections
+                        with st.expander("📈 Detailed Aspect Scores", expanded=True):
+                            aspect_col1, aspect_col2, aspect_col3, aspect_col4, aspect_col5 = st.columns(5)
                             
-                            # Display various fields if they exist
-                            for field, label in [
-                                ('To', 'Media Contact'),
-                                ('Affiliation', 'Publication'),
-                                ('Clip URL', 'Clip URL'),
-                                ('Links', 'Original Link'),
-                            ]:
-                                if field in selected_row:
-                                    st.write(f"**{label}:** {selected_row[field]}")
+                            aspects = [
+                                ('Performance Score', 'Performance Note', '🏎️ Performance', aspect_col1),
+                                ('Design Score', 'Design Note', '🎨 Design', aspect_col2),
+                                ('Interior Score', 'Interior Note', '🪑 Interior', aspect_col3),
+                                ('Technology Score', 'Technology Note', '💻 Technology', aspect_col4),
+                                ('Value Score', 'Value Note', '💰 Value', aspect_col5)
+                            ]
                             
-                            # Decision buttons
-                            approval_col1, approval_col2 = st.columns(2)
-                            with approval_col1:
-                                if st.button("✅ Approve Clip", key=f"approve_{selected_wo}"):
-                                    # Logic to move to approved list
-                                    st.success(f"Clip for WO #{selected_wo} approved!")
-                                    
-                                    # Try to load or create approved clips file
-                                    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                                    
-                                    if os.path.exists(approved_file):
-                                        approved_df = pd.read_csv(approved_file)
-                                        # Check if this WO is already in the approved list
-                                        if "WO #" in approved_df.columns and selected_wo not in approved_df["WO #"].values:
-                                            approved_df = pd.concat([approved_df, pd.DataFrame([selected_row])], ignore_index=True)
+                            for score_field, note_field, label, col in aspects:
+                                with col:
+                                    score = selected_row.get(score_field, 0)
+                                    note = selected_row.get(note_field, '')
+                                    if score and score != 0:
+                                        st.metric(label, f"{score}/10", help=note if note else None)
                                     else:
-                                        approved_df = pd.DataFrame([selected_row])
-                                    
-                                    # Save the updated approved clips
-                                    approved_df.to_csv(approved_file, index=False)
-                                    
-                                    # Rerun the app to update the UI
-                                    st.rerun()
-                            
-                            with approval_col2:
-                                if st.button("❌ Flag for Review", key=f"flag_{selected_wo}"):
-                                    st.warning(f"Clip for WO #{selected_wo} flagged for review")
+                                        st.metric(label, "N/A")
                         
-                        with col2:
-                            st.subheader("AI Analysis")
-                            
-                            # Display various analysis fields if they exist
-                            for field, label, suffix in [
-                                ('Relevance Score', 'Relevance Score', '/10'),
-                                ('Sentiment', 'Sentiment', ''),
-                            ]:
-                                if field in selected_row:
-                                    st.metric(label, f"{selected_row.get(field, 'N/A')}{suffix}")
-                            
-                            # Display summary if it exists
-                            if 'Summary' in selected_row:
-                                st.subheader("Summary")
-                                st.write(selected_row['Summary'])
-                            else:
-                                st.info("No AI summary available yet")
-                            
-                            # Display brand alignment if it exists
-                            if 'Brand Alignment' in selected_row:
-                                st.subheader("Brand Alignment")
-                                st.write(selected_row['Brand Alignment'])
+                        # Summary section
+                        if 'Summary' in selected_row and selected_row['Summary']:
+                            with st.expander("📝 AI Summary", expanded=True):
+                                st.markdown(f"*{selected_row['Summary']}*")
+                        
+                        # Pros and Cons in a clean layout
+                        pros_text = selected_row.get('Pros', '')
+                        cons_text = selected_row.get('Cons', '')
+                        if pros_text or cons_text:
+                            with st.expander("⚖️ Pros & Cons Analysis", expanded=False):
+                                pros_col, cons_col = st.columns(2)
+                                
+                                with pros_col:
+                                    st.markdown("**✅ Strengths**")
+                                    if pros_text and pros_text.strip():
+                                        pros_list = [p.strip() for p in pros_text.split('|') if p.strip()]
+                                        for pro in pros_list:
+                                            st.markdown(f"• {pro}")
+                                    else:
+                                        st.markdown("*No specific strengths highlighted*")
+                                
+                                with cons_col:
+                                    st.markdown("**❌ Areas for Improvement**")
+                                    if cons_text and cons_text.strip():
+                                        cons_list = [c.strip() for c in cons_text.split('|') if c.strip()]
+                                        for con in cons_list:
+                                            st.markdown(f"• {con}")
+                                    else:
+                                        st.markdown("*No specific concerns noted*")
+                        
+                        # Key Mentions section
+                        key_mentions = selected_row.get('Key Mentions', '')
+                        if key_mentions and key_mentions != '[]':
+                            with st.expander("🔑 Key Features Mentioned", expanded=False):
+                                try:
+                                    import ast
+                                    mentions_list = ast.literal_eval(key_mentions)
+                                    if mentions_list:
+                                        mentions_str = ", ".join([f"`{mention}`" for mention in mentions_list])
+                                        st.markdown(mentions_str)
+                                except:
+                                    st.markdown(f"`{key_mentions}`")
             else:
                 st.info("No pending clips to review. Upload a CSV file or process existing data.")
         
@@ -245,6 +379,10 @@ with tab2:
     if os.path.exists(approved_file):
         try:
             approved_df = pd.read_csv(approved_file)
+            
+            # Ensure WO # is treated as string to avoid comma formatting
+            if 'WO #' in approved_df.columns:
+                approved_df['WO #'] = approved_df['WO #'].astype(str)
             
             if not approved_df.empty:
                 # Display the approved clips - use columns that exist in the file
