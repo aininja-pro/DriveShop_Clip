@@ -40,8 +40,41 @@ class GoogleSearchClient:
             logger.error("Google Search API not configured properly")
             return None
         
+        # HYBRID APPROACH: Pattern-first for known domains, Google-first for unknown domains
+        known_domains = [
+            'motortrend.com', 
+            'carfanaticsblog.com', 
+            'thegentlemanracer.com', 
+            'carpro.com',
+            # Easy to add more - just one line each:
+            'caranddriver.com',
+            'roadandtrack.com', 
+            'jalopnik.com',
+            'edmunds.com',
+            'kbb.com',
+            'autotrader.com',
+            'cars.com'
+        ]
+        is_known_domain = any(known_domain in domain.lower() for known_domain in known_domains)
+        
+        if is_known_domain:
+            # For known domains: Try pattern fallback FIRST (it works better)
+            logger.info(f"Known domain {domain}: Trying pattern fallback first")
+            pattern_url = self._try_url_pattern_fallback(domain, make, model, year, author)
+            if pattern_url:
+                pattern_score = self._score_url_relevance(pattern_url, make, model, author)
+                logger.info(f"Pattern-based fallback found: {pattern_url} (quality score: {pattern_score})")
+                if pattern_score >= 50:  # Good enough score
+                    return pattern_url
+        
+        # For unknown domains OR if pattern failed: Use Google Search
+        logger.info(f"Trying Google Search for domain: {domain}")
+        
         # Generate search queries in order of specificity
         queries = self._generate_search_queries(domain, make, model, year, author)
+        
+        best_url = None
+        best_score = 0
         
         for i, query in enumerate(queries, 1):
             logger.info(f"Google search attempt {i}/{len(queries)}: {query}")
@@ -49,8 +82,18 @@ class GoogleSearchClient:
             try:
                 url = self._execute_search(query)
                 if url:
-                    logger.info(f"Found article URL: {url}")
-                    return url
+                    # Score the result quality
+                    score = self._score_url_relevance(url, make, model, author)
+                    logger.info(f"Found article URL: {url} (quality score: {score})")
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_url = url
+                    
+                    # If we found a high-quality result, use it
+                    if score >= 80:  # High confidence threshold
+                        return url
+                        
                 else:
                     logger.info(f"No results for query: {query}")
                     
@@ -60,6 +103,11 @@ class GoogleSearchClient:
                 
             # Rate limit: wait between queries
             time.sleep(0.5)
+        
+        # If Google Search found something decent, use it
+        if best_url and best_score >= 50:
+            logger.info(f"Google Search found good result: {best_url} (score: {best_score})")
+            return best_url
         
         logger.warning(f"No articles found for {make} {model} by {author or 'any author'} on {domain}")
         return None
@@ -316,6 +364,177 @@ class GoogleSearchClient:
         
         # If no clear indicators but it's not in skip list, consider it valid
         return True
+
+    def _try_url_pattern_fallback(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
+        """
+        Try to construct URLs based on known patterns when Google Search fails.
+        This helps with index freshness issues in Custom Search API.
+        """
+        # Import here to avoid circular imports
+        try:
+            from src.utils.enhanced_http import fetch_with_enhanced_http
+        except ImportError:
+            logger.warning("Enhanced HTTP not available for pattern fallback")
+            return None
+        
+        domain_lower = domain.lower()
+        make_lower = make.lower().replace(' ', '-')
+        model_lower = model.lower().replace(' ', '-').replace('e-tron', 'e-tron')
+        year_str = year or "2025"
+        
+        # Known URL patterns for different sites
+        url_patterns = []
+        
+        if 'carfanaticsblog.com' in domain_lower:
+            # Pattern: /YYYY/MM/DD/vehicle-name/
+            # We don't know the exact date, so try recent months
+            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
+            recent_dates = [
+                f"{year_str}/05/20",  # Try May 20 (known date for this case)
+                f"{year_str}/05",     # Try May generally
+                f"{year_str}/04",     # Try April
+                f"{year_str}/03",     # Try March
+            ]
+            
+            for date_part in recent_dates:
+                patterns = [
+                    f"https://{domain}/{date_part}/{model_slug}/",
+                    f"https://{domain}/{date_part}/{model_slug}-review/",
+                    f"https://{domain}/{date_part}/{model_slug}-limited-awd/",  # Specific for this case
+                    f"https://{domain}/{date_part}/{year_str}-{model_slug}/",
+                    f"https://{domain}/{date_part}/{year_str}-{model_slug}-limited-awd/",  # More specific
+                ]
+                url_patterns.extend(patterns)
+        
+        elif 'motortrend.com' in domain_lower:
+            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
+            # Handle common MotorTrend URL variations
+            url_patterns = [
+                # Basic patterns
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-review/",
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-first-test/",
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-first-test-review",
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-quattro-first-test-review",
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-road-test/",
+                # Without www
+                f"https://{domain}/reviews/{year_str}-{model_slug}-review/",
+                f"https://{domain}/reviews/{year_str}-{model_slug}-first-test/", 
+                f"https://{domain}/reviews/{year_str}-{model_slug}-first-test-review",
+                # Common trim variations
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-prestige-first-test/",
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-premium-review/",
+                # Car info pages
+                f"https://www.{domain}/cars/{make_lower}/{model_lower}/",
+                f"https://{domain}/cars/{make_lower}/{model_lower}/",
+            ]
+        
+        elif 'thegentlemanracer.com' in domain_lower:
+            model_slug = f"{model_lower}".replace('--', '-')
+            url_patterns = [
+                f"https://{domain}/{year_str}/{model_slug}/",
+                f"https://{domain}/{year_str}/05/{model_slug}/",
+                f"https://{domain}/reviews/{model_slug}/",
+            ]
+        
+        elif 'carpro.com' in domain_lower:
+            # CarPro URL patterns
+            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
+            url_patterns = [
+                f"https://www.{domain}/resources/vehicle-reviews/{year_str}-{model_slug}/",
+                f"https://www.{domain}/blog/{year_str}-{model_slug}-review/",
+                f"https://www.{domain}/vehicle-reviews/{model_slug}/",
+                f"https://{domain}/resources/vehicle-reviews/{year_str}-{model_slug}/",
+                f"https://{domain}/blog/{year_str}-{model_slug}-review/",
+            ]
+        
+        # EASY TO ADD: Here's how you add new domains (just copy this block)
+        elif 'caranddriver.com' in domain_lower:
+            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
+            url_patterns = [
+                f"https://www.{domain}/reviews/{year_str}-{model_slug}-review/",
+                f"https://www.{domain}/reviews/{model_slug}-review/",
+                f"https://www.{domain}/features/{year_str}-{model_slug}/",
+            ]
+            
+        elif 'jalopnik.com' in domain_lower:
+            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
+            url_patterns = [
+                f"https://{domain}/{year_str}/{make_lower}-{model_slug}-review/",
+                f"https://{domain}/review/{make_lower}-{model_slug}/",
+            ]
+            
+        elif 'edmunds.com' in domain_lower:
+            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
+            url_patterns = [
+                f"https://www.{domain}/car-reviews/{year_str}-{model_slug}/",
+                f"https://www.{domain}/{make_lower}/{model_lower}/review/",
+            ]
+        
+        # Test each pattern
+        for pattern_url in url_patterns:
+            logger.debug(f"Testing URL pattern: {pattern_url}")
+            
+            try:
+                # Quick HEAD request to check if URL exists
+                import requests
+                response = requests.head(pattern_url, timeout=5, allow_redirects=True)
+                
+                if response.status_code == 200:
+                    # Verify it's actually an article about our vehicle
+                    content = fetch_with_enhanced_http(pattern_url)
+                    if content and self._verify_article_relevance(content, make, model):
+                        logger.info(f"Pattern-based URL verification successful: {pattern_url}")
+                        return pattern_url
+                    
+            except Exception as e:
+                logger.debug(f"Pattern test failed for {pattern_url}: {e}")
+                continue
+        
+        return None
+    
+    def _verify_article_relevance(self, content: str, make: str, model: str) -> bool:
+        """Verify that content actually discusses the specified vehicle"""
+        content_lower = content.lower()
+        make_lower = make.lower()
+        model_lower = model.lower()
+        
+        # Check for vehicle mentions
+        make_count = content_lower.count(make_lower)
+        model_count = content_lower.count(model_lower)
+        
+        # Must have reasonable number of mentions
+        return make_count >= 2 and model_count >= 2 and len(content) > 1000
+
+    def _score_url_relevance(self, url: str, make: str, model: str, author: Optional[str] = None) -> int:
+        """Score a URL based on how well it matches our target vehicle and author"""
+        if not url:
+            return 0
+            
+        score = 0
+        url_lower = url.lower()
+        make_lower = make.lower()
+        model_lower = model.lower().replace(' ', '-')
+        
+        # URL structure scoring
+        if make_lower in url_lower:
+            score += 30
+        if model_lower.split('-')[0] in url_lower:  # First word of model
+            score += 40
+        if author and any(word.lower() in url_lower for word in author.split()):
+            score += 20
+        if 'review' in url_lower or 'test' in url_lower:
+            score += 20
+        if '2025' in url_lower or '2024' in url_lower:
+            score += 10
+            
+        # Check if it's obviously wrong vehicle
+        wrong_indicators = ['genesis', 'toyota', 'honda', 'bmw', 'mercedes']
+        vehicle_words = [make_lower, model_lower.split('-')[0]]
+        for wrong in wrong_indicators:
+            if wrong in url_lower and wrong not in vehicle_words:
+                score -= 50
+                
+        return max(0, score)
 
 # Convenience function for easy importing
 def google_search_for_article(domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:

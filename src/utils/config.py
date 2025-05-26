@@ -19,7 +19,9 @@ GENERIC_INDEX_PATTERNS = [
     "/reviews",
     "/road-tests", 
     "/first-drives",
-    "/test-drives"
+    "/test-drives",
+    "/resources/vehicle-reviews",  # For carpro.com
+    "/category/news/reviews/"      # For carfanaticsblog.com (already working but for completeness)
 ]
 
 # Additional patterns for content discovery
