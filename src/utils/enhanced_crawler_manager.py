@@ -1,11 +1,12 @@
 """
-Enhanced Crawler Manager with OPTIMIZED 5-Tier Escalation System
+Enhanced Crawler Manager with CLEAN 4-Tier Escalation System
 
 Tier 1: Google Search API (find specific articles from index pages)
-Tier 2: Enhanced HTTP (browser-like headers - FREE & FAST) 
-Tier 3: ScrapingBee API (JS-heavy domains - only when HTTP fails)
-Tier 4: RSS Feed (if available)
-Tier 5: Playwright Headless (last resort)
+Tier 2: Enhanced HTTP (browser-like headers - FREE & FAST) + CONTENT QUALITY CHECK
+Tier 3: ScrapingBee API (when Enhanced HTTP fails OR returns generic content)
+Tier 4: Original Crawler (RSS + Playwright as last resort)
+
+CLEAN AND SIMPLE: try each tier until one succeeds with QUALITY content.
 """
 
 import logging
@@ -23,7 +24,7 @@ from .crawler_manager import CrawlerManager  # Original crawler for tiers 4-5
 logger = logging.getLogger(__name__)
 
 class EnhancedCrawlerManager:
-    """Enhanced crawler with optimized 5-tier escalation including Google Search, Enhanced HTTP, and ScrapingBee"""
+    """Enhanced crawler with clean 4-tier escalation including Google Search, Enhanced HTTP, and ScrapingBee"""
     
     def __init__(self):
         self.google_search = GoogleSearchClient()
@@ -77,9 +78,79 @@ class EnhancedCrawlerManager:
             logger.error(f"Error parsing URL {url}: {e}")
             return False
         
+    def is_generic_content(self, content: str, url: str, make: str, model: str) -> bool:
+        """Detect if content is a generic index page vs specific article"""
+        if not content:
+            return True
+            
+        content_lower = content.lower()
+        make_lower = make.lower()
+        model_lower = model.lower()
+        
+        # Check if content mentions the specific make/model we're looking for
+        make_found = make_lower in content_lower
+        model_found = model_lower in content_lower
+        
+        # If neither make nor model is found, it's likely generic content
+        if not make_found and not model_found:
+            logger.info(f"Generic content detected: {make} {model} not found in content")
+            return True
+            
+        # Check for generic index page indicators
+        generic_indicators = [
+            'car reviews</title>',
+            'vehicle reviews</title>',
+            'latest reviews',
+            'recent reviews', 
+            'all reviews',
+            'review archive',
+            'browse reviews',
+            'car review',
+            'vehicle review'
+        ]
+        
+        title_indicators_found = sum(1 for indicator in generic_indicators if indicator in content_lower)
+        
+        # Check for specific article indicators
+        specific_indicators = [
+            f'{make_lower} {model_lower}',
+            f'review: {make_lower}',
+            f'test drive',
+            f'first drive', 
+            f'road test',
+            f'{model_lower} review'
+        ]
+        
+        specific_indicators_found = sum(1 for indicator in specific_indicators if indicator in content_lower)
+        
+        # If we have generic indicators but no specific ones, it's probably an index page
+        if title_indicators_found >= 2 and specific_indicators_found == 0:
+            logger.info(f"Generic content detected: {title_indicators_found} generic indicators, {specific_indicators_found} specific indicators")
+            return True
+            
+        # Check URL patterns for generic pages
+        url_lower = url.lower()
+        generic_url_patterns = [
+            '/reviews',
+            '/car-reviews', 
+            '/vehicle-reviews',
+            '/review-archive',
+            '/latest-reviews'
+        ]
+        
+        is_generic_url = any(pattern in url_lower for pattern in generic_url_patterns)
+        
+        # If URL is generic and content doesn't strongly indicate a specific article
+        if is_generic_url and specific_indicators_found < 2:
+            logger.info(f"Generic content detected: generic URL pattern and only {specific_indicators_found} specific indicators")
+            return True
+            
+        logger.info(f"Content appears specific: {specific_indicators_found} specific indicators found")
+        return False
+
     def crawl_url(self, url: str, make: str, model: str, person_name: str = "") -> Dict[str, Any]:
         """
-        OPTIMIZED crawling with 5-tier escalation
+        CLEAN 4-tier escalation system with CONTENT QUALITY DETECTION
         
         Returns: {
             'success': bool,
@@ -119,21 +190,21 @@ class EnhancedCrawlerManager:
             
             # Extract domain from URL
             parsed_url = urlparse(url)
-            domain = parsed_url.netloc.lower().replace('www.', '')
+            domain_clean = parsed_url.netloc.lower().replace('www.', '')
             
             # Try to find a specific article using Google Search
             specific_url = self.google_search.search_for_article(
-                domain=domain,
+                domain=domain_clean,
                 make=make,
                 model=model,
-                year=None,  # Don't hardcode year
-                author=person_name  # Pass the author name from the "To" field!
+                year=None,
+                author=person_name
             )
             
             if specific_url and specific_url != url:
                 logger.info(f"Tier 1 Success: Google Search found specific article: {specific_url}")
                 
-                # Now crawl the specific article we found using optimized tiers
+                # Now crawl the specific article we found
                 article_result = self._crawl_specific_url(specific_url, make, model)
                 
                 if article_result['success']:
@@ -153,44 +224,20 @@ class EnhancedCrawlerManager:
                     )
                     return result
                     
-        # Tier 2: Enhanced HTTP (NEW - try this before ScrapingBee)
+        # Tier 2: Enhanced HTTP (fast and free) + QUALITY CHECK
         logger.info(f"Tier 2: Trying Enhanced HTTP for {url}")
         
         http_content = self.enhanced_http.fetch_url(url)
         if http_content:
-            logger.info(f"Tier 2 Success: Enhanced HTTP crawled {url}")
-            result = {
-                'success': True,
-                'content': http_content,
-                'title': 'Enhanced HTTP Result',
-                'url': url,
-                'tier_used': 'Tier 2: Enhanced HTTP',
-                'cached': False
-            }
-            # Cache the result
-            self.cache_manager.store_result(
-                person_id=person_name or "unknown",
-                domain=domain,
-                make=make,
-                model=model,
-                url=url,
-                content=http_content
-            )
-            return result
-                
-        # Tier 3: ScrapingBee API (moved down - only when Enhanced HTTP fails)
-        if self.should_use_scraping_bee(url):
-            logger.info(f"Tier 3: Enhanced HTTP failed, trying ScrapingBee for {url}")
-            
-            bee_content = self.scraping_bee.scrape_url(url)
-            if bee_content:
-                logger.info(f"Tier 3 Success: ScrapingBee crawled {url}")
+            # Check if the content is actually useful or just generic
+            if not self.is_generic_content(http_content, url, make, model):
+                logger.info(f"Tier 2 Success: Enhanced HTTP found SPECIFIC content for {url}")
                 result = {
                     'success': True,
-                    'content': bee_content,
-                    'title': 'ScrapingBee Result',
+                    'content': http_content,
+                    'title': 'Enhanced HTTP Result',
                     'url': url,
-                    'tier_used': 'Tier 3: ScrapingBee',
+                    'tier_used': 'Tier 2: Enhanced HTTP',
                     'cached': False
                 }
                 # Cache the result
@@ -200,12 +247,39 @@ class EnhancedCrawlerManager:
                     make=make,
                     model=model,
                     url=url,
-                    content=bee_content
+                    content=http_content
                 )
                 return result
+            else:
+                logger.info(f"Tier 2: Enhanced HTTP got GENERIC content, escalating to ScrapingBee")
                 
-        # Tiers 4-5: Fall back to original crawler (RSS + Playwright)
-        logger.info(f"Tiers 4-5: Enhanced HTTP and ScrapingBee failed, using original crawler for {url}")
+        # Tier 3: ScrapingBee (when Enhanced HTTP fails OR returns generic content)
+        logger.info(f"Tier 3: Trying ScrapingBee for {url}")
+        
+        bee_content = self.scraping_bee.scrape_url(url)
+        if bee_content:
+            logger.info(f"Tier 3 Success: ScrapingBee crawled {url}")
+            result = {
+                'success': True,
+                'content': bee_content,
+                'title': 'ScrapingBee Result',
+                'url': url,
+                'tier_used': 'Tier 3: ScrapingBee',
+                'cached': False
+            }
+            # Cache the result
+            self.cache_manager.store_result(
+                person_id=person_name or "unknown",
+                domain=domain,
+                make=make,
+                model=model,
+                url=url,
+                content=bee_content
+            )
+            return result
+                
+        # Tier 4: Original crawler (RSS + Playwright as last resort)
+        logger.info(f"Tier 4: Enhanced HTTP and ScrapingBee failed, using original crawler for {url}")
         
         # Original crawler returns (content, title, error, actual_url)
         content, title, error, actual_url = self.original_crawler.crawl(
@@ -222,7 +296,7 @@ class EnhancedCrawlerManager:
                 'content': content,
                 'title': title or 'Unknown Title',
                 'url': actual_url or url,
-                'tier_used': f"Tier 4-5: Original Crawler",
+                'tier_used': f"Tier 4: Original Crawler",
                 'cached': False
             }
             # Cache the result
@@ -248,36 +322,39 @@ class EnhancedCrawlerManager:
         }
         
     def _crawl_specific_url(self, url: str, make: str, model: str) -> Dict[str, Any]:
-        """Crawl a specific URL using OPTIMIZED tier order"""
+        """Crawl a specific URL using OPTIMIZED tier order with CONTENT QUALITY CHECK"""
         
-        # Tier 2: Try Enhanced HTTP first (FREE and FAST)
+        # Tier 2: Try Enhanced HTTP first (FREE and FAST) + QUALITY CHECK
         logger.info(f"Trying Enhanced HTTP for specific URL: {url}")
         http_content = self.enhanced_http.fetch_url(url)
         if http_content:
-            logger.info(f"Enhanced HTTP success for specific URL: {url}")
-            return {
-                'success': True,
-                'content': http_content,
-                'title': 'Enhanced HTTP Result',
-                'url': url,
-                'tier_used': 'Enhanced HTTP'
-            }
-            
-        # Tier 3: Try ScrapingBee if Enhanced HTTP failed
-        if self.should_use_scraping_bee(url):
-            logger.info(f"Enhanced HTTP failed, trying ScrapingBee for specific URL: {url}")
-            bee_content = self.scraping_bee.scrape_url(url)
-            if bee_content:
-                logger.info(f"ScrapingBee success for specific URL: {url}")
+            # Check if the content is actually useful or just generic
+            if not self.is_generic_content(http_content, url, make, model):
+                logger.info(f"Enhanced HTTP found SPECIFIC content for: {url}")
                 return {
                     'success': True,
-                    'content': bee_content,
-                    'title': 'ScrapingBee Result',
+                    'content': http_content,
+                    'title': 'Enhanced HTTP Result',
                     'url': url,
-                    'tier_used': 'ScrapingBee'
+                    'tier_used': 'Enhanced HTTP'
                 }
             else:
-                logger.warning(f"ScrapingBee failed for specific URL: {url}, falling back to original crawler")
+                logger.info(f"Enhanced HTTP got GENERIC content for {url}, escalating to ScrapingBee")
+            
+        # Tier 3: Try ScrapingBee for ALL URLs when Enhanced HTTP fails OR returns generic content
+        logger.info(f"Trying ScrapingBee for specific URL: {url}")
+        bee_content = self.scraping_bee.scrape_url(url)
+        if bee_content:
+            logger.info(f"ScrapingBee success for specific URL: {url}")
+            return {
+                'success': True,
+                'content': bee_content,
+                'title': 'ScrapingBee Result',
+                'url': url,
+                'tier_used': 'ScrapingBee'
+            }
+        else:
+            logger.warning(f"ScrapingBee failed for specific URL: {url}, falling back to original crawler")
             
         # Tiers 4-5: Use original crawler as last resort
         logger.info(f"Using original crawler for specific URL: {url}")
