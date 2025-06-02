@@ -78,7 +78,7 @@ def get_channel_id(url):
 
 def resolve_handle_to_channel_id(handle):
     """
-    Resolve a YouTube handle (@username) to a channel ID.
+    Resolve a YouTube handle (@username) to a channel ID using multiple extraction patterns.
     
     Args:
         handle (str): YouTube handle without @
@@ -91,13 +91,56 @@ def resolve_handle_to_channel_id(handle):
         rate_limiter.wait_if_needed('youtube.com')
         
         url = f"https://www.youtube.com/@{handle}"
-        response = requests.get(url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
-            # Extract channel ID from HTML
-            channel_id_match = re.search(r'"channelId":"([a-zA-Z0-9_-]+)"', response.text)
-            if channel_id_match:
-                return channel_id_match.group(1)
+            html_content = response.text
+            
+            # Multiple patterns for extracting channel ID from YouTube HTML
+            channel_id_patterns = [
+                r'"channelId":"([a-zA-Z0-9_-]+)"',  # Original pattern
+                r'"externalId":"([a-zA-Z0-9_-]+)"',  # Alternative JSON field
+                r'property="og:url"\s+content="[^"]*channel/([a-zA-Z0-9_-]+)"',  # Open Graph meta tag
+                r'<link[^>]*href="[^"]*channel/([a-zA-Z0-9_-]+)"[^>]*>',  # Link tag
+                r'"browseEndpoint"[^}]*"browseId":"([a-zA-Z0-9_-]+)"',  # Browse endpoint
+                r'"channelMetadataRenderer"[^}]*"channelUrl":"[^"]*channel/([a-zA-Z0-9_-]+)"',  # Channel metadata
+                r'"ownerChannelName":"[^"]*","channelId":"([a-zA-Z0-9_-]+)"',  # Owner channel info
+                r'/channel/([a-zA-Z0-9_-]+)',  # Any mention of /channel/ID
+            ]
+            
+            for i, pattern in enumerate(channel_id_patterns, 1):
+                try:
+                    channel_id_match = re.search(pattern, html_content, re.IGNORECASE)
+                    if channel_id_match:
+                        channel_id = channel_id_match.group(1)
+                        
+                        # Validate channel ID format (YouTube channel IDs are typically 24 chars)
+                        if len(channel_id) >= 20 and channel_id.startswith(('UC', 'UU', 'UL', 'LL')):
+                            logger.info(f"✅ Successfully resolved @{handle} to channel ID: {channel_id} (pattern {i})")
+                            return channel_id
+                        else:
+                            logger.warning(f"Pattern {i} found potential ID '{channel_id}' but doesn't match expected format")
+                            continue
+                            
+                except Exception as e:
+                    logger.warning(f"Error with pattern {i} for @{handle}: {e}")
+                    continue
+            
+            logger.warning(f"All {len(channel_id_patterns)} patterns failed to find valid channel ID for @{handle}")
+            
+            # DEBUG: Log part of HTML response to help diagnose
+            if len(html_content) > 100:
+                logger.info(f"HTML response sample (first 500 chars): {html_content[:500]}")
+            else:
+                logger.warning(f"HTML response was very short ({len(html_content)} chars): {html_content}")
+                
+        else:
+            logger.error(f"HTTP {response.status_code} when resolving YouTube handle @{handle}")
+            
     except Exception as e:
         logger.error(f"Error resolving YouTube handle @{handle}: {e}")
     
@@ -105,7 +148,7 @@ def resolve_handle_to_channel_id(handle):
 
 def resolve_username_to_channel_id(username):
     """
-    Resolve a YouTube username to a channel ID.
+    Resolve a YouTube username to a channel ID using multiple extraction patterns.
     
     Args:
         username (str): YouTube username
@@ -118,13 +161,56 @@ def resolve_username_to_channel_id(username):
         rate_limiter.wait_if_needed('youtube.com')
         
         url = f"https://www.youtube.com/user/{username}"
-        response = requests.get(url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
-            # Extract channel ID from HTML
-            channel_id_match = re.search(r'"channelId":"([a-zA-Z0-9_-]+)"', response.text)
-            if channel_id_match:
-                return channel_id_match.group(1)
+            html_content = response.text
+            
+            # Multiple patterns for extracting channel ID from YouTube HTML
+            channel_id_patterns = [
+                r'"channelId":"([a-zA-Z0-9_-]+)"',  # Original pattern
+                r'"externalId":"([a-zA-Z0-9_-]+)"',  # Alternative JSON field
+                r'property="og:url"\s+content="[^"]*channel/([a-zA-Z0-9_-]+)"',  # Open Graph meta tag
+                r'<link[^>]*href="[^"]*channel/([a-zA-Z0-9_-]+)"[^>]*>',  # Link tag
+                r'"browseEndpoint"[^}]*"browseId":"([a-zA-Z0-9_-]+)"',  # Browse endpoint
+                r'"channelMetadataRenderer"[^}]*"channelUrl":"[^"]*channel/([a-zA-Z0-9_-]+)"',  # Channel metadata
+                r'"ownerChannelName":"[^"]*","channelId":"([a-zA-Z0-9_-]+)"',  # Owner channel info
+                r'/channel/([a-zA-Z0-9_-]+)',  # Any mention of /channel/ID
+            ]
+            
+            for i, pattern in enumerate(channel_id_patterns, 1):
+                try:
+                    channel_id_match = re.search(pattern, html_content, re.IGNORECASE)
+                    if channel_id_match:
+                        channel_id = channel_id_match.group(1)
+                        
+                        # Validate channel ID format (YouTube channel IDs are typically 24 chars)
+                        if len(channel_id) >= 20 and channel_id.startswith(('UC', 'UU', 'UL', 'LL')):
+                            logger.info(f"✅ Successfully resolved user/{username} to channel ID: {channel_id} (pattern {i})")
+                            return channel_id
+                        else:
+                            logger.warning(f"Pattern {i} found potential ID '{channel_id}' but doesn't match expected format")
+                            continue
+                            
+                except Exception as e:
+                    logger.warning(f"Error with pattern {i} for user/{username}: {e}")
+                    continue
+            
+            logger.warning(f"All {len(channel_id_patterns)} patterns failed to find valid channel ID for user/{username}")
+            
+            # DEBUG: Log part of HTML response to help diagnose
+            if len(html_content) > 100:
+                logger.info(f"HTML response sample (first 500 chars): {html_content[:500]}")
+            else:
+                logger.warning(f"HTML response was very short ({len(html_content)} chars): {html_content}")
+                
+        else:
+            logger.error(f"HTTP {response.status_code} when resolving YouTube username {username}")
+            
     except Exception as e:
         logger.error(f"Error resolving YouTube username {username}: {e}")
     

@@ -113,31 +113,72 @@ st.markdown("""
         text-align: center;
     }
     
-    /* Compact metrics */
+    /* FIXED metrics targeting - make numbers VISIBLE but bigger */
     div[data-testid="metric-container"] {
-        background-color: #f8f9fa;
-        border: 1px solid #e9ecef;
-        padding: 0.5rem;
-        border-radius: 0.25rem;
-        margin: 0.2rem 0;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        background-color: #f8f9fa !important;
+        border: 1px solid #e9ecef !important;
+        padding: 0.3rem 0.4rem !important;
+        border-radius: 0.2rem !important;
+        margin: 0.15rem 0 !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        height: auto !important;
+        min-height: 2.5rem !important;
+        max-height: 3.5rem !important;
     }
     
-    div[data-testid="metric-container"] > div {
-        font-size: 0.55rem;
-        line-height: 1.3;
+    /* Target ALL metric text elements but keep READABLE */
+    div[data-testid="metric-container"] > div,
+    div[data-testid="metric-container"] span,
+    div[data-testid="metric-container"] p,
+    [data-testid="metric-container"] * {
+        font-size: 0.9rem !important;
+        line-height: 1.2 !important;
+        margin: 0.1rem 0 !important;
+        padding: 0 !important;
     }
     
-    div[data-testid="metric-container"] > div:first-child {
-        font-size: 0.5rem;
-        font-weight: 600;
-        color: #6c757d;
-        margin-bottom: 0.1rem;
+    /* Force label text to be small but readable */
+    div[data-testid="metric-container"] > div:first-child,
+    [data-testid="metric-container"] [data-testid="metric-label"],
+    .metric-label {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        color: #6c757d !important;
+        margin-bottom: 0.15rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.3px !important;
+        line-height: 1.1 !important;
     }
     
-    /* Add breathing room after header */
-    .first-row {
-        padding-top: 18px !important;
+    /* Force value text to be bigger and VISIBLE */
+    div[data-testid="metric-container"] > div:last-child,
+    [data-testid="metric-container"] [data-testid="metric-value"],
+    .metric-value {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* Override Streamlit's default metric styling */
+    .stMetric {
+        padding: 0.15rem !important;
+        margin: 0.15rem !important;
+        height: auto !important;
+        min-height: 2.5rem !important;
+    }
+    
+    .stMetric > div {
+        font-size: 0.9rem !important;
+        line-height: 1.2 !important;
+    }
+    
+    /* Nuclear option - target by text content if needed */
+    div:contains("Total Clips"),
+    div:contains("Avg Score"), 
+    div:contains("High Quality"),
+    div:contains("Approved") {
+        font-size: 0.1rem !important;
     }
     
     /* Table row styling */
@@ -327,75 +368,104 @@ with bulk_tab:
                     lambda x: "😊 Pos" if x == "positive" else "😞 Neg" if x == "negative" else "😐 Neu"
                 )
                 
-                # Select and reorder columns for display
-                display_columns = ['WO #', 'Model', 'Contact', 'Publication', 'Score', 'Sentiment', 'Clip URL']
+                # Add approve/reject checkbox columns
+                display_df['✅ Approve'] = False
+                display_df['❌ Reject'] = False
+                
+                # Select and reorder columns for display  
+                display_columns = ['WO #', 'Model', 'Contact', 'Publication', 'Score', 'Sentiment', 'Clip URL', '✅ Approve', '❌ Reject']
                 display_df = display_df[display_columns]
                 
-                # Add interactive approve/reject columns
-                display_df['Approve'] = False
-                display_df['Reject'] = False
-                
-                # Use st.data_editor with column_config for clickable links AND interactive checkboxes
+                # Configure the data editor with inline approve/reject functionality
                 edited_df = st.data_editor(
                     display_df,
+                    height=500,  # Set fixed height for scrolling
+                    use_container_width=True,
+                    hide_index=True,
                     column_config={
-                        "WO #": st.column_config.TextColumn("WO #", width="small", disabled=True),
-                        "Model": st.column_config.TextColumn("Model", width="medium", disabled=True),
-                        "Contact": st.column_config.TextColumn("Contact", width="medium", disabled=True),
-                        "Publication": st.column_config.TextColumn("Publication", width="medium", disabled=True),
-                        "Score": st.column_config.TextColumn("Score", width="small", disabled=True),
-                        "Sentiment": st.column_config.TextColumn("Sentiment", width="small", disabled=True),
-                        "Clip URL": st.column_config.LinkColumn(
-                            "Link",
+                        "WO #": st.column_config.NumberColumn(
+                            "WO #",
                             width="small",
                             disabled=True
                         ),
-                        "Approve": st.column_config.CheckboxColumn(
+                        "Model": st.column_config.TextColumn(
+                            "Model",
+                            width="medium",
+                            disabled=True
+                        ),
+                        "Contact": st.column_config.TextColumn(
+                            "Contact",
+                            width="medium",
+                            disabled=True
+                        ),
+                        "Publication": st.column_config.TextColumn(
+                            "Publication", 
+                            width="medium",
+                            disabled=True
+                        ),
+                        "Score": st.column_config.TextColumn(
+                            "Score",
+                            width="small",
+                            disabled=True
+                        ),
+                        "Sentiment": st.column_config.TextColumn(
+                            "Sentiment",
+                            width="small", 
+                            disabled=True
+                        ),
+                        "Clip URL": st.column_config.LinkColumn(
+                            "📄 View",
+                            width="small",
+                            disabled=True,
+                            display_text="📄 View"
+                        ),
+                        "✅ Approve": st.column_config.CheckboxColumn(
                             "✅ Approve",
                             width="small",
-                            default=False
+                            help="Check to approve this clip"
                         ),
-                        "Reject": st.column_config.CheckboxColumn(
+                        "❌ Reject": st.column_config.CheckboxColumn(
                             "❌ Reject", 
                             width="small",
-                            default=False
+                            help="Check to reject this clip"
                         ),
                     },
-                    use_container_width=True,
-                    height=500,
-                    hide_index=True,
-                    key="clip_editor"
                 )
                 
-                # Process approve/reject actions
-                approved_wos = edited_df[edited_df['Approve'] == True]['WO #'].tolist()
-                rejected_wos = edited_df[edited_df['Reject'] == True]['WO #'].tolist()
-                
-                if approved_wos:
-                    st.success(f"✅ {len(approved_wos)} clips marked for approval: {', '.join(map(str, approved_wos))}")
+                # Process inline actions
+                if not edited_df.equals(display_df):
+                    # Find which rows were approved or rejected
+                    approved_wos = edited_df[edited_df['✅ Approve'] == True]['WO #'].tolist()
+                    rejected_wos = edited_df[edited_df['❌ Reject'] == True]['WO #'].tolist()
                     
-                    # Auto-save approved clips
-                    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                    selected_rows = df[df['WO #'].astype(str).isin(map(str, approved_wos))]
+                    # Process approvals
+                    if approved_wos:
+                        approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                        selected_rows = df[df['WO #'].astype(str).isin(map(str, approved_wos))]
+                        
+                        if os.path.exists(approved_file):
+                            approved_df = pd.read_csv(approved_file)
+                            if 'WO #' in approved_df.columns:
+                                approved_df['WO #'] = approved_df['WO #'].astype(str)
+                            # Only add rows that aren't already approved
+                            new_rows = selected_rows[~selected_rows['WO #'].astype(str).isin(approved_df['WO #'].astype(str))]
+                            if not new_rows.empty:
+                                approved_df = pd.concat([approved_df, new_rows], ignore_index=True)
+                                approved_df.to_csv(approved_file, index=False)
+                        else:
+                            selected_rows.to_csv(approved_file, index=False)
+                        
+                        if len(approved_wos) > 0:
+                            st.success(f"✅ Approved {len(approved_wos)} clips!")
+                            st.rerun()
                     
-                    if os.path.exists(approved_file):
-                        approved_df = pd.read_csv(approved_file)
-                        if 'WO #' in approved_df.columns:
-                            approved_df['WO #'] = approved_df['WO #'].astype(str)
-                        # Only add rows that aren't already approved
-                        new_rows = selected_rows[~selected_rows['WO #'].astype(str).isin(approved_df['WO #'].astype(str))]
-                        if not new_rows.empty:
-                            approved_df = pd.concat([approved_df, new_rows], ignore_index=True)
-                            approved_df.to_csv(approved_file, index=False)
-                    else:
-                        selected_rows.to_csv(approved_file, index=False)
+                    # Process rejections  
+                    if rejected_wos:
+                        st.success(f"❌ Rejected {len(rejected_wos)} clips!")
+                        st.rerun()
                 
-                if rejected_wos:
-                    st.warning(f"❌ {len(rejected_wos)} clips marked for rejection: {', '.join(map(str, rejected_wos))}")
-                
+                # Quick bulk actions below table
                 st.markdown("---")
-                
-                # Bulk actions
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     if st.button("✅ Approve All High Quality (9+)"):
@@ -408,26 +478,34 @@ with bulk_tab:
                             else:
                                 approved_df = high_quality_df.copy()
                             approved_df.to_csv(approved_file, index=False)
-                            st.success(f"✅ Approved {len(high_quality_df)} clips!")
+                            st.success(f"✅ Approved {len(high_quality_df)} high-quality clips!")
                             st.rerun()
+                        else:
+                            st.info("No high-quality clips (9+) found")
                 
                 with col2:
-                    if st.button("📤 Export Approved"):
-                        approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                        if os.path.exists(approved_file):
-                            approved_df = pd.read_csv(approved_file)
-                            csv_data = approved_df.to_csv(index=False)
-                            st.download_button(
-                                "📥 Download CSV",
-                                data=csv_data,
-                                file_name=f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                                mime="text/csv"
-                            )
-                        else:
-                            st.warning("No approved clips to export")
+                    if st.button("📄 Export Approved Clips"):
+                        try:
+                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                            if os.path.exists(approved_file):
+                                approved_df = pd.read_csv(approved_file)
+                                if not approved_df.empty:
+                                    csv_data = approved_df.to_csv(index=False)
+                                    st.download_button(
+                                        label="💾 Download Approved Clips CSV",
+                                        data=csv_data,
+                                        file_name=f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                        mime="text/csv"
+                                    )
+                                else:
+                                    st.warning("No approved clips to export")
+                            else:
+                                st.warning("No approved clips file found")
+                        except Exception as e:
+                            st.error(f"Error exporting clips: {e}")
                 
                 with col3:
-                    if st.button("🔄 Refresh"):
+                    if st.button("🔄 Refresh Data"):
                         st.rerun()
             else:
                 st.info("No clips to review. Process loans first.")
