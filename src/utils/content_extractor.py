@@ -2,6 +2,7 @@ import re
 from typing import Optional, Dict, Any, List
 from bs4 import BeautifulSoup
 import logging
+from urllib.parse import urlparse
 
 from src.utils.logger import setup_logger
 
@@ -39,16 +40,22 @@ def extract_article_content(html: str, url: str, expected_topic: str = "") -> st
     for ad in soup.find_all(class_=lambda c: c and ('ad' in c.lower() or 'banner' in c.lower() or 'cookie' in c.lower())):
         ad.decompose()
     
-    # Step 1: Try basic extraction (site-specific or generic)
+    # Step 1: Try site-specific extraction first
+    site_specific_content = try_site_specific_extraction(soup, url, expected_topic)
+    if site_specific_content and not is_content_quality_poor(site_specific_content, url, expected_topic):
+        log_content_excerpt(site_specific_content, "Site-Specific")
+        return site_specific_content
+    
+    # Step 2: Try basic extraction (site-specific or generic)
     basic_extracted = _extract_with_basic_methods(soup, url)
     
-    # Step 2: Quality check
+    # Step 3: Quality check
     if not is_content_quality_poor(basic_extracted, url, expected_topic):
         # Basic extraction succeeded
         log_content_excerpt(basic_extracted, "Basic")
         return basic_extracted
     
-    # Step 3: Basic extraction failed quality check - try alternatives
+    # Step 4: Basic extraction failed quality check - try alternatives
     logger.info(f"Basic extraction failed quality check ({len(basic_extracted)} chars), trying alternatives")
     
     alternative_extracted = try_alternative_extraction(html, url, expected_topic)
@@ -58,7 +65,7 @@ def extract_article_content(html: str, url: str, expected_topic: str = "") -> st
         log_content_excerpt(alternative_extracted, "Alternative")
         return alternative_extracted
     
-    # Step 4: All methods failed - return the best we have
+    # Step 5: All methods failed - return the best we have
     if len(alternative_extracted) > len(basic_extracted):
         logger.warning("All extractions failed quality check, returning best alternative result")
         log_content_excerpt(alternative_extracted, "Fallback Alternative")
@@ -67,6 +74,158 @@ def extract_article_content(html: str, url: str, expected_topic: str = "") -> st
         logger.warning("All extractions failed quality check, returning basic result")
         log_content_excerpt(basic_extracted, "Fallback Basic")
         return basic_extracted
+
+def try_site_specific_extraction(soup: BeautifulSoup, url: str, expected_topic: str = "") -> str:
+    """
+    Try site-specific extraction methods for known problematic sites.
+    
+    Args:
+        soup: BeautifulSoup object with cleaned HTML
+        url: URL of the page
+        expected_topic: Expected topic (e.g., "VW Jetta")
+        
+    Returns:
+        Extracted content using site-specific methods, or empty string if not applicable
+    """
+    domain = urlparse(url).netloc.lower()
+    
+    # Handle thegentlemanracer.com specifically
+    if 'thegentlemanracer.com' in domain:
+        return extract_thegentlemanracer_content(soup, url, expected_topic)
+    
+    # Add other site-specific handlers here as needed
+    # if 'anothersite.com' in domain:
+    #     return extract_anothersite_content(soup, url, expected_topic)
+    
+    return ""
+
+def extract_thegentlemanracer_content(soup: BeautifulSoup, url: str, expected_topic: str = "") -> str:
+    """
+    Site-specific extraction for thegentlemanracer.com.
+    This site has sidebar content with other vehicle reviews that can confuse the generic extractor.
+    """
+    logger.info("Using thegentlemanracer.com-specific content extraction")
+    
+    article_text = ""
+    
+    # Try to find the main article content area
+    # Look for the post content container
+    content_selectors = [
+        '.post-content',
+        '.entry-content', 
+        'article .content',
+        '.single-post-content',
+        'div[class*="post-content"]',
+        'div[class*="entry-content"]'
+    ]
+    
+    content_container = None
+    for selector in content_selectors:
+        elements = soup.select(selector)
+        if elements:
+            content_container = elements[0]  # Take the first match
+            logger.info(f"Found thegentlemanracer content using selector: {selector}")
+            break
+    
+    # If no specific content container found, try to find the main article
+    if not content_container:
+        article_element = soup.find('article')
+        if article_element:
+            content_container = article_element
+            logger.info("Using article element for thegentlemanracer content")
+    
+    # If still nothing, try finding a div that contains the title and substantial content
+    if not content_container:
+        title_element = soup.find('h1')
+        if title_element:
+            # Look for the parent container that has the most paragraphs
+            current = title_element
+            best_container = None
+            max_paragraphs = 0
+            
+            for _ in range(5):  # Go up max 5 levels
+                current = current.parent if current else None
+                if not current:
+                    break
+                    
+                paragraphs = current.find_all('p')
+                if len(paragraphs) > max_paragraphs:
+                    max_paragraphs = len(paragraphs)
+                    best_container = current
+            
+            if best_container and max_paragraphs >= 3:
+                content_container = best_container
+                logger.info(f"Found thegentlemanracer content by title proximity ({max_paragraphs} paragraphs)")
+    
+    if not content_container:
+        logger.warning("Could not find specific content container for thegentlemanracer.com")
+        return ""
+    
+    # Remove any sidebar elements that might be within the container
+    sidebar_selectors = [
+        '.sidebar',
+        '.widget',
+        '.related-posts',
+        '.recent-posts',
+        '.popular-posts',
+        'aside',
+        '[class*="sidebar"]',
+        '[class*="widget"]',
+        '[class*="related"]'
+    ]
+    
+    for selector in sidebar_selectors:
+        for element in content_container.select(selector):
+            element.decompose()
+    
+    # Extract the title
+    title = soup.find('h1')
+    if title:
+        title_text = title.get_text().strip()
+        article_text += title_text + "\n\n"
+        logger.debug(f"Extracted title: {title_text[:100]}...")
+    
+    # Extract paragraphs from the content container
+    paragraphs = content_container.find_all('p')
+    paragraph_count = 0
+    
+    for p in paragraphs:
+        text = p.get_text().strip()
+        if len(text) > 30:  # Skip very short paragraphs
+            # Skip paragraphs that look like navigation or sidebar content
+            text_lower = text.lower()
+            if any(skip_phrase in text_lower for skip_phrase in [
+                'related posts', 'recent posts', 'you may also like', 'more from',
+                'categories:', 'tags:', 'share this', 'follow us', 'subscribe'
+            ]):
+                continue
+                
+            article_text += text + "\n\n"
+            paragraph_count += 1
+    
+    # Clean up the text
+    article_text = clean_text(article_text)
+    
+    logger.info(f"Extracted {paragraph_count} paragraphs from thegentlemanracer.com ({len(article_text)} chars)")
+    
+    # Final validation - make sure this looks like actual article content
+    if len(article_text) < 500:
+        logger.warning("thegentlemanracer extraction resulted in very short content")
+        return ""
+    
+    # If we have an expected topic, do a basic relevance check
+    if expected_topic:
+        topic_words = expected_topic.lower().split()
+        article_lower = article_text.lower()
+        matches = sum(1 for word in topic_words if word in article_lower)
+        
+        if matches == 0:
+            logger.warning(f"thegentlemanracer extraction doesn't mention expected topic: {expected_topic}")
+            return ""
+        else:
+            logger.info(f"thegentlemanracer extraction mentions {matches}/{len(topic_words)} topic words")
+    
+    return article_text
 
 def _extract_with_basic_methods(soup: BeautifulSoup, url: str) -> str:
     """
@@ -114,9 +273,14 @@ def extract_generic_content(soup: BeautifulSoup, url: str) -> str:
             logger.info(f"Found content using selector: {selector}")
             break
     
-    # If no container found, try to extract from body
+    # ENHANCED: If no container found, use smart content detection instead of body fallback
     if not content_container:
-        logger.warning("No content container found, extracting from body")
+        logger.info("Standard selectors failed, using smart content detection")
+        content_container = find_main_content_area(soup)
+        
+    # If smart detection also failed, fall back to body (but this should be rare now)
+    if not content_container:
+        logger.warning("Smart content detection failed, extracting from body")
         content_container = soup.body if soup.body else soup
     
     # Extract the title if possible
@@ -149,6 +313,116 @@ def extract_generic_content(soup: BeautifulSoup, url: str) -> str:
     log_content_excerpt(article_text, "Generic")
     
     return article_text
+
+def find_main_content_area(soup: BeautifulSoup) -> Optional[Any]:
+    """
+    Smart detection of main content area when standard selectors fail.
+    Uses content analysis to identify the most likely article container.
+    """
+    logger.info("Running smart content area detection")
+    
+    # Find the H1 title first - content is usually near it
+    h1 = soup.find('h1')
+    if not h1:
+        logger.warning("No H1 found for content area detection")
+        return None
+    
+    title_text = h1.get_text().strip()
+    logger.info(f"Using H1 as anchor: {title_text[:100]}...")
+    
+    # Strategy 1: Find the container with the most paragraphs near the H1
+    candidates = []
+    
+    # Check H1's parent and grandparent containers
+    current = h1
+    for level in range(4):  # Go up 4 levels max
+        parent = current.parent if current else None
+        if not parent or parent.name in ['html', 'body']:
+            break
+            
+        # Score this container based on content quality
+        paragraphs = parent.find_all('p')
+        if len(paragraphs) >= 3:  # Must have at least 3 paragraphs
+            score = calculate_content_score(parent, title_text)
+            candidates.append((parent, score, f"parent_level_{level}"))
+            logger.debug(f"Candidate at level {level}: {len(paragraphs)} paragraphs, score {score}")
+        
+        current = parent
+    
+    # Strategy 2: Look for containers that follow the H1
+    sibling = h1
+    for _ in range(10):  # Check next 10 siblings
+        sibling = sibling.find_next_sibling() if sibling else None
+        if not sibling:
+            break
+            
+        if sibling.name in ['div', 'section', 'article']:
+            paragraphs = sibling.find_all('p')
+            if len(paragraphs) >= 2:
+                score = calculate_content_score(sibling, title_text)
+                candidates.append((sibling, score, "following_sibling"))
+                logger.debug(f"Sibling candidate: {len(paragraphs)} paragraphs, score {score}")
+    
+    # Strategy 3: Look for the div with the highest paragraph density in the page
+    all_divs = soup.find_all('div')
+    for div in all_divs:
+        paragraphs = div.find_all('p')
+        if len(paragraphs) >= 5:  # Higher threshold for global search
+            score = calculate_content_score(div, title_text)
+            candidates.append((div, score, "high_density"))
+    
+    # Select the best candidate
+    if candidates:
+        best_container, best_score, method = max(candidates, key=lambda x: x[1])
+        logger.info(f"Selected content container using {method} with score {best_score}")
+        return best_container
+    
+    logger.warning("Smart content detection found no suitable candidates")
+    return None
+
+def calculate_content_score(container: Any, title_text: str) -> float:
+    """
+    Calculate a quality score for a potential content container.
+    Higher scores indicate better content areas.
+    """
+    score = 0.0
+    
+    # Get all text in the container
+    text = container.get_text(strip=True)
+    if len(text) < 200:  # Too short to be main content
+        return 0.0
+    
+    # Score based on paragraph count (more paragraphs = likely article)
+    paragraphs = container.find_all('p')
+    paragraph_score = len(paragraphs) * 2  # 2 points per paragraph
+    score += paragraph_score
+    
+    # Score based on total text length (but cap it)
+    length_score = min(len(text) / 500, 10)  # Max 10 points for length
+    score += length_score
+    
+    # Bonus for having the title text in the container
+    if title_text.lower() in text.lower():
+        score += 5
+    
+    # Penalty for navigation-like content
+    nav_indicators = ['recent posts', 'related articles', 'categories', 'tags', 'share this', 'follow us']
+    nav_count = sum(1 for indicator in nav_indicators if indicator in text.lower())
+    score -= nav_count * 3  # -3 points per navigation indicator
+    
+    # Bonus for article-like structure (sentences ending with periods)
+    sentence_count = text.count('.')
+    if sentence_count > 10:
+        score += min(sentence_count / 10, 5)  # Max 5 bonus points
+    
+    # Penalty if the container has too many links (likely navigation)
+    links = container.find_all('a')
+    if len(links) > 20:  # Too many links suggests navigation area
+        score -= 5
+    
+    logger.debug(f"Content score breakdown: paragraphs={paragraph_score}, length={length_score}, sentences={sentence_count}, nav_penalty={nav_count*3}")
+    
+    return max(score, 0.0)  # Don't return negative scores
 
 def clean_text(text: str) -> str:
     """Clean extracted text."""

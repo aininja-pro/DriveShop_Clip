@@ -34,6 +34,7 @@ import time
 import requests
 import asyncio
 import logging
+import re
 
 # Import local modules
 from src.utils.logger import setup_logger
@@ -47,6 +48,132 @@ logger = setup_logger(__name__)
 
 # Initialize the enhanced crawler manager (it will be reused for all URLs)
 crawler_manager = EnhancedCrawlerManager()
+
+def determine_vehicle_make_from_both(model_full: str, model_short: str) -> str:
+    """
+    Determine the actual vehicle make from BOTH model columns (C & M).
+    This uses both the full model name and short model name for better accuracy.
+    
+    Args:
+        model_full: Full model name from Column C (e.g., "LX 700h F Sport")
+        model_short: Short model name from Column M (e.g., "LX")
+        
+    Returns:
+        Vehicle make (e.g., "Lexus", "Toyota", "Honda")
+    """
+    # Try with the short model name first (usually more reliable)
+    if model_short:
+        make_from_short = determine_vehicle_make(model_short)
+        if make_from_short:
+            return make_from_short
+    
+    # Fall back to full model name
+    if model_full:
+        make_from_full = determine_vehicle_make(model_full)
+        if make_from_full:
+            return make_from_full
+    
+    # If neither worked, return empty
+    logger.warning(f"Could not determine vehicle make from full: '{model_full}', short: '{model_short}'")
+    return ''
+
+def determine_vehicle_make(model: str) -> str:
+    """
+    Determine the actual vehicle make from the model name.
+    This replaces using Fleet business category data.
+    
+    Args:
+        model: Vehicle model name (e.g., "LX 700h F Sport", "Camry", "Civic Type R")
+        
+    Returns:
+        Vehicle make (e.g., "Lexus", "Toyota", "Honda")
+    """
+    if not model:
+        return ''
+    
+    model_lower = model.lower().strip()
+    
+    # Lexus models (these are often confused with Toyota in business data)
+    lexus_models = ['lx', 'gx', 'rx', 'nx', 'ux', 'ls', 'es', 'gs', 'is', 'lc', 'rc']
+    for lexus_model in lexus_models:
+        if model_lower.startswith(lexus_model + ' ') or model_lower == lexus_model:
+            return 'Lexus'
+    
+    # Toyota models
+    toyota_models = ['camry', 'corolla', 'prius', 'rav4', 'highlander', '4runner', 'tacoma', 
+                     'tundra', 'sienna', 'sequoia', 'land cruiser', 'avalon', 'venza', 'chr']
+    for toyota_model in toyota_models:
+        if model_lower.startswith(toyota_model) or toyota_model in model_lower:
+            return 'Toyota'
+    
+    # Honda models
+    honda_models = ['civic', 'accord', 'cr-v', 'pilot', 'passport', 'ridgeline', 'odyssey', 
+                    'hr-v', 'insight', 'fit']
+    for honda_model in honda_models:
+        if model_lower.startswith(honda_model) or honda_model in model_lower:
+            return 'Honda'
+    
+    # Ford models
+    ford_models = ['f-150', 'f-250', 'f-350', 'mustang', 'explorer', 'escape', 'edge', 
+                   'expedition', 'bronco', 'ranger', 'maverick', 'transit']
+    for ford_model in ford_models:
+        if model_lower.startswith(ford_model) or ford_model in model_lower:
+            return 'Ford'
+    
+    # Chevrolet models
+    chevy_models = ['silverado', 'tahoe', 'suburban', 'equinox', 'traverse', 'malibu', 
+                    'camaro', 'corvette', 'colorado', 'trailblazer']
+    for chevy_model in chevy_models:
+        if model_lower.startswith(chevy_model) or chevy_model in model_lower:
+            return 'Chevrolet'
+    
+    # Volkswagen models (THIS WAS MISSING!)
+    volkswagen_models = ['jetta', 'passat', 'golf', 'beetle', 'tiguan', 'atlas', 'arteon', 
+                         'id.4', 'taos', 'gli', 'gti', 'cc', 'touareg']
+    for vw_model in volkswagen_models:
+        if model_lower.startswith(vw_model) or vw_model in model_lower:
+            return 'Volkswagen'
+    
+    # BMW models (usually start with letters/numbers)
+    if re.match(r'^[xz]?[1-8][0-9]*', model_lower) or model_lower.startswith('i'):
+        return 'BMW'
+    
+    # Mercedes models (usually start with class letters)
+    if re.match(r'^[a-z]-class|^[gcse]l[skc]|^amg', model_lower):
+        return 'Mercedes-Benz'
+    
+    # Audi models (usually start with A, Q, R, S, RS, TT)
+    if re.match(r'^[aqr][1-9]|^s[1-9]|^rs[1-9]|^tt|^e-tron', model_lower):
+        return 'Audi'
+    
+    # Cadillac models
+    cadillac_models = ['escalade', 'xt4', 'xt5', 'xt6', 'ct4', 'ct5', 'vistiq', 'lyriq']
+    for cadillac_model in cadillac_models:
+        if model_lower.startswith(cadillac_model) or cadillac_model in model_lower:
+            return 'Cadillac'
+    
+    # If no match found, try to extract from the model string itself
+    # Sometimes models include the make (e.g., "Toyota Camry")
+    words = model_lower.split()
+    if len(words) > 1:
+        first_word = words[0]
+        known_makes = ['toyota', 'honda', 'ford', 'chevrolet', 'chevy', 'bmw', 'mercedes', 
+                       'audi', 'lexus', 'cadillac', 'buick', 'gmc', 'nissan', 'hyundai', 
+                       'kia', 'mazda', 'subaru', 'volkswagen', 'vw', 'volvo', 'jaguar', 
+                       'land rover', 'porsche', 'tesla', 'jeep', 'dodge', 'ram', 'chrysler']
+        
+        if first_word in known_makes:
+            # Capitalize properly
+            if first_word == 'chevy':
+                return 'Chevrolet'
+            elif first_word == 'vw':
+                return 'Volkswagen'
+            else:
+                return first_word.title()
+    
+    # If still no match, return empty string (we'll log this)
+    logger.warning(f"Could not determine vehicle make for model: {model}")
+    return ''
 
 def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -140,17 +267,34 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
                 'urls': []
             }
             
-            # Add Fleet if available (use as Make)
-            if 'Fleet' in df.columns:
-                loan['make'] = row['Fleet'].split(' ')[0] if pd.notna(row['Fleet']) else ''
-            else:
-                loan['make'] = ''
-                
-            # Add Model
+            # Determine vehicle make from BOTH model columns (Column C & M)
+            model_value = ''
+            model_short_value = ''
+            
             if model_column:
-                loan['model'] = row[model_column] if pd.notna(row[model_column]) else ''
+                model_value = row[model_column] if pd.notna(row[model_column]) else ''
+                loan['model'] = model_value
             else:
                 loan['model'] = ''
+            
+            # ENHANCEMENT: Also get Model Short Name (Column M) for make detection
+            if 'Model Short Name' in df.columns:
+                model_short_value = row['Model Short Name'] if pd.notna(row['Model Short Name']) else ''
+            
+            # Use BOTH columns for smart make detection
+            detected_make = determine_vehicle_make_from_both(model_value, model_short_value)
+            loan['make'] = detected_make
+            
+            # Log the detected make for verification
+            if loan['make'] and loan['model']:
+                logger.info(f"Detected vehicle: {loan['make']} {loan['model']} (from Model: '{model_value}', Short: '{model_short_value}')")
+            
+            # ENHANCEMENT: Also capture full model name from Column C for broader search context
+            # This helps with cases like "4runner" vs "Toyota 4Runner" for better search accuracy
+            if 'Model' in df.columns and model_column != 'Model':
+                loan['model_full'] = row['Model'] if pd.notna(row['Model']) else ''
+            else:
+                loan['model_full'] = loan['model']  # Use same as model if no separate full name
                 
             # Add source/affiliation
             if 'Affiliation' in df.columns:
@@ -275,15 +419,21 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         # Try to find a relevant video by checking titles
         make = loan.get('make', '').lower()
         model = loan.get('model', '').lower()
+        model_full = loan.get('model_full', model).lower()  # Get full model for enhanced matching
         
-        # Create flexible model variations to handle spacing and formatting
+        # ENHANCEMENT: Create flexible model variations including both short and full names
         model_variations = [
-            model,  # Original: "mazda3"
+            model,  # Original: "4runner"
+            model_full,  # Full: "toyota 4runner"
             model.replace('3', ' 3'),  # Add space before number: "mazda 3"
             model.replace('mazda3', 'mazda 3'),  # Specific case: "mazda 3"
             model.replace('civic', 'civic'),  # Keep as is
             model.replace('corolla', 'corolla'),  # Keep as is
         ]
+        
+        # Add make + model combinations for better matching
+        if make and model_full != f"{make} {model}":
+            model_variations.append(f"{make} {model}")  # "toyota 4runner"
         
         # Remove duplicates and empty strings
         model_variations = list(set([v.strip() for v in model_variations if v.strip()]))
@@ -427,8 +577,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                 channel_name = ""
             
             # Build proper YouTube search queries
-            # Use model variations that match actual video titles
-            model_variations = ['mazda 3', 'mazda3']  # Note: 'mazda 3' first (more likely)
+            # ENHANCEMENT: Use the same model variations we built earlier for consistency
+            # This replaces the hardcoded ['mazda 3', 'mazda3'] with dynamic variations
             
             search_queries = []
             if channel_name:
@@ -567,6 +717,13 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Get make and model for finding relevant content
         make = loan.get('make', '')
         model = loan.get('model', '')
+        model_full = loan.get('model_full', model)  # Use full model if available
+        
+        # ENHANCEMENT: Use full model name for broader search context when available
+        # For cases like "4runner" vs "Toyota 4Runner", the full name helps find comparison articles
+        search_model = model_full if model_full and len(model_full) > len(model) else model
+        
+        logger.info(f"Using search model: '{search_model}' (original: '{model}', full: '{model_full}')")
         
         # Get person name for caching if available
         person_name = loan.get('to', loan.get('affiliation', ''))
@@ -575,7 +732,7 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         result = crawler_manager.crawl_url(
             url=url,
             make=make,
-            model=model,
+            model=search_model,  # Use the enhanced model for better search results
             person_name=person_name
         )
         

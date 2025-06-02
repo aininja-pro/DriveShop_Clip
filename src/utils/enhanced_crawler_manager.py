@@ -79,24 +79,50 @@ class EnhancedCrawlerManager:
             return False
         
     def is_generic_content(self, content: str, url: str, make: str, model: str) -> bool:
-        """Detect if content is a generic index page vs specific article"""
+        """Detect if content is a generic index page vs specific article - FIXED VERSION"""
         if not content:
             return True
             
         content_lower = content.lower()
-        make_lower = make.lower()
-        model_lower = model.lower()
+        make_lower = make.lower() if make else ""
+        model_lower = model.lower() if model else ""
         
-        # Check if content mentions the specific make/model we're looking for
-        make_found = make_lower in content_lower
-        model_found = model_lower in content_lower
+        # STRICT CHECK: Both make AND model must be present for specific content
+        # Handle empty make/model values properly - empty strings should be treated as "not found"
+        make_found = bool(make_lower) and (make_lower in content_lower)
+        model_found = bool(model_lower) and (model_lower in content_lower)
         
-        # If neither make nor model is found, it's likely generic content
+        # If NEITHER make nor model is found (or both are empty), it's definitely generic/wrong content
         if not make_found and not model_found:
-            logger.info(f"Generic content detected: {make} {model} not found in content")
+            make_status = f"'{make}' found" if make_found else f"'{make}' NOT found"
+            model_status = f"'{model}' found" if model_found else f"'{model}' NOT found"
+            logger.info(f"WRONG CONTENT detected: {make_status}, {model_status} - ESCALATING")
             return True
             
-        # Check for generic index page indicators
+        # If only ONE of make/model is found, we need to be extra careful
+        # Check for strong indicators that this is actually about our specific vehicle
+        if make_found != model_found:  # Only one of them found
+            found_term = make if make_found else model
+            missing_term = model if make_found else make
+            
+            # Look for the combined make+model phrase to be sure
+            combined_phrases = []
+            if make_lower and model_lower:
+                combined_phrases = [
+                    f'{make_lower} {model_lower}',
+                    f'{model_lower} {make_lower}',
+                    f'{make_lower}-{model_lower}',
+                    f'{model_lower}-{make_lower}'
+                ]
+            
+            combined_found = any(phrase in content_lower for phrase in combined_phrases) if combined_phrases else False
+            
+            if not combined_found:
+                logger.info(f"SUSPICIOUS CONTENT: Only '{found_term}' found, '{missing_term}' missing, no combined phrase - ESCALATING")
+                return True
+        
+        # If we get here, both make and model were found, or we found a combined phrase
+        # Check for obvious generic page indicators that override specific content
         generic_indicators = [
             'car reviews</title>',
             'vehicle reviews</title>',
@@ -104,48 +130,51 @@ class EnhancedCrawlerManager:
             'recent reviews', 
             'all reviews',
             'review archive',
-            'browse reviews',
-            'car review',
-            'vehicle review'
+            'browse reviews'
         ]
         
         title_indicators_found = sum(1 for indicator in generic_indicators if indicator in content_lower)
         
-        # Check for specific article indicators
-        specific_indicators = [
-            f'{make_lower} {model_lower}',
-            f'review: {make_lower}',
-            f'test drive',
-            f'first drive', 
-            f'road test',
-            f'{model_lower} review'
-        ]
-        
-        specific_indicators_found = sum(1 for indicator in specific_indicators if indicator in content_lower)
-        
-        # If we have generic indicators but no specific ones, it's probably an index page
-        if title_indicators_found >= 2 and specific_indicators_found == 0:
-            logger.info(f"Generic content detected: {title_indicators_found} generic indicators, {specific_indicators_found} specific indicators")
+        # If we have multiple generic indicators, it's probably still an index page
+        if title_indicators_found >= 2:
+            logger.info(f"GENERIC PAGE detected: {title_indicators_found} generic indicators found - ESCALATING")
             return True
             
-        # Check URL patterns for generic pages
+        # Check URL patterns for obvious generic pages
         url_lower = url.lower()
         generic_url_patterns = [
-            '/reviews',
-            '/car-reviews', 
-            '/vehicle-reviews',
-            '/review-archive',
-            '/latest-reviews'
+            '/reviews/',
+            '/car-reviews/', 
+            '/vehicle-reviews/',
+            '/review-archive/',
+            '/latest-reviews/'
         ]
         
         is_generic_url = any(pattern in url_lower for pattern in generic_url_patterns)
         
-        # If URL is generic and content doesn't strongly indicate a specific article
-        if is_generic_url and specific_indicators_found < 2:
-            logger.info(f"Generic content detected: generic URL pattern and only {specific_indicators_found} specific indicators")
-            return True
+        # If URL is clearly generic AND we don't have strong content indicators, escalate
+        if is_generic_url:
+            # Look for very specific indicators that this is actually a specific review
+            specific_review_indicators = []
+            if make_lower and model_lower:
+                specific_review_indicators = [
+                    f'{make_lower} {model_lower} review',
+                    f'{model_lower} review',
+                    f'test drive',
+                    f'first drive', 
+                    f'road test',
+                    f'we drove',
+                    f'our test'
+                ]
             
-        logger.info(f"Content appears specific: {specific_indicators_found} specific indicators found")
+            specific_indicators_found = sum(1 for indicator in specific_review_indicators if indicator in content_lower)
+            
+            if specific_indicators_found < 2:
+                logger.info(f"GENERIC URL with weak content: only {specific_indicators_found} specific indicators - ESCALATING")
+                return True
+        
+        # If we get here, content appears to be specifically about our make/model
+        logger.info(f"SPECIFIC CONTENT confirmed: {make} {model} found with sufficient confidence")
         return False
 
     def crawl_url(self, url: str, make: str, model: str, person_name: str = "") -> Dict[str, Any]:
