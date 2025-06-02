@@ -1,23 +1,24 @@
 # Core dependencies
-pandas==2.0.1
-streamlit==1.25.0
-streamlit-aggrid==0.3.4
+pandas==2.0.3
+streamlit==1.45.0
 python-dotenv==1.0.0
 
 # Web crawling
 scrapy==2.8.0
-playwright==1.39.0
-requests==2.30.0
+requests==2.31.0
 
 # YouTube API
-youtube-transcript-api==0.6.1
+youtube-transcript-api==0.4.4
 
 # OpenAI integration
-openai==0.27.8
+openai==0.27.0
 
 # Notifications
-slack-sdk==3.21.3
+slack-sdk==3.19.0
 
 # Utils
 tqdm==4.65.0
-beautifulsoup4==4.12.2 
+beautifulsoup4==4.12.2
+lxml==4.9.3
+aiofiles==23.2.1
+schedule==1.1.0 

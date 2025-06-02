@@ -124,12 +124,12 @@ st.markdown("""
     }
     
     div[data-testid="metric-container"] > div {
-        font-size: 0.7rem;
+        font-size: 0.55rem;
         line-height: 1.3;
     }
     
     div[data-testid="metric-container"] > div:first-child {
-        font-size: 0.65rem;
+        font-size: 0.5rem;
         font-weight: 600;
         color: #6c757d;
         margin-bottom: 0.1rem;
@@ -316,96 +316,82 @@ with bulk_tab:
                 # Compact table with headers
                 st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem;">📊 All Clips</p>', unsafe_allow_html=True)
                 
-                # Add CSS for compact styling
-                st.markdown("""
-                <style>
-                .stButton button {
-                    font-size: 10px !important;
-                    padding: 2px 8px !important;
-                    height: 24px !important;
-                    min-height: 24px !important;
-                }
+                # Use native Streamlit dataframe with LinkColumn - MUCH more reliable!
+                display_df = df.copy()
                 
-                .stMarkdown p {
-                    font-size: 11px !important;
-                    margin: 0 !important;
-                    padding: 2px !important;
-                    line-height: 1.2 !important;
-                }
+                # Format columns for better display
+                display_df['Contact'] = display_df['To'].apply(lambda x: x[:20] + "..." if len(str(x)) > 20 else str(x))
+                display_df['Publication'] = display_df['Affiliation'].apply(lambda x: x[:20] + "..." if len(str(x)) > 20 else str(x))
+                display_df['Score'] = display_df['Relevance Score'].apply(lambda x: f"{x}/10")
+                display_df['Sentiment'] = display_df['Overall Sentiment'].apply(
+                    lambda x: "😊 Pos" if x == "positive" else "😞 Neg" if x == "negative" else "😐 Neu"
+                )
                 
-                .stColumns {
-                    gap: 0.2rem !important;
-                }
+                # Select and reorder columns for display
+                display_columns = ['WO #', 'Model', 'Contact', 'Publication', 'Score', 'Sentiment', 'Clip URL']
+                display_df = display_df[display_columns]
                 
-                div[data-testid="column"] {
-                    padding: 1px !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
+                # Add interactive approve/reject columns
+                display_df['Approve'] = False
+                display_df['Reject'] = False
                 
-                # Create table header
-                header_cols = st.columns([0.8, 1.0, 2.0, 1.8, 0.8, 0.8, 0.8, 1.2])
-                header_cols[0].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">WO #</p>', unsafe_allow_html=True)
-                header_cols[1].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Model</p>', unsafe_allow_html=True)
-                header_cols[2].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Contact</p>', unsafe_allow_html=True)
-                header_cols[3].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Publication</p>', unsafe_allow_html=True)
-                header_cols[4].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Score</p>', unsafe_allow_html=True)
-                header_cols[5].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Link</p>', unsafe_allow_html=True)
-                header_cols[6].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Sentiment</p>', unsafe_allow_html=True)
-                header_cols[7].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Actions</p>', unsafe_allow_html=True)
+                # Use st.data_editor with column_config for clickable links AND interactive checkboxes
+                edited_df = st.data_editor(
+                    display_df,
+                    column_config={
+                        "WO #": st.column_config.TextColumn("WO #", width="small", disabled=True),
+                        "Model": st.column_config.TextColumn("Model", width="medium", disabled=True),
+                        "Contact": st.column_config.TextColumn("Contact", width="medium", disabled=True),
+                        "Publication": st.column_config.TextColumn("Publication", width="medium", disabled=True),
+                        "Score": st.column_config.TextColumn("Score", width="small", disabled=True),
+                        "Sentiment": st.column_config.TextColumn("Sentiment", width="small", disabled=True),
+                        "Clip URL": st.column_config.LinkColumn(
+                            "Link",
+                            width="small",
+                            disabled=True
+                        ),
+                        "Approve": st.column_config.CheckboxColumn(
+                            "✅ Approve",
+                            width="small",
+                            default=False
+                        ),
+                        "Reject": st.column_config.CheckboxColumn(
+                            "❌ Reject", 
+                            width="small",
+                            default=False
+                        ),
+                    },
+                    use_container_width=True,
+                    height=500,
+                    hide_index=True,
+                    key="clip_editor"
+                )
                 
-                st.markdown('<div style="border-bottom: 1px solid #dee2e6; margin: 4px 0;"></div>', unsafe_allow_html=True)
+                # Process approve/reject actions
+                approved_wos = edited_df[edited_df['Approve'] == True]['WO #'].tolist()
+                rejected_wos = edited_df[edited_df['Reject'] == True]['WO #'].tolist()
                 
-                # Create container for scrollable content
-                with st.container():
-                    # Add each row with data and buttons
-                    for idx, (_, row) in enumerate(df.iterrows()):
-                        cols = st.columns([0.8, 1.0, 2.0, 1.8, 0.8, 0.8, 0.8, 1.2])
-                        
-                        # Data columns with small text
-                        cols[0].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{str(row["WO #"])}</p>', unsafe_allow_html=True)
-                        cols[1].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{row["Model"]}</p>', unsafe_allow_html=True)
-                        
-                        contact_short = row['To'][:20] + "..." if len(str(row['To'])) > 20 else str(row['To'])
-                        cols[2].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{contact_short}</p>', unsafe_allow_html=True)
-                        
-                        pub_short = row['Affiliation'][:20] + "..." if len(str(row['Affiliation'])) > 20 else str(row['Affiliation'])
-                        cols[3].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{pub_short}</p>', unsafe_allow_html=True)
-                        
-                        cols[4].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px; color: #28a745; font-weight: 600;">{row["Relevance Score"]}/10</p>', unsafe_allow_html=True)
-                        
-                        # Link column - much smaller now
-                        if row['Clip URL']:
-                            cols[5].markdown(f'<p style="font-size: 9px; margin: 0; padding: 2px;"><a href="{row["Clip URL"]}" target="_blank">📄 View</a></p>', unsafe_allow_html=True)
-                        else:
-                            cols[5].markdown('<p style="font-size: 9px; margin: 0; padding: 2px;">No link</p>', unsafe_allow_html=True)
-                        
-                        # Sentiment with emoji
-                        sentiment = row['Overall Sentiment']
-                        sentiment_emoji = "😊" if sentiment == "positive" else "😞" if sentiment == "negative" else "😐"
-                        cols[6].markdown(f'<p style="font-size: 12px; margin: 0; padding: 2px; text-align: center;">{sentiment_emoji}</p>', unsafe_allow_html=True)
-                        
-                        # Action buttons in the same row
-                        with cols[7]:
-                            action_col1, action_col2 = st.columns(2)
-                            with action_col1:
-                                if st.button("✓", key=f"approve_{idx}"):
-                                    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                                    if os.path.exists(approved_file):
-                                        approved_df = pd.read_csv(approved_file)
-                                        if 'WO #' in approved_df.columns:
-                                            approved_df['WO #'] = approved_df['WO #'].astype(str)
-                                        if str(row['WO #']) not in approved_df['WO #'].values:
-                                            approved_df = pd.concat([approved_df, pd.DataFrame([row])], ignore_index=True)
-                                    else:
-                                        approved_df = pd.DataFrame([row])
-                                    approved_df.to_csv(approved_file, index=False)
-                                    st.success(f"✅ Approved WO #{row['WO #']}")
-                                    st.rerun()
-                            
-                            with action_col2:
-                                if st.button("✗", key=f"reject_{idx}"):
-                                    st.error(f"❌ Rejected WO #{row['WO #']}")
+                if approved_wos:
+                    st.success(f"✅ {len(approved_wos)} clips marked for approval: {', '.join(map(str, approved_wos))}")
+                    
+                    # Auto-save approved clips
+                    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                    selected_rows = df[df['WO #'].astype(str).isin(map(str, approved_wos))]
+                    
+                    if os.path.exists(approved_file):
+                        approved_df = pd.read_csv(approved_file)
+                        if 'WO #' in approved_df.columns:
+                            approved_df['WO #'] = approved_df['WO #'].astype(str)
+                        # Only add rows that aren't already approved
+                        new_rows = selected_rows[~selected_rows['WO #'].astype(str).isin(approved_df['WO #'].astype(str))]
+                        if not new_rows.empty:
+                            approved_df = pd.concat([approved_df, new_rows], ignore_index=True)
+                            approved_df.to_csv(approved_file, index=False)
+                    else:
+                        selected_rows.to_csv(approved_file, index=False)
+                
+                if rejected_wos:
+                    st.warning(f"❌ {len(rejected_wos)} clips marked for rejection: {', '.join(map(str, rejected_wos))}")
                 
                 st.markdown("---")
                 
