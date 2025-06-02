@@ -40,11 +40,11 @@ sys.path.append(str(project_root))
 
 # Import local modules
 try:
-    from src.ingest.ingest import run_ingest
+    from src.ingest.ingest import run_ingest_concurrent
 except ImportError:
     # Define a stub for when the module is not yet implemented
-    def run_ingest(file_path):
-        st.error("Ingest module not implemented yet")
+    def run_ingest_concurrent(file_path):
+        st.error("Concurrent ingest module not implemented yet")
         return False
 
 # Load environment variables
@@ -69,87 +69,176 @@ st.title("DriveShop Clip Tracking Dashboard")
 # Custom CSS for better styling
 st.markdown("""
 <style>
-    /* Reduce font sizes for metrics */
-    .metric-container {
-        font-size: 0.8rem;
+    /* Modern, tighter typography */
+    .main > div {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+        padding-top: 1.5rem !important;
     }
     
-    /* Compact metric styling */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 1rem !important;
+    }
+    
+    /* Fix main title visibility */
+    h1 {
+        font-size: 1.8rem !important;
+        font-weight: 600 !important;
+        line-height: 1.3 !important;
+        margin-bottom: 1rem !important;
+        margin-top: 0.5rem !important;
+        padding-top: 0.5rem !important;
+        color: #1a1a1a !important;
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+        z-index: 999 !important;
+    }
+    
+    /* Ensure title container has space */
+    .stApp > header {
+        background-color: transparent;
+    }
+    
+    /* Compact table header styling */
+    .clip-table-header {
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        color: #5a6c7d !important;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        background-color: #f8f9fa;
+        padding: 0.4rem 0.3rem;
+        border-bottom: 2px solid #adb5bd;
+        text-align: center;
+    }
+    
+    /* Compact metrics */
     div[data-testid="metric-container"] {
         background-color: #f8f9fa;
         border: 1px solid #e9ecef;
         padding: 0.5rem;
         border-radius: 0.25rem;
-        margin: 0.1rem 0;
+        margin: 0.2rem 0;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     
     div[data-testid="metric-container"] > div {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
+        line-height: 1.3;
     }
     
     div[data-testid="metric-container"] > div:first-child {
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 600;
         color: #6c757d;
+        margin-bottom: 0.1rem;
     }
     
-    /* Compact expander styling */
-    .streamlit-expanderHeader {
-        font-size: 0.9rem;
-        font-weight: 600;
+    /* Add breathing room after header */
+    .first-row {
+        padding-top: 18px !important;
     }
     
-    /* Smaller buttons */
-    .stButton > button {
-        height: 2.5rem;
-        font-size: 0.85rem;
+    /* Table row styling */
+    .table-row {
+        padding: 6px 4px;
+        min-height: 1.8rem;
+        display: flex;
+        align-items: center;
+        text-align: center;
+        font-size: 0.7rem;
+        line-height: 1.2;
     }
     
-    /* Compact dataframe */
-    .dataframe {
-        font-size: 0.8rem;
+    /* Better button targeting - all buttons in action columns */
+    div[data-testid="column"]:last-child div[data-testid="stButton"]:nth-child(1) button {
+        background: #28a745 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 3px 12px !important;
+        height: 1.8rem !important;
     }
     
-    /* Reduce spacing in columns */
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
+    div[data-testid="column"]:last-child div[data-testid="stButton"]:nth-child(3) button {
+        background: #dc3545 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 3px 12px !important;
+        height: 1.8rem !important;
     }
     
-    /* Make selectbox more compact */
-    .stSelectbox > div > div {
-        font-size: 0.85rem;
+    /* More aggressive targeting for all checkmark buttons */
+    button:contains("✓") {
+        background-color: #28a745 !important;
+        color: white !important;
+    }
+    
+    /* More aggressive targeting for all X buttons */
+    button:contains("✗") {
+        background-color: #dc3545 !important;
+        color: white !important;
+    }
+    
+    /* Universal button override */
+    .stButton button {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 3px 12px !important;
+        border: none !important;
+        border-radius: 4px !important;
+        height: 1.8rem !important;
+    }
+    
+    /* Score color styling */
+    .score-high { color: #28a745; font-weight: 600; }
+    .score-med { color: #007bff; font-weight: 600; }
+    .score-low { color: #ffc107; font-weight: 600; }
+    
+    /* Scrollable table styling */
+    .scrollable-table {
+        max-height: 450px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background: white;
+    }
+    
+    .fixed-header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: white;
+        border-bottom: 2px solid #adb5bd;
+        padding: 0.2rem 0;
+    }
+    
+    /* Smooth scrolling */
+    .scrollable-table::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .scrollable-table::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    .scrollable-table::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+    }
+    
+    .scrollable-table::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Debug section
-with st.expander("Debug Information", expanded=False):
-    st.write("App is running")
-    st.write(f"Project root: {project_root}")
-    
-    results_file = os.path.join(project_root, "data", "loan_results.csv")
-    if os.path.exists(results_file):
-        st.write(f"Results file exists at: {results_file}")
-        
-        try:
-            df = pd.read_csv(results_file)
-            st.write(f"Results file contains {len(df)} rows")
-            st.write("Columns in results file:")
-            st.write(df.columns.tolist())
-            
-            # Ensure WO # is treated as string to avoid comma formatting
-            if 'WO #' in df.columns:
-                df['WO #'] = df['WO #'].astype(str)
-            
-            # Show first row as an example
-            if not df.empty:
-                st.write("First row example:")
-                st.write(df.iloc[0].to_dict())
-        except Exception as e:
-            st.write(f"Error loading results file: {e}")
-    else:
-        st.write(f"Results file does not exist at: {results_file}")
 
 # Sidebar for uploading files and running ingestion
 with st.sidebar:
@@ -165,7 +254,7 @@ with st.sidebar:
         # Run ingestion button
         if st.button("Process Uploaded File"):
             with st.spinner("Processing loans..."):
-                success = run_ingest(temp_file_path)
+                success = run_ingest_concurrent(temp_file_path)
                 if success:
                     st.success("Processing complete!")
                 else:
@@ -176,249 +265,462 @@ with st.sidebar:
     if st.button("Process Existing Data"):
         with st.spinner("Processing existing loan data..."):
             default_file = os.path.join(project_root, "data", "fixtures", "Loans_without_Clips.csv")
-            success = run_ingest(default_file)
+            success = run_ingest_concurrent(default_file)
             if success:
                 st.success("Processing complete!")
             else:
                 st.error("Processing failed. Check logs for details.")
 
-# Main content area with tabs
-tab1, tab2 = st.tabs(["Pending Clips", "Approved Clips"])
+# Main content area with tabs for different workflows
+st.markdown("---")
 
-with tab1:
-    st.header("Pending Clips for Review")
+# Create tabs for different user workflows
+bulk_tab, analysis_tab = st.tabs(["📋 Bulk Review", "🔍 Detailed Analysis"])
+
+# ========== BULK REVIEW TAB (New Worker Interface) ==========
+with bulk_tab:
+    st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">📋 Quick Clip Review</p>', unsafe_allow_html=True)
     
-    # Try to load results file if it exists
+    # Try to load results file
     results_file = os.path.join(project_root, "data", "loan_results.csv")
     if os.path.exists(results_file):
         try:
             df = pd.read_csv(results_file)
             
-            # Ensure WO # is treated as string to avoid comma formatting
+            # Ensure WO # is treated as string
             if 'WO #' in df.columns:
                 df['WO #'] = df['WO #'].astype(str)
             
             if not df.empty:
-                # Display the data in a table - use columns that exist in the file
-                display_columns = ["WO #", "Model", "To", "Affiliation"]
+                # Quick stats overview
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Clips", len(df))
+                with col2:
+                    avg_score = df['Relevance Score'].mean() if 'Relevance Score' in df.columns else 0
+                    st.metric("Avg Score", f"{avg_score:.1f}/10")
+                with col3:
+                    high_quality = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns else 0
+                    st.metric("High Quality", high_quality)
+                with col4:
+                    # Check approved count
+                    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                    approved_count = 0
+                    if os.path.exists(approved_file):
+                        approved_df = pd.read_csv(approved_file)
+                        approved_count = len(approved_df)
+                    st.metric("Approved", approved_count)
                 
-                # Add optional columns if they exist
-                optional_columns = ["Relevance Score", "Clip URL"]
-                for col in optional_columns:
-                    if col in df.columns:
-                        display_columns.append(col)
+                st.markdown("---")
                 
-                # Filter to columns that actually exist in the DataFrame
-                actual_display_columns = [col for col in display_columns if col in df.columns]
+                # Compact table with headers
+                st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem;">📊 All Clips</p>', unsafe_allow_html=True)
                 
-                if actual_display_columns:
-                    st.dataframe(
-                        df[actual_display_columns],
-                        use_container_width=True,
-                        hide_index=True
-                    )
-                else:
-                    st.error("Could not find any expected columns in the results file. Please check the data format.")
-                    st.write("Available columns:", df.columns.tolist())
+                # Add CSS for compact styling
+                st.markdown("""
+                <style>
+                .stButton button {
+                    font-size: 10px !important;
+                    padding: 2px 8px !important;
+                    height: 24px !important;
+                    min-height: 24px !important;
+                }
                 
-                # When a row is selected, show details
-                if "WO #" in df.columns:
-                    selected_wo = st.selectbox("Select Work Order to Review", df["WO #"].unique())
-                    
-                    if selected_wo:
-                        selected_row = df[df["WO #"] == selected_wo].iloc[0]
+                .stMarkdown p {
+                    font-size: 11px !important;
+                    margin: 0 !important;
+                    padding: 2px !important;
+                    line-height: 1.2 !important;
+                }
+                
+                .stColumns {
+                    gap: 0.2rem !important;
+                }
+                
+                div[data-testid="column"] {
+                    padding: 1px !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Create table header
+                header_cols = st.columns([0.8, 1.0, 2.0, 1.8, 0.8, 0.8, 0.8, 1.2])
+                header_cols[0].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">WO #</p>', unsafe_allow_html=True)
+                header_cols[1].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Model</p>', unsafe_allow_html=True)
+                header_cols[2].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Contact</p>', unsafe_allow_html=True)
+                header_cols[3].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Publication</p>', unsafe_allow_html=True)
+                header_cols[4].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Score</p>', unsafe_allow_html=True)
+                header_cols[5].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Link</p>', unsafe_allow_html=True)
+                header_cols[6].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Sentiment</p>', unsafe_allow_html=True)
+                header_cols[7].markdown('<p style="font-size: 10px; font-weight: 600; margin: 0; padding: 4px;">Actions</p>', unsafe_allow_html=True)
+                
+                st.markdown('<div style="border-bottom: 1px solid #dee2e6; margin: 4px 0;"></div>', unsafe_allow_html=True)
+                
+                # Create container for scrollable content
+                with st.container():
+                    # Add each row with data and buttons
+                    for idx, (_, row) in enumerate(df.iterrows()):
+                        cols = st.columns([0.8, 1.0, 2.0, 1.8, 0.8, 0.8, 0.8, 1.2])
                         
-                        # Header section with key info
-                        st.markdown(f"### {selected_row.get('Model', 'Unknown Model')}")
+                        # Data columns with small text
+                        cols[0].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{str(row["WO #"])}</p>', unsafe_allow_html=True)
+                        cols[1].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{row["Model"]}</p>', unsafe_allow_html=True)
                         
-                        # Basic info in a compact row
-                        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
-                        with info_col1:
-                            st.markdown(f"**Media Contact:** {selected_row.get('To', 'N/A')}")
-                        with info_col2:
-                            st.markdown(f"**Publication:** {selected_row.get('Affiliation', 'N/A')}")
-                        with info_col3:
-                            if 'Clip URL' in selected_row:
-                                st.markdown(f"**[📄 Review Link]({selected_row['Clip URL']})**")
-                        with info_col4:
-                            if 'Links' in selected_row:
-                                st.markdown(f"**[🔗 Original]({selected_row['Links']})**")
+                        contact_short = row['To'][:20] + "..." if len(str(row['To'])) > 20 else str(row['To'])
+                        cols[2].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{contact_short}</p>', unsafe_allow_html=True)
                         
-                        st.divider()
+                        pub_short = row['Affiliation'][:20] + "..." if len(str(row['Affiliation'])) > 20 else str(row['Affiliation'])
+                        cols[3].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px;">{pub_short}</p>', unsafe_allow_html=True)
                         
-                        # Key scores in a prominent row
-                        score_col1, score_col2, score_col3, score_col4 = st.columns(4)
-                        with score_col1:
-                            overall_score = selected_row.get('Overall Score', 'N/A')
-                            st.metric("📊 Overall Score", f"{overall_score}/10" if overall_score != 'N/A' else 'N/A')
-                        with score_col2:
-                            relevance_score = selected_row.get('Relevance Score', 'N/A')
-                            st.metric("🎯 Relevance", f"{relevance_score}/10" if relevance_score != 'N/A' else 'N/A')
-                        with score_col3:
-                            sentiment = selected_row.get('Sentiment', 'N/A')
-                            sentiment_emoji = "😊" if sentiment == "positive" else "😐" if sentiment == "neutral" else "😞"
-                            st.metric("💭 Sentiment", f"{sentiment_emoji} {sentiment.title()}" if sentiment != 'N/A' else 'N/A')
-                        with score_col4:
-                            alignment = selected_row.get('Brand Alignment', False)
-                            st.metric("🎨 Brand Fit", "✅ Yes" if alignment else "❌ No")
+                        cols[4].markdown(f'<p style="font-size: 10px; margin: 0; padding: 2px; color: #28a745; font-weight: 600;">{row["Relevance Score"]}/10</p>', unsafe_allow_html=True)
                         
-                        # Decision buttons in a prominent position
-                        st.markdown("#### 📋 Review Decision")
-                        decision_col1, decision_col2, decision_col3 = st.columns([1, 1, 2])
-                        with decision_col1:
-                            if st.button("✅ Approve Clip", key=f"approve_{selected_wo}", use_container_width=True):
-                                # Logic to move to approved list
-                                st.success(f"Clip for WO #{selected_wo} approved!")
-                                
-                                # Try to load or create approved clips file
-                                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                                
-                                if os.path.exists(approved_file):
-                                    approved_df = pd.read_csv(approved_file)
-                                    # Check if this WO is already in the approved list
-                                    if "WO #" in approved_df.columns and selected_wo not in approved_df["WO #"].values:
-                                        approved_df = pd.concat([approved_df, pd.DataFrame([selected_row])], ignore_index=True)
-                                else:
-                                    approved_df = pd.DataFrame([selected_row])
-                                
-                                # Save the updated approved clips
-                                approved_df.to_csv(approved_file, index=False)
-                                
-                                # Rerun the app to update the UI
-                                st.rerun()
-                        with decision_col2:
-                            if st.button("❌ Flag for Review", key=f"flag_{selected_wo}", use_container_width=True):
-                                st.warning(f"Clip for WO #{selected_wo} flagged for review")
-                        with decision_col3:
-                            rec = selected_row.get('Recommendation', '')
-                            if rec:
-                                if 'would recommend' in rec.lower():
-                                    st.info("🤖 **AI Recommendation:** 👍 Recommend")
-                                elif 'would not recommend' in rec.lower():
-                                    st.info("🤖 **AI Recommendation:** 👎 Not Recommend")
-                                else:
-                                    st.info("🤖 **AI Recommendation:** 🤔 Consider")
+                        # Link column - much smaller now
+                        if row['Clip URL']:
+                            cols[5].markdown(f'<p style="font-size: 9px; margin: 0; padding: 2px;"><a href="{row["Clip URL"]}" target="_blank">📄 View</a></p>', unsafe_allow_html=True)
+                        else:
+                            cols[5].markdown('<p style="font-size: 9px; margin: 0; padding: 2px;">No link</p>', unsafe_allow_html=True)
                         
-                        # Detailed analysis in organized sections
-                        with st.expander("📈 Detailed Aspect Scores", expanded=True):
-                            aspect_col1, aspect_col2, aspect_col3, aspect_col4, aspect_col5 = st.columns(5)
+                        # Sentiment with emoji
+                        sentiment = row['Overall Sentiment']
+                        sentiment_emoji = "😊" if sentiment == "positive" else "😞" if sentiment == "negative" else "😐"
+                        cols[6].markdown(f'<p style="font-size: 12px; margin: 0; padding: 2px; text-align: center;">{sentiment_emoji}</p>', unsafe_allow_html=True)
+                        
+                        # Action buttons in the same row
+                        with cols[7]:
+                            action_col1, action_col2 = st.columns(2)
+                            with action_col1:
+                                if st.button("✓", key=f"approve_{idx}"):
+                                    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                                    if os.path.exists(approved_file):
+                                        approved_df = pd.read_csv(approved_file)
+                                        if 'WO #' in approved_df.columns:
+                                            approved_df['WO #'] = approved_df['WO #'].astype(str)
+                                        if str(row['WO #']) not in approved_df['WO #'].values:
+                                            approved_df = pd.concat([approved_df, pd.DataFrame([row])], ignore_index=True)
+                                    else:
+                                        approved_df = pd.DataFrame([row])
+                                    approved_df.to_csv(approved_file, index=False)
+                                    st.success(f"✅ Approved WO #{row['WO #']}")
+                                    st.rerun()
                             
-                            aspects = [
-                                ('Performance Score', 'Performance Note', '🏎️ Performance', aspect_col1),
-                                ('Design Score', 'Design Note', '🎨 Design', aspect_col2),
-                                ('Interior Score', 'Interior Note', '🪑 Interior', aspect_col3),
-                                ('Technology Score', 'Technology Note', '💻 Technology', aspect_col4),
-                                ('Value Score', 'Value Note', '💰 Value', aspect_col5)
-                            ]
-                            
-                            for score_field, note_field, label, col in aspects:
-                                with col:
-                                    score = selected_row.get(score_field, 0)
-                                    note = selected_row.get(note_field, '')
-                                    if score and score != 0:
-                                        st.metric(label, f"{score}/10", help=note if note else None)
-                                    else:
-                                        st.metric(label, "N/A")
-                        
-                        # Summary section
-                        if 'Summary' in selected_row and selected_row['Summary']:
-                            with st.expander("📝 AI Summary", expanded=True):
-                                st.markdown(f"*{selected_row['Summary']}*")
-                        
-                        # Pros and Cons in a clean layout
-                        pros_text = selected_row.get('Pros', '')
-                        cons_text = selected_row.get('Cons', '')
-                        if pros_text or cons_text:
-                            with st.expander("⚖️ Pros & Cons Analysis", expanded=False):
-                                pros_col, cons_col = st.columns(2)
-                                
-                                with pros_col:
-                                    st.markdown("**✅ Strengths**")
-                                    if pros_text and pros_text.strip():
-                                        pros_list = [p.strip() for p in pros_text.split('|') if p.strip()]
-                                        for pro in pros_list:
-                                            st.markdown(f"• {pro}")
-                                    else:
-                                        st.markdown("*No specific strengths highlighted*")
-                                
-                                with cons_col:
-                                    st.markdown("**❌ Areas for Improvement**")
-                                    if cons_text and cons_text.strip():
-                                        cons_list = [c.strip() for c in cons_text.split('|') if c.strip()]
-                                        for con in cons_list:
-                                            st.markdown(f"• {con}")
-                                    else:
-                                        st.markdown("*No specific concerns noted*")
-                        
-                        # Key Mentions section
-                        key_mentions = selected_row.get('Key Mentions', '')
-                        if key_mentions and key_mentions != '[]':
-                            with st.expander("🔑 Key Features Mentioned", expanded=False):
-                                try:
-                                    import ast
-                                    mentions_list = ast.literal_eval(key_mentions)
-                                    if mentions_list:
-                                        mentions_str = ", ".join([f"`{mention}`" for mention in mentions_list])
-                                        st.markdown(mentions_str)
-                                except:
-                                    st.markdown(f"`{key_mentions}`")
+                            with action_col2:
+                                if st.button("✗", key=f"reject_{idx}"):
+                                    st.error(f"❌ Rejected WO #{row['WO #']}")
+                
+                st.markdown("---")
+                
+                # Bulk actions
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button("✅ Approve All High Quality (9+)"):
+                        high_quality_df = df[df['Relevance Score'] >= 9]
+                        if not high_quality_df.empty:
+                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                            if os.path.exists(approved_file):
+                                approved_df = pd.read_csv(approved_file)
+                                approved_df = pd.concat([approved_df, high_quality_df], ignore_index=True)
+                            else:
+                                approved_df = high_quality_df.copy()
+                            approved_df.to_csv(approved_file, index=False)
+                            st.success(f"✅ Approved {len(high_quality_df)} clips!")
+                            st.rerun()
+                
+                with col2:
+                    if st.button("📤 Export Approved"):
+                        approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                        if os.path.exists(approved_file):
+                            approved_df = pd.read_csv(approved_file)
+                            csv_data = approved_df.to_csv(index=False)
+                            st.download_button(
+                                "📥 Download CSV",
+                                data=csv_data,
+                                file_name=f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                                mime="text/csv"
+                            )
+                        else:
+                            st.warning("No approved clips to export")
+                
+                with col3:
+                    if st.button("🔄 Refresh"):
+                        st.rerun()
             else:
-                st.info("No pending clips to review. Upload a CSV file or process existing data.")
-        
+                st.info("No clips to review. Process loans first.")
         except Exception as e:
-            st.error(f"Error loading results: {str(e)}")
-            st.info("Try uploading a CSV file or processing existing data.")
+            st.error(f"Error loading clips: {e}")
     else:
-        st.info("No results file found. Upload a CSV file or process existing data to begin.")
+        st.info("No results file found. Upload and process loans to begin.")
 
-with tab2:
-    st.header("Approved Clips")
+# ========== DETAILED ANALYSIS TAB (Existing 40/60 Interface) ==========
+with analysis_tab:
+    # Create 40/60 split columns for detailed analysis
+    left_pane, right_pane = st.columns([0.4, 0.6])
     
-    # Try to load approved clips file if it exists
-    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-    if os.path.exists(approved_file):
-        try:
-            approved_df = pd.read_csv(approved_file)
-            
-            # Ensure WO # is treated as string to avoid comma formatting
-            if 'WO #' in approved_df.columns:
-                approved_df['WO #'] = approved_df['WO #'].astype(str)
-            
-            if not approved_df.empty:
-                # Display the approved clips - use columns that exist in the file
-                display_columns = ["WO #", "Model", "To", "Affiliation"]
-                
-                # Add optional columns if they exist
-                optional_columns = ["Clip URL", "Links"]
-                for col in optional_columns:
-                    if col in approved_df.columns:
-                        display_columns.append(col)
-                
-                # Filter to columns that actually exist in the DataFrame
-                actual_display_columns = [col for col in display_columns if col in approved_df.columns]
-                
-                if actual_display_columns:
-                    st.dataframe(
-                        approved_df[actual_display_columns],
-                        use_container_width=True,
-                        hide_index=True
-                    )
-                else:
-                    st.error("Could not find any expected columns in the approved file. Please check the data format.")
-                    st.write("Available columns:", approved_df.columns.tolist())
-                
-                # Export button
-                if st.download_button(
-                    "Export Approved Clips",
-                    data=approved_df.to_csv(index=False),
-                    file_name="approved_clips.csv",
-                    mime="text/csv"
-                ):
-                    st.success("File downloaded successfully")
-            else:
-                st.info("No approved clips yet. Review and approve clips from the Pending Clips tab.")
+    with left_pane:
+        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">📊 Command Center</p>', unsafe_allow_html=True)
         
-        except Exception as e:
-            st.error(f"Error loading approved clips: {str(e)}")
-    else:
-        st.info("No approved clips file found. Review and approve clips from the Pending Clips tab.") 
+        # Try to load results file for summary
+        results_file = os.path.join(project_root, "data", "loan_results.csv")
+        if os.path.exists(results_file):
+            try:
+                df = pd.read_csv(results_file)
+                
+                # Ensure WO # is treated as string
+                if 'WO #' in df.columns:
+                    df['WO #'] = df['WO #'].astype(str)
+                
+                if not df.empty:
+                    # Overview Stats
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">🎯 Overview</p>', unsafe_allow_html=True)
+                    total_loans = len(df)
+                    avg_relevance = df['Relevance Score'].mean() if 'Relevance Score' in df.columns else 0
+                    high_relevance = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns else 0
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total Loans", total_loans)
+                    with col2:
+                        st.metric("Avg Relevance", f"{avg_relevance:.1f}/10")
+                    with col3:
+                        st.metric("High Quality", f"{high_relevance}/{total_loans}")
+                    
+                    # Group by Media Personality
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">👥 By Media Personality</p>', unsafe_allow_html=True)
+                    
+                    # Create grouping by 'To' field (media contact)
+                    if 'To' in df.columns:
+                        personality_stats = df.groupby('To').agg({
+                            'WO #': 'count',
+                            'Relevance Score': ['mean', 'min'] if 'Relevance Score' in df.columns else 'count'
+                        }).round(1)
+                        
+                        # Flatten column names
+                        if 'Relevance Score' in df.columns:
+                            personality_stats.columns = ['Count', 'Avg_Score', 'Min_Score']
+                            personality_stats['Success_Rate'] = (personality_stats['Min_Score'] >= 7).astype(int) * 100
+                        else:
+                            personality_stats.columns = ['Count']
+                            personality_stats['Avg_Score'] = 10.0
+                            personality_stats['Success_Rate'] = 100
+                        
+                        # Sort by count and avg score
+                        personality_stats = personality_stats.sort_values(['Count', 'Avg_Score'], ascending=[False, False])
+                        
+                        # Display as interactive table
+                        selected_personality = st.selectbox(
+                            "Select Media Personality:",
+                            options=[''] + list(personality_stats.index),
+                            format_func=lambda x: f"{x} ({personality_stats.loc[x, 'Count']} loans, {personality_stats.loc[x, 'Avg_Score']:.1f}/10)" if x else "-- Select --"
+                        )
+                        
+                        # Show personality stats as metrics
+                        if selected_personality:
+                            stats = personality_stats.loc[selected_personality]
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Loans", int(stats['Count']))
+                            with col2:
+                                st.metric("Avg Score", f"{stats['Avg_Score']:.1f}/10")
+                    
+                    # Compact Loans List
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Loans List</p>', unsafe_allow_html=True)
+                    
+                    # Filter to selected personality if any
+                    filtered_df = df.copy()
+                    if selected_personality:
+                        filtered_df = filtered_df[filtered_df['To'] == selected_personality]
+                    
+                    # Display compact table
+                    if not filtered_df.empty:
+                        display_cols = ['WO #', 'Model', 'To']
+                        if 'Relevance Score' in filtered_df.columns:
+                            display_cols.append('Relevance Score')
+                        
+                        # Make table clickable by using selectbox
+                        selected_wo = st.selectbox(
+                            "Select Work Order:",
+                            options=[''] + list(filtered_df['WO #'].values),
+                            format_func=lambda x: f"{x} - {filtered_df[filtered_df['WO #']==x]['Model'].iloc[0]} ({filtered_df[filtered_df['WO #']==x]['Relevance Score'].iloc[0]}/10)" if x else "-- Select Loan --"
+                        )
+                        
+                        # Store selected work order in session state
+                        if selected_wo:
+                            st.session_state.selected_work_order = selected_wo
+                    
+                    # Action Buttons
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Quick Actions</p>', unsafe_allow_html=True)
+                    if st.button("📤 Export All Approved", use_container_width=True, key="export_detailed"):
+                        approved_data = df.to_csv(index=False)
+                        st.download_button(
+                            "📥 Download CSV",
+                            data=approved_data,
+                            file_name=f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                            key="download_detailed"
+                        )
+                else:
+                    st.info("No data available. Process loans to see summary.")
+            except Exception as e:
+                st.error(f"Error loading data: {e}")
+        else:
+            st.info("No results file found. Upload and process loans to begin.")
+    
+    with right_pane:
+        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">🔍 Loan Inspector</p>', unsafe_allow_html=True)
+        
+        # Show details if a work order is selected
+        selected_wo = st.session_state.get('selected_work_order', None)
+        
+        if selected_wo and os.path.exists(results_file):
+            try:
+                df = pd.read_csv(results_file)
+                if 'WO #' in df.columns:
+                    df['WO #'] = df['WO #'].astype(str)
+                
+                selected_row = df[df['WO #'] == selected_wo]
+                if not selected_row.empty:
+                    selected_row = selected_row.iloc[0]
+                    
+                    # Header with model info
+                    st.markdown(f"#### {selected_row.get('Model', 'Unknown Model')} - WO #{selected_wo}")
+                    
+                    # Rebalanced info in 3 columns for better distribution
+                    info_col1, info_col2, info_col3 = st.columns(3)
+                    with info_col1:
+                        st.markdown(f"**👤 Contact**  \n{selected_row.get('To', 'N/A')}")
+                    with info_col2:
+                        st.markdown(f"**📰 Publication**  \n{selected_row.get('Affiliation', 'N/A')}")
+                    with info_col3:
+                        link_html = ""
+                        if 'Clip URL' in selected_row and selected_row['Clip URL']:
+                            link_html += f"**[📄 Review Link]({selected_row['Clip URL']})**  \n"
+                        if 'Links' in selected_row and selected_row['Links']:
+                            link_html += f"**[🔗 Original]({selected_row['Links']})**"
+                        if link_html:
+                            st.markdown(link_html)
+                    
+                    # Key metrics in prominent display
+                    st.markdown("---")
+                    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                    
+                    with metric_col1:
+                        overall_score = selected_row.get('Overall Score', 'N/A')
+                        st.metric("📊 Overall", f"{overall_score}/10" if overall_score != 'N/A' else 'N/A')
+                    
+                    with metric_col2:
+                        relevance_score = selected_row.get('Relevance Score', 'N/A')
+                        st.metric("🎯 Relevance", f"{relevance_score}/10" if relevance_score != 'N/A' else 'N/A')
+                    
+                    with metric_col3:
+                        sentiment = selected_row.get('Overall Sentiment', 'N/A')
+                        sentiment_emoji = "😊" if sentiment == "positive" else "😞" if sentiment == "negative" else "😐"
+                        st.metric("💭 Sentiment", f"{sentiment_emoji} {sentiment.title()}" if sentiment != 'N/A' else 'N/A')
+                    
+                    with metric_col4:
+                        alignment = selected_row.get('Brand Alignment', False)
+                        st.metric("🎨 Brand Fit", "✅ Yes" if alignment else "❌ No")
+                    
+                    # Decision buttons
+                    st.markdown("---")
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Review Decision</p>', unsafe_allow_html=True)
+                    
+                    decision_col1, decision_col2, decision_col3 = st.columns([1, 1, 2])
+                    with decision_col1:
+                        if st.button("✓", key=f"approve_detailed_{selected_wo}", use_container_width=True, help="Approve"):
+                            # Move to approved list logic
+                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                            if os.path.exists(approved_file):
+                                approved_df = pd.read_csv(approved_file)
+                                if 'WO #' in approved_df.columns and selected_wo not in approved_df['WO #'].astype(str).values:
+                                    approved_df = pd.concat([approved_df, pd.DataFrame([selected_row])], ignore_index=True)
+                            else:
+                                approved_df = pd.DataFrame([selected_row])
+                            approved_df.to_csv(approved_file, index=False)
+                            st.success(f"✅ Approved WO #{selected_wo}")
+                            
+                    with decision_col2:
+                        if st.button("✗", key=f"reject_detailed_{selected_wo}", use_container_width=True, help="Reject"):
+                            st.warning(f"⚠️ Flagged WO #{selected_wo}")
+                    
+                    with decision_col3:
+                        rec = selected_row.get('Recommendation', '')
+                        if rec:
+                            if 'would recommend' in rec.lower():
+                                st.info("🤖 **AI:** 👍 Recommend")
+                            elif 'would not recommend' in rec.lower():
+                                st.info("🤖 **AI:** 👎 Not Recommend")
+                            else:
+                                st.info("🤖 **AI:** 🤔 Consider")
+                    
+                    # Detailed analysis sections (keep all existing functionality)
+                    with st.expander("📈 Aspect Breakdown", expanded=False):
+                        aspect_col1, aspect_col2, aspect_col3, aspect_col4, aspect_col5 = st.columns(5)
+                        
+                        aspects = [
+                            ('Performance Score', 'Performance Note', '🏎️ Performance', aspect_col1),
+                            ('Design Score', 'Design Note', '🎨 Design', aspect_col2),
+                            ('Interior Score', 'Interior Note', '🪑 Interior', aspect_col3),
+                            ('Technology Score', 'Technology Note', '💻 Technology', aspect_col4),
+                            ('Value Score', 'Value Note', '💰 Value', aspect_col5)
+                        ]
+                        
+                        for score_field, note_field, label, col in aspects:
+                            with col:
+                                score = selected_row.get(score_field, 0)
+                                note = selected_row.get(note_field, '')
+                                if score and score != 0:
+                                    st.metric(label, f"{score}/10", help=note if note else None)
+                                else:
+                                    st.metric(label, "N/A")
+                    
+                    # Summary
+                    if 'Summary' in selected_row and selected_row['Summary']:
+                        with st.expander("📝 AI Summary", expanded=True):
+                            st.markdown(f"*{selected_row['Summary']}*")
+                    
+                    # Pros and Cons
+                    pros_text = selected_row.get('Pros', '')
+                    cons_text = selected_row.get('Cons', '')
+                    if pros_text or cons_text:
+                        with st.expander("⚖️ Pros & Cons", expanded=False):
+                            pros_col, cons_col = st.columns(2)
+                            
+                            with pros_col:
+                                st.markdown("**✅ Strengths**")
+                                if pros_text and pros_text.strip():
+                                    pros_list = [p.strip() for p in pros_text.split('|') if p.strip()]
+                                    for pro in pros_list:
+                                        st.markdown(f"• {pro}")
+                                else:
+                                    st.markdown("*No specific strengths highlighted*")
+                            
+                            with cons_col:
+                                st.markdown("**❌ Areas for Improvement**")
+                                if cons_text and cons_text.strip():
+                                    cons_list = [c.strip() for c in cons_text.split('|') if c.strip()]
+                                    for con in cons_list:
+                                        st.markdown(f"• {con}")
+                                else:
+                                    st.markdown("*No specific concerns noted*")
+                    
+                    # Add bottom spacing for better visual separation
+                    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+                else:
+                    st.warning("Selected work order not found in data.")
+            except Exception as e:
+                st.error(f"Error loading loan details: {e}")
+        else:
+            st.info("👈 Select a loan from the Command Center to view details")
+            
+            # Show helpful instructions
+            st.markdown("""
+            **How to use:**
+            1. 📤 **Upload/Process** loans in the sidebar
+            2. 👥 **Select** a media personality or filter loans  
+            3. 📋 **Choose** a specific work order to review
+            4. ✅ **Approve** or ⚠️ **flag** the clip
+            5. 📤 **Export** approved clips when ready
+            """)
+            
+            # Add extra bottom spacing
+            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True) 

@@ -1,6 +1,7 @@
 # Core dependencies
 pandas==2.0.1
 streamlit==1.25.0
+streamlit-aggrid==0.3.4
 python-dotenv==1.0.0
 
 # Web crawling

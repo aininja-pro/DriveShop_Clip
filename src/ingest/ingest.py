@@ -1,3 +1,29 @@
+### DO NOT TOUCH THIS CONTRACT ###
+# `process_loan(loan)` MUST keep its current logic:
+#  - Four-tier escalation (Google, HTTP, ScrapingBee, playwright)
+#  - Vehicle-specific GPT prompt with {make} {model}
+#  - Returns dict with keys:
+#       work_order, media, make_model, status, url, snippet, logs
+#
+# It currently achieves ~100% recall on our test set.
+#
+# We only want to speed up **overall throughput** by running
+# many of these calls in parallel, WITHOUT changing inside
+# `process_loan`.  Acceptable changes:
+#  - Async / ThreadPool wrapper
+#  - Result aggregation
+#  - Caching layer (per-URL, per-YouTube-video) behind an LRU
+#  - Graceful fallback to `Status="Not found"` after ladder exhausted
+#
+# Absolutely NO changes to:
+#  * YouTube transcript parser
+#  * GPT prompt strings
+#  * Escalation tier order
+#
+# Down-stream code (dashboard) will group the final DataFrame
+# by `media` for UX only.  No business logic relies on batching.
+### END OF GUARANTEED CONTRACT ###
+
 import os
 import csv
 import pandas as pd
@@ -6,6 +32,8 @@ from pathlib import Path
 from datetime import datetime
 import time
 import requests
+import asyncio
+import logging
 
 # Import local modules
 from src.utils.logger import setup_logger
@@ -787,6 +815,124 @@ def run_ingest(input_file: str, output_file: Optional[str] = None) -> bool:
         error_message = f"❌ Clip Tracking: Error during ingestion: {e}"
         logger.error(error_message)
         # send_slack_message(error_message)
+        return False
+    finally:
+        # Clean up resources
+        crawler_manager.close()
+
+# ---------- CONCURRENT PROCESSING IMPLEMENTATION ----------
+# Following ChatGPT's blueprint for safe concurrency wrapper
+
+# Configuration
+MAX_CONCURRENT = int(os.environ.get('MAX_CONCURRENT_LOANS', '5'))  # Start conservative
+
+async def process_loan_async(semaphore: asyncio.Semaphore, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Async wrapper around the existing process_loan function.
+    
+    This function preserves the exact same logic as process_loan()
+    but runs it in a thread to enable concurrency.
+    
+    Args:
+        semaphore: Async semaphore to control concurrency
+        loan: Loan data dictionary
+        
+    Returns:
+        Same as process_loan() - result dict or None
+    """
+    async with semaphore:
+        # Run the existing process_loan function in a thread
+        # This preserves ALL existing logic without any changes
+        return await asyncio.to_thread(process_loan, loan)
+
+async def process_loans_concurrent(loans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Process multiple loans concurrently using ChatGPT's approach.
+    
+    This function runs multiple process_loan() calls in parallel
+    without changing any of the internal logic.
+    
+    Args:
+        loans: List of loan dictionaries
+        
+    Returns:
+        List of results (same format as sequential processing)
+    """
+    if not loans:
+        return []
+    
+    # Create semaphore to control concurrency
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    
+    logger.info(f"Starting concurrent processing of {len(loans)} loans (max {MAX_CONCURRENT} concurrent)")
+    
+    # Create tasks for all loans
+    tasks = [
+        process_loan_async(semaphore, loan) 
+        for loan in loans
+    ]
+    
+    # Wait for all tasks to complete
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Filter out None results and exceptions
+    final_results = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            loan = loans[i]
+            work_order = loan.get('work_order', 'Unknown')
+            logger.error(f"Error processing loan {work_order}: {result}")
+        elif result is not None:
+            final_results.append(result)
+    
+    logger.info(f"Concurrent processing completed: {len(final_results)} results from {len(loans)} loans")
+    return final_results
+
+def run_ingest_concurrent(input_file: str, output_file: Optional[str] = None) -> bool:
+    """
+    Run the full ingestion pipeline with concurrent processing.
+    
+    This is ChatGPT's recommended approach - same as run_ingest() but with
+    concurrent loan processing for better performance.
+    
+    Args:
+        input_file: Path to the input CSV/Excel file
+        output_file: Path to the output CSV file (optional)
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    start_time = time.time()
+    
+    try:
+        # Set default output file if not provided
+        if not output_file:
+            project_root = Path(__file__).parent.parent.parent
+            output_file = os.path.join(project_root, 'data', 'loan_results.csv')
+        
+        # Load loans data (same as before)
+        loans = load_loans_data(input_file)
+        
+        if not loans:
+            logger.error(f"No loans data loaded from {input_file}")
+            return False
+        
+        # Process loans concurrently (this is the only change!)
+        results = asyncio.run(process_loans_concurrent(loans))
+        
+        # Save results (same as before)
+        if save_results(results, output_file):
+            elapsed_time = time.time() - start_time
+            message = (f"✅ Clip Tracking (Concurrent): Processed {len(loans)} loans, found {len(results)} clips "
+                      f"in {elapsed_time:.1f} seconds")
+            logger.info(message)
+            return True
+        else:
+            return False
+            
+    except Exception as e:
+        error_message = f"❌ Clip Tracking (Concurrent): Error during ingestion: {e}"
+        logger.error(error_message)
         return False
     finally:
         # Clean up resources

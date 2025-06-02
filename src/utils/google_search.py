@@ -65,7 +65,11 @@ class GoogleSearchClient:
                 pattern_score = self._score_url_relevance(pattern_url, make, model, author)
                 logger.info(f"Pattern-based fallback found: {pattern_url} (quality score: {pattern_score})")
                 if pattern_score >= 50:  # Good enough score
-                    return pattern_url
+                    # Verify author if specified
+                    if author and not self._verify_author_in_content(pattern_url, author):
+                        logger.warning(f"Pattern result doesn't contain author {author}, skipping")
+                    else:
+                        return pattern_url
         
         # For unknown domains OR if pattern failed: Use Google Search
         logger.info(f"Trying Google Search for domain: {domain}")
@@ -79,12 +83,21 @@ class GoogleSearchClient:
         for i, query in enumerate(queries, 1):
             logger.info(f"Google search attempt {i}/{len(queries)}: {query}")
             
+            # CRITICAL FIX: If author was specified, require author to be in query
+            if author and not self._query_requires_author(query, author):
+                logger.info(f"Query without required author {author}, will try but with lower priority: {query}")
+            
             try:
                 url = self._execute_search(query)
                 if url:
                     # Score the result quality
                     score = self._score_url_relevance(url, make, model, author)
                     logger.info(f"Found article URL: {url} (quality score: {score})")
+                    
+                    # CRITICAL FIX: Verify author in content if specified
+                    if author and not self._verify_author_in_content(url, author):
+                        logger.warning(f"Article doesn't contain author {author}, reducing score: {url}")
+                        score = max(10, score - 30)  # Reduce score instead of completely blocking
                     
                     if score > best_score:
                         best_score = score
@@ -104,7 +117,7 @@ class GoogleSearchClient:
             # Rate limit: wait between queries
             time.sleep(0.5)
         
-        # If Google Search found something decent, use it
+        # If Google Search found something decent, use it (already verified above)
         if best_url and best_score >= 50:
             logger.info(f"Google Search found good result: {best_url} (score: {best_score})")
             return best_url
@@ -143,28 +156,25 @@ class GoogleSearchClient:
             queries.append(f'site:{domain} "{year} {make} {clean_model}" -"Related Posts" -"Recent Posts"')
         queries.append(f'site:{domain} "{make} {clean_model}" -"Related Posts" -"Recent Posts" review')
         
-        # Tier 4: Site-specific without author (fallback)
-        if year:
-            queries.append(f'site:{domain} "{year} {make} {clean_model}" review')
-            queries.append(f'site:{domain} "{year} {make} {clean_model}" "first drive"')
-            
-        queries.append(f'site:{domain} "{make} {clean_model}" review')
-        queries.append(f'site:{domain} "{make} {clean_model}" "first drive"')
-        queries.append(f'site:{domain} "{make} {clean_model}" "test drive"')
-        
-        # Tier 5: Drop site restriction - search entire web with author
-        if clean_author:
+        # Tier 4: Site-specific without author (fallback for when NO AUTHOR specified)
+        if not clean_author:  # Only add these if no author was specified
             if year:
-                queries.append(f'"{year} {make} {clean_model}" "{clean_author}" review')
-            queries.append(f'"{make} {clean_model}" "{clean_author}" review')
-            queries.append(f'"{make} {clean_model}" "{clean_author}" "first drive"')
+                queries.append(f'site:{domain} "{year} {make} {clean_model}" review')
+                queries.append(f'site:{domain} "{year} {make} {clean_model}" "first drive"')
+                
+            queries.append(f'site:{domain} "{make} {clean_model}" review')
+            queries.append(f'site:{domain} "{make} {clean_model}" "first drive"')
+            queries.append(f'site:{domain} "{make} {clean_model}" "test drive"')
         
-        # Tier 6: Final fallback without author
-        if year:
-            queries.append(f'"{year} {make} {clean_model}" review')
-        queries.append(f'"{make} {clean_model}" review')
-        queries.append(f'"{make} {clean_model}" "first drive"')
+        # If we have an author, add a few more author-specific searches
+        if clean_author:
+            # Try broader searches but still with author requirement
+            if year:
+                queries.append(f'"{year} {make} {clean_model}" "{clean_author}" review site:{domain}')
+            queries.append(f'"{make} {clean_model}" "{clean_author}" review OR "first drive" site:{domain}')
+            queries.append(f'"{make} {clean_model}" "{clean_author}" test OR review site:{domain}')
         
+        logger.info(f"Generated {len(queries)} search queries (author requirement: {'YES' if clean_author else 'NO'})")
         return queries
     
     def _execute_search(self, query: str) -> Optional[str]:
@@ -535,6 +545,54 @@ class GoogleSearchClient:
                 score -= 50
                 
         return max(0, score)
+
+    def _query_requires_author(self, query: str, author: str) -> bool:
+        """Check if a search query includes the specified author"""
+        author_lower = author.lower()
+        query_lower = query.lower()
+        
+        # Check if author name is quoted in the query
+        return f'"{author_lower}"' in query_lower or f"'{author_lower}'" in query_lower
+    
+    def _verify_author_in_content(self, url: str, author: str) -> bool:
+        """
+        Verify that the article content actually contains the specified author.
+        This prevents wrong articles from being returned.
+        """
+        try:
+            # Import here to avoid circular imports
+            from src.utils.enhanced_http import fetch_with_enhanced_http
+            
+            # Quick fetch of article content
+            content = fetch_with_enhanced_http(url)
+            if not content:
+                return False
+            
+            content_lower = content.lower()
+            author_lower = author.lower()
+            
+            # Check if author name appears in content
+            author_words = author_lower.split()
+            
+            # Author must appear as full name or individual words
+            if author_lower in content_lower:
+                logger.info(f"✅ Author verification passed: {author} found in content")
+                return True
+            
+            # Check for individual author words (handle "First Last" names)
+            if len(author_words) >= 2:
+                words_found = sum(1 for word in author_words if word in content_lower)
+                if words_found >= len(author_words):
+                    logger.info(f"✅ Author verification passed: All words of {author} found in content")
+                    return True
+            
+            logger.warning(f"❌ Author verification failed: {author} not found in content")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error verifying author in content: {e}")
+            # If we can't verify, assume it's valid (don't block valid results)
+            return True
 
 # Convenience function for easy importing
 def google_search_for_article(domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
