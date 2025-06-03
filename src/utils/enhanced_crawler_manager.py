@@ -213,8 +213,8 @@ class EnhancedCrawlerManager:
                 'cached': True
             }
             
-        # Tier 1: Google Search (for index pages or hard-to-crawl domains)
-        if self.should_use_google_search(url, make, model):
+        # Tier 1: Try Google Search first (ALWAYS)
+        if True:  # Always try Google Search first - removed pattern matching for scalability
             logger.info(f"Tier 1: Trying Google Search to find specific article for {make} {model}")
             
             # Extract domain from URL

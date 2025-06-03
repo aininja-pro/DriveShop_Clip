@@ -35,6 +35,7 @@ import requests
 import asyncio
 import logging
 import re
+import argparse
 
 # Import local modules
 from src.utils.logger import setup_logger
@@ -289,13 +290,34 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
             if loan['make'] and loan['model']:
                 logger.info(f"Detected vehicle: {loan['make']} {loan['model']} (from Model: '{model_value}', Short: '{model_short_value}')")
             
-            # ENHANCEMENT: Also capture full model name from Column C for broader search context
-            # This helps with cases like "4runner" vs "Toyota 4Runner" for better search accuracy
-            if 'Model' in df.columns and model_column != 'Model':
-                loan['model_full'] = row['Model'] if pd.notna(row['Model']) else ''
+            # ENHANCEMENT: Build hierarchical model name for smarter searching
+            # The goal is to create the most specific model name possible, which our
+            # hierarchical search will then intelligently strip back if needed
+            
+            # Start with the base model (short name is usually cleaner)
+            base_model = model_short_value if model_short_value else model_value
+            
+            # If we have a full model that contains additional info, use it
+            if model_value and model_short_value and model_value != model_short_value:
+                # Check if the full model contains the short model
+                if model_short_value.lower() in model_value.lower():
+                    # Use the full model as it's more specific
+                    hierarchical_model = model_value
+                else:
+                    # Combine them intelligently
+                    hierarchical_model = f"{base_model} {model_value}".strip()
             else:
-                loan['model_full'] = loan['model']  # Use same as model if no separate full name
-                
+                # Use whichever one we have
+                hierarchical_model = model_value if model_value else model_short_value
+            
+            # Clean up the hierarchical model
+            hierarchical_model = hierarchical_model.strip()
+            
+            # Store both the base model and the hierarchical search model
+            loan['model'] = base_model  # Keep this for compatibility
+            loan['model_full'] = model_value if model_value else base_model  # Original full from CSV
+            loan['search_model'] = hierarchical_model  # This is what we'll pass to hierarchical search
+            
             # Add source/affiliation
             if 'Affiliation' in df.columns:
                 loan['source'] = row['Affiliation'] if pd.notna(row['Affiliation']) else ''
@@ -711,28 +733,21 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         Dictionary with article content or None if not found
     """
     try:
-        # Use the enhanced crawler manager with 5-tier escalation
-        logger.info(f"Processing web URL: {url}")
-        
         # Get make and model for finding relevant content
         make = loan.get('make', '')
         model = loan.get('model', '')
-        model_full = loan.get('model_full', model)  # Use full model if available
+        search_model = loan.get('search_model', model)  # Use hierarchical search model
         
-        # ENHANCEMENT: Use full model name for broader search context when available
-        # For cases like "4runner" vs "Toyota 4Runner", the full name helps find comparison articles
-        search_model = model_full if model_full and len(model_full) > len(model) else model
-        
-        logger.info(f"Using search model: '{search_model}' (original: '{model}', full: '{model_full}')")
+        logger.info(f"Using hierarchical search model: '{search_model}' (base: '{model}', make: '{make}')")
         
         # Get person name for caching if available
         person_name = loan.get('to', loan.get('affiliation', ''))
         
-        # Use the new enhanced crawler with 5-tier escalation
+        # Use the new enhanced crawler with 5-tier escalation and hierarchical search
         result = crawler_manager.crawl_url(
             url=url,
             make=make,
-            model=search_model,  # Use the enhanced model for better search results
+            model=search_model,  # Use the hierarchical search model
             person_name=person_name
         )
         
@@ -1096,7 +1111,27 @@ def run_ingest_concurrent(input_file: str, output_file: Optional[str] = None) ->
         crawler_manager.close()
 
 if __name__ == "__main__":
-    # When run directly, use the default fixtures
-    project_root = Path(__file__).parent.parent.parent
-    input_file = os.path.join(project_root, "data", "fixtures", "Loans_without_Clips.csv")
-    run_ingest(input_file) 
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Run clip tracking ingestion pipeline")
+    parser.add_argument("--input", "-i", required=False, help="Path to input CSV/Excel file")
+    parser.add_argument("--output", "-o", required=False, help="Path to output CSV file")
+    parser.add_argument("--concurrent", action="store_true", help="Use concurrent processing")
+    
+    args = parser.parse_args()
+    
+    # Determine input file
+    if args.input:
+        input_file = args.input
+    else:
+        # When run directly without arguments, use the default fixtures
+        project_root = Path(__file__).parent.parent.parent
+        input_file = os.path.join(project_root, "data", "fixtures", "Loans_without_Clips.csv")
+    
+    # Run the appropriate ingestion function
+    if args.concurrent:
+        success = run_ingest_concurrent(input_file, args.output)
+    else:
+        success = run_ingest(input_file, args.output)
+    
+    # Exit with appropriate code
+    exit(0 if success else 1) 

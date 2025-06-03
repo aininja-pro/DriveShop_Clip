@@ -25,6 +25,7 @@ class GoogleSearchClient:
     def search_for_article(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
         """
         Search for a specific vehicle review article using graduated fallback queries.
+        Now includes HIERARCHICAL MODEL SEARCH: tries full model name first, then progressively simpler terms.
         
         Args:
             domain: Target domain (e.g., "motortrend.com")
@@ -40,89 +41,62 @@ class GoogleSearchClient:
             logger.error("Google Search API not configured properly")
             return None
         
-        # HYBRID APPROACH: Pattern-first for known domains, Google-first for unknown domains
-        known_domains = [
-            'motortrend.com', 
-            'carfanaticsblog.com', 
-            'thegentlemanracer.com', 
-            'carpro.com',
-            # Easy to add more - just one line each:
-            'caranddriver.com',
-            'roadandtrack.com', 
-            'jalopnik.com',
-            'edmunds.com',
-            'kbb.com',
-            'autotrader.com',
-            'cars.com'
-        ]
-        is_known_domain = any(known_domain in domain.lower() for known_domain in known_domains)
+        # Generate hierarchical model variations (from most specific to most general)
+        model_variations = self._generate_model_variations(model)
+        logger.info(f"Generated {len(model_variations)} model variations: {model_variations}")
         
-        if is_known_domain:
-            # For known domains: Try pattern fallback FIRST (it works better)
-            logger.info(f"Known domain {domain}: Trying pattern fallback first")
-            pattern_url = self._try_url_pattern_fallback(domain, make, model, year, author)
-            if pattern_url:
-                pattern_score = self._score_url_relevance(pattern_url, make, model, author)
-                logger.info(f"Pattern-based fallback found: {pattern_url} (quality score: {pattern_score})")
-                if pattern_score >= 50:  # Good enough score
-                    # Verify author if specified
-                    if author and not self._verify_author_in_content(pattern_url, author):
-                        logger.warning(f"Pattern result doesn't contain author {author}, skipping")
-                    else:
-                        return pattern_url
-        
-        # For unknown domains OR if pattern failed: Use Google Search
-        logger.info(f"Trying Google Search for domain: {domain}")
-        
-        # Generate search queries in order of specificity
-        queries = self._generate_search_queries(domain, make, model, year, author)
-        
-        best_url = None
-        best_score = 0
-        
-        for i, query in enumerate(queries, 1):
-            logger.info(f"Google search attempt {i}/{len(queries)}: {query}")
+        # Try each model variation in hierarchical order
+        for i, current_model in enumerate(model_variations):
+            logger.info(f"Hierarchical search attempt {i+1}/{len(model_variations)}: trying model '{current_model}'")
             
-            # CRITICAL FIX: If author was specified, require author to be in query
-            if author and not self._query_requires_author(query, author):
-                logger.info(f"Query without required author {author}, will try but with lower priority: {query}")
+            # Generate search queries for this specific model variation
+            queries = self._generate_search_queries(domain, make, current_model, year, author)
             
-            try:
-                url = self._execute_search(query)
-                if url:
-                    # Score the result quality
-                    score = self._score_url_relevance(url, make, model, author)
-                    logger.info(f"Found article URL: {url} (quality score: {score})")
-                    
-                    # CRITICAL FIX: Verify author in content if specified
-                    if author and not self._verify_author_in_content(url, author):
-                        logger.warning(f"Article doesn't contain author {author}, reducing score: {url}")
-                        score = max(10, score - 30)  # Reduce score instead of completely blocking
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_url = url
-                    
-                    # If we found a high-quality result, use it
-                    if score >= 80:  # High confidence threshold
-                        return url
-                        
-                else:
-                    logger.info(f"No results for query: {query}")
-                    
-            except Exception as e:
-                logger.error(f"Error in search attempt {i}: {e}")
-                continue
+            best_url = None
+            best_score = 0
+            
+            for j, query in enumerate(queries, 1):
+                logger.info(f"Google search attempt {j}/{len(queries)}: {query}")
                 
-            # Rate limit: wait between queries
-            time.sleep(0.5)
+                try:
+                    url = self._execute_search(query)
+                    if url:
+                        # Score the result quality
+                        score = self._score_url_relevance(url, make, current_model, author)
+                        logger.info(f"Found article URL: {url} (quality score: {score})")
+                        
+                        # Verify author in content if specified
+                        if author and not self._verify_author_in_content(url, author):
+                            logger.warning(f"Article doesn't contain author {author}, reducing score: {url}")
+                            score = max(10, score - 30)  # Reduce score instead of completely blocking
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_url = url
+                        
+                        # If we found a high-quality result, use it immediately
+                        if score >= 80:  # High confidence threshold
+                            logger.info(f"✅ Found high-quality article with model variation '{current_model}': {url}")
+                            return url
+                            
+                    else:
+                        logger.info(f"No results for query: {query}")
+                        
+                except Exception as e:
+                    logger.error(f"Error in search attempt {j}: {e}")
+                    continue
+                    
+                # Rate limit: wait between queries
+                time.sleep(0.5)
+            
+            # If Google Search found something decent for this model variation, use it
+            if best_url and best_score >= 50:
+                logger.info(f"✅ Found good article with model variation '{current_model}': {best_url} (score: {best_score})")
+                return best_url
+            
+            logger.info(f"No good results for model variation '{current_model}', trying next variation...")
         
-        # If Google Search found something decent, use it (already verified above)
-        if best_url and best_score >= 50:
-            logger.info(f"Google Search found good result: {best_url} (score: {best_score})")
-            return best_url
-        
-        logger.warning(f"No articles found for {make} {model} by {author or 'any author'} on {domain}")
+        logger.warning(f"❌ No articles found for any model variation of {make} {model} by {author or 'any author'} on {domain}")
         return None
     
     def _generate_search_queries(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> List[str]:
@@ -375,145 +349,94 @@ class GoogleSearchClient:
         # If no clear indicators but it's not in skip list, consider it valid
         return True
 
-    def _try_url_pattern_fallback(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
+    def _generate_model_variations(self, model: str) -> List[str]:
         """
-        Try to construct URLs based on known patterns when Google Search fails.
-        This helps with index freshness issues in Custom Search API.
+        Generate hierarchical model variations from most specific to most general.
+        This is the SMART part - it automatically knows what to strip back!
+        
+        Examples:
+        - "Jetta GLI Autobahn" → ["Jetta GLI Autobahn", "Jetta GLI", "Jetta"]
+        - "Q6 e-tron Prestige" → ["Q6 e-tron Prestige", "Q6 e-tron", "Q6"]
+        - "Camry XSE" → ["Camry XSE", "Camry"]
+        - "F-150 Lightning Platinum" → ["F-150 Lightning Platinum", "F-150 Lightning", "F-150"]
         """
-        # Import here to avoid circular imports
-        try:
-            from src.utils.enhanced_http import fetch_with_enhanced_http
-        except ImportError:
-            logger.warning("Enhanced HTTP not available for pattern fallback")
-            return None
+        if not model or not model.strip():
+            return [""]
         
-        domain_lower = domain.lower()
-        make_lower = make.lower().replace(' ', '-')
-        model_lower = model.lower().replace(' ', '-').replace('e-tron', 'e-tron')
-        year_str = year or "2025"
+        model = model.strip()
+        variations = []
         
-        # Known URL patterns for different sites
-        url_patterns = []
+        # STEP 1: Always start with the full model name as provided
+        variations.append(model)
         
-        if 'carfanaticsblog.com' in domain_lower:
-            # Pattern: /YYYY/MM/DD/vehicle-name/
-            # We don't know the exact date, so try recent months
-            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
-            recent_dates = [
-                f"{year_str}/05/20",  # Try May 20 (known date for this case)
-                f"{year_str}/05",     # Try May generally
-                f"{year_str}/04",     # Try April
-                f"{year_str}/03",     # Try March
-            ]
+        # STEP 2: Define common automotive terms to strip (trim levels, packages, etc.)
+        trim_terms = {
+            # Luxury/Premium trims
+            'prestige', 'premium', 'platinum', 'signature', 'reserve', 'limited', 
+            'ultimate', 'touring', 'grand touring', 'elite', 'summit',
             
-            for date_part in recent_dates:
-                patterns = [
-                    f"https://{domain}/{date_part}/{model_slug}/",
-                    f"https://{domain}/{date_part}/{model_slug}-review/",
-                    f"https://{domain}/{date_part}/{model_slug}-limited-awd/",  # Specific for this case
-                    f"https://{domain}/{date_part}/{year_str}-{model_slug}/",
-                    f"https://{domain}/{date_part}/{year_str}-{model_slug}-limited-awd/",  # More specific
-                ]
-                url_patterns.extend(patterns)
-        
-        elif 'motortrend.com' in domain_lower:
-            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
-            # Handle common MotorTrend URL variations
-            url_patterns = [
-                # Basic patterns
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-review/",
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-first-test/",
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-first-test-review",
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-quattro-first-test-review",
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-road-test/",
-                # Without www
-                f"https://{domain}/reviews/{year_str}-{model_slug}-review/",
-                f"https://{domain}/reviews/{year_str}-{model_slug}-first-test/", 
-                f"https://{domain}/reviews/{year_str}-{model_slug}-first-test-review",
-                # Common trim variations
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-prestige-first-test/",
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-premium-review/",
-                # Car info pages
-                f"https://www.{domain}/cars/{make_lower}/{model_lower}/",
-                f"https://{domain}/cars/{make_lower}/{model_lower}/",
-            ]
-        
-        elif 'thegentlemanracer.com' in domain_lower:
-            model_slug = f"{model_lower}".replace('--', '-')
-            url_patterns = [
-                f"https://{domain}/{year_str}/{model_slug}/",
-                f"https://{domain}/{year_str}/05/{model_slug}/",
-                f"https://{domain}/reviews/{model_slug}/",
-            ]
-        
-        elif 'carpro.com' in domain_lower:
-            # CarPro URL patterns
-            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
-            url_patterns = [
-                f"https://www.{domain}/resources/vehicle-reviews/{year_str}-{model_slug}/",
-                f"https://www.{domain}/blog/{year_str}-{model_slug}-review/",
-                f"https://www.{domain}/vehicle-reviews/{model_slug}/",
-                f"https://{domain}/resources/vehicle-reviews/{year_str}-{model_slug}/",
-                f"https://{domain}/blog/{year_str}-{model_slug}-review/",
-            ]
-        
-        # EASY TO ADD: Here's how you add new domains (just copy this block)
-        elif 'caranddriver.com' in domain_lower:
-            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
-            url_patterns = [
-                f"https://www.{domain}/reviews/{year_str}-{model_slug}-review/",
-                f"https://www.{domain}/reviews/{model_slug}-review/",
-                f"https://www.{domain}/features/{year_str}-{model_slug}/",
-            ]
+            # Performance trims  
+            'sport', 'r-line', 'rs', 'amg', 'm', 'st', 'type r', 'si', 'gti', 'gli',
+            'srt', 'hellcat', 'demon', 'redeye', 'scatpack', 'rt', 'sxt',
+            'ss', 'zl1', 'z28', 'zo6', 'zr1', 'shelby', 'gt350', 'gt500',
             
-        elif 'jalopnik.com' in domain_lower:
-            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
-            url_patterns = [
-                f"https://{domain}/{year_str}/{make_lower}-{model_slug}-review/",
-                f"https://{domain}/review/{make_lower}-{model_slug}/",
-            ]
+            # Package/trim indicators
+            'autobahn', 'technik', 'komfort', 'progressiv', 'highline',
+            'sel', 'se', 'base', 'standard', 'deluxe', 'luxury',
+            'convenience', 'technology', 'driver assistance',
             
-        elif 'edmunds.com' in domain_lower:
-            model_slug = f"{make_lower}-{model_lower}".replace('--', '-')
-            url_patterns = [
-                f"https://www.{domain}/car-reviews/{year_str}-{model_slug}/",
-                f"https://www.{domain}/{make_lower}/{model_lower}/review/",
-            ]
+            # Drive types (sometimes part of model name)
+            'awd', '4wd', 'quattro', 'xdrive', '4motion', 'symmetrical',
+            
+            # Electric/Hybrid indicators (sometimes trim-level)
+            'hybrid', 'plug-in', 'phev', 'electric', 'ev', 'e-tron', 'i3', 'i4', 'ix',
+            
+            # Cab/body styles (for trucks/SUVs)
+            'crew cab', 'extended cab', 'regular cab', 'supercab', 'supercrew',
+            'long box', 'short box', 'extended', 'regular'
+        }
         
-        # Test each pattern
-        for pattern_url in url_patterns:
-            logger.debug(f"Testing URL pattern: {pattern_url}")
+        # Convert to lowercase for matching
+        trim_terms_lower = {term.lower() for term in trim_terms}
+        
+        # STEP 3: Try progressive word removal from right to left
+        words = model.split()
+        
+        # Generate variations by removing words from the end
+        for i in range(len(words) - 1, 0, -1):  # Don't go to 0 (keep at least one word)
+            candidate = ' '.join(words[:i])
             
-            try:
-                # Quick HEAD request to check if URL exists
-                import requests
-                response = requests.head(pattern_url, timeout=5, allow_redirects=True)
-                
-                if response.status_code == 200:
-                    # Verify it's actually an article about our vehicle
-                    content = fetch_with_enhanced_http(pattern_url)
-                    if content and self._verify_article_relevance(content, make, model):
-                        logger.info(f"Pattern-based URL verification successful: {pattern_url}")
-                        return pattern_url
-                    
-            except Exception as e:
-                logger.debug(f"Pattern test failed for {pattern_url}: {e}")
+            # Skip if this candidate is just a trim term by itself
+            if candidate.lower() in trim_terms_lower:
                 continue
+                
+            # Add this variation if it's not already in the list and it's meaningful
+            if candidate not in variations and len(candidate.strip()) > 1:
+                variations.append(candidate)
         
-        return None
-    
-    def _verify_article_relevance(self, content: str, make: str, model: str) -> bool:
-        """Verify that content actually discusses the specified vehicle"""
-        content_lower = content.lower()
-        make_lower = make.lower()
-        model_lower = model.lower()
+        # STEP 4: Smart splitting for hyphenated models (e.g., "F-150 Lightning" → "F-150")
+        if '-' in model and len(words) > 1:
+            # For hyphenated first word, try keeping just the base (e.g., "F-150 Lightning" → "F-150")
+            first_part = words[0]
+            if first_part not in variations and len(first_part) > 2:
+                variations.append(first_part)
         
-        # Check for vehicle mentions
-        make_count = content_lower.count(make_lower)
-        model_count = content_lower.count(model_lower)
+        # STEP 5: Handle special cases for electric vehicles
+        # If model contains "e-tron", also try without it (e.g., "Q6 e-tron" → "Q6")
+        if 'e-tron' in model.lower():
+            base_without_etron = model.replace('e-tron', '').replace('E-Tron', '').strip()
+            if base_without_etron and base_without_etron not in variations:
+                variations.append(base_without_etron)
         
-        # Must have reasonable number of mentions
-        return make_count >= 2 and model_count >= 2 and len(content) > 1000
+        # STEP 6: Remove duplicates while preserving order
+        unique_variations = []
+        seen = set()
+        for variation in variations:
+            if variation not in seen and variation.strip():
+                unique_variations.append(variation)
+                seen.add(variation)
+        
+        return unique_variations
 
     def _score_url_relevance(self, url: str, make: str, model: str, author: Optional[str] = None) -> int:
         """Score a URL based on how well it matches our target vehicle and author"""
@@ -546,14 +469,6 @@ class GoogleSearchClient:
                 
         return max(0, score)
 
-    def _query_requires_author(self, query: str, author: str) -> bool:
-        """Check if a search query includes the specified author"""
-        author_lower = author.lower()
-        query_lower = query.lower()
-        
-        # Check if author name is quoted in the query
-        return f'"{author_lower}"' in query_lower or f"'{author_lower}'" in query_lower
-    
     def _verify_author_in_content(self, url: str, author: str) -> bool:
         """
         Verify that the article content actually contains the specified author.
