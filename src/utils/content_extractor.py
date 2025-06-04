@@ -1,12 +1,195 @@
 import re
+import json
+import requests
 from typing import Optional, Dict, Any, List
 from bs4 import BeautifulSoup
 import logging
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+def extract_fliphtml5(html: str) -> Optional[str]:
+    """
+    Extract plain text content from FlipHTML5 viewer if present.
+    
+    Args:
+        html: Raw HTML content from the page
+        
+    Returns:
+        Plain text content if FlipHTML5 viewer detected, None otherwise
+    """
+    logger.info("Checking for FlipHTML5 viewer...")
+    
+    # DEBUG: Log HTML snippet to see what we're working with
+    logger.info(f"HTML content length: {len(html)} characters")
+    logger.info(f"HTML preview (first 500 chars): {html[:500]}")
+    
+    # Updated detection: Look for FlipHTML5 navigation controls (rendered content)
+    fliphtml5_indicators = [
+        "First Previous Page Next Page Last",
+        "Return Home Zoom In Search Thumbnails Auto Flip",
+        "Sound Off Social Share Fullscreen Email",
+        "fliphtml5",
+        "Auto Flip Sound Off"
+    ]
+    
+    # Check if this looks like FlipHTML5 rendered content
+    is_fliphtml5 = any(indicator in html for indicator in fliphtml5_indicators)
+    
+    if is_fliphtml5:
+        logger.info("🎯 FlipHTML5 viewer detected via navigation controls!")
+        
+        # Try to find the flipbook URL in the original HTML (before rendering)
+        # Look for common FlipHTML5 URL patterns
+        flipbook_patterns = [
+            r'src="(https://online\.fliphtml5\.com/[^/]+/[^/]+/)"',
+            r'href="(https://online\.fliphtml5\.com/[^/]+/[^/]+/[^"]*)"',
+            r'"(https://online\.fliphtml5\.com/[^"]+)"'
+        ]
+        
+        flipbook_url = None
+        for pattern in flipbook_patterns:
+            match = re.search(pattern, html, re.I)
+            if match:
+                flipbook_url = match.group(1)
+                if not flipbook_url.endswith('/'):
+                    flipbook_url += '/'
+                logger.info(f"Found flipbook URL: {flipbook_url}")
+                break
+        
+        if flipbook_url:
+            # Try method 1: Look for text version link
+            text_url = flipbook_url + "text/index.html"
+            logger.info(f"Trying text version URL: {text_url}")
+            
+            try:
+                response = requests.get(text_url, timeout=20)
+                if response.status_code == 200:
+                    text_soup = BeautifulSoup(response.text, "lxml")
+                    text_content = text_soup.get_text(" ", strip=True)
+                    if len(text_content) > 100:  # Ensure we got substantial content
+                        logger.info(f"✅ Successfully extracted {len(text_content)} chars from text version")
+                        return text_content
+                    else:
+                        logger.warning("Text version URL returned minimal content")
+                else:
+                    logger.warning(f"Text version URL returned status {response.status_code}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch text version: {e}")
+            
+            # Try method 2: JSON endpoint
+            json_url = flipbook_url + "text/text.json"
+            logger.info(f"Trying JSON endpoint: {json_url}")
+            
+            try:
+                response = requests.get(json_url, timeout=20)
+                if response.status_code == 200:
+                    data = response.json()
+                    if "page_text" in data:
+                        text_content = " ".join(p.get("text", "") for p in data["page_text"])
+                        if len(text_content) > 100:
+                            logger.info(f"✅ Successfully extracted {len(text_content)} chars from JSON endpoint")
+                            return text_content
+                        else:
+                            logger.warning("JSON endpoint returned minimal content")
+                    else:
+                        logger.warning("JSON response missing page_text field")
+                else:
+                    logger.warning(f"JSON endpoint returned status {response.status_code}")
+            except Exception as e:
+                logger.warning(f"Failed to fetch JSON endpoint: {e}")
+        
+        else:
+            logger.warning("FlipHTML5 detected but couldn't find flipbook URL")
+        
+        # ENHANCED: If we can't find the text endpoints, try more aggressive content extraction
+        logger.info("Trying enhanced text extraction from rendered FlipHTML5...")
+        soup = BeautifulSoup(html, 'lxml')
+        
+        # Try to extract from page text spans or divs that might contain article content
+        article_selectors = [
+            'div[class*="page-text"]',
+            'span[class*="page-text"]', 
+            'div[class*="article"]',
+            'div[class*="content"]',
+            'div[class*="text"]',
+            '.page-content',
+            '.article-content',
+            '.text-content'
+        ]
+        
+        extracted_content = ""
+        for selector in article_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                text = element.get_text(" ", strip=True)
+                # Skip if it's just navigation controls
+                if not any(indicator.lower() in text.lower() for indicator in fliphtml5_indicators):
+                    extracted_content += " " + text
+        
+        if extracted_content and len(extracted_content.strip()) > 100:
+            logger.info(f"✅ Extracted {len(extracted_content)} chars from FlipHTML5 article selectors")
+            return extracted_content.strip()
+        
+        # If specific selectors don't work, try title-based extraction
+        # Look for the article title and try to find content near it
+        title_patterns = [
+            r'(20\d{2})\s+([A-Z][a-z]+\s+[A-Z0-9-]+)',  # "2025 Genesis G80"
+            r'([A-Z][a-z]+\s+[A-Z][A-Z0-9-]+)',         # "Genesis G80"
+            r'(\w+\s+CX-\d+)',                           # "Mazda CX-90"
+        ]
+        
+        page_text = soup.get_text()
+        for pattern in title_patterns:
+            match = re.search(pattern, page_text, re.I)
+            if match:
+                title = match.group(0)
+                logger.info(f"Found potential title: {title}")
+                
+                # Try to extract content around the title
+                title_index = page_text.lower().find(title.lower())
+                if title_index >= 0:
+                    # Extract a reasonable chunk of content after the title
+                    start_pos = max(0, title_index - 100)
+                    end_pos = min(len(page_text), title_index + 2000)
+                    content_chunk = page_text[start_pos:end_pos]
+                    
+                    # Clean up navigation text
+                    for indicator in fliphtml5_indicators:
+                        content_chunk = content_chunk.replace(indicator, "")
+                    
+                    content_chunk = re.sub(r'\s+', ' ', content_chunk).strip()
+                    
+                    if len(content_chunk) > 100:
+                        logger.info(f"✅ Extracted {len(content_chunk)} chars via title-based extraction")
+                        return content_chunk
+        
+        # Final fallback: Just return the title we can find (better than navigation controls)
+        all_text = soup.get_text(" ", strip=True)
+        
+        # Remove all the navigation controls
+        for indicator in fliphtml5_indicators:
+            all_text = all_text.replace(indicator, "")
+        
+        # Remove numbers (page numbers)
+        all_text = re.sub(r'\b\d+\s*-?\s*\d+\b', '', all_text)
+        all_text = re.sub(r'\s+', ' ', all_text).strip()
+        
+        # Only return if we have more than just the URL/title
+        if len(all_text) > 50:
+            logger.info(f"✅ Extracted {len(all_text)} chars via fallback FlipHTML5 cleaning")
+            return all_text
+        else:
+            logger.warning("FlipHTML5 extraction couldn't find substantial content")
+            # Return None so other extraction methods can try
+            return None
+    
+    else:
+        logger.info("No FlipHTML5 content found")
+    
+    return None
 
 def extract_article_content(html: str, url: str, expected_topic: str = "") -> str:
     """
@@ -92,6 +275,10 @@ def try_site_specific_extraction(soup: BeautifulSoup, url: str, expected_topic: 
     # Handle thegentlemanracer.com specifically
     if 'thegentlemanracer.com' in domain:
         return extract_thegentlemanracer_content(soup, url, expected_topic)
+    
+    # Handle spotlightepnews.com specifically (PDF viewer/flipbook format)
+    if 'spotlightepnews.com' in domain:
+        return extract_spotlightepnews_content(soup, url, expected_topic)
     
     # Add other site-specific handlers here as needed
     # if 'anothersite.com' in domain:
@@ -226,6 +413,108 @@ def extract_thegentlemanracer_content(soup: BeautifulSoup, url: str, expected_to
             logger.info(f"thegentlemanracer extraction mentions {matches}/{len(topic_words)} topic words")
     
     return article_text
+
+def extract_spotlightepnews_content(soup: BeautifulSoup, url: str, expected_topic: str = "") -> str:
+    """
+    Site-specific extraction for spotlightepnews.com.
+    This site uses FlipHTML5 viewer that requires special handling.
+    """
+    logger.info("Using spotlightepnews.com-specific content extraction")
+    
+    # FIRST: Try FlipHTML5 extraction if this is a flipbook
+    original_html = str(soup)  # Get the full HTML for FlipHTML5 detection
+    fliphtml5_content = extract_fliphtml5(original_html)
+    if fliphtml5_content:
+        logger.info(f"✅ FlipHTML5 extraction successful: {len(fliphtml5_content)} characters")
+        return fliphtml5_content
+    
+    # FALLBACK: Use existing extraction methods for non-flipbook content
+    logger.info("No FlipHTML5 content found, trying standard spotlightepnews extraction")
+    
+    article_text = ""
+    
+    # Look for specific content containers that work better than generic extraction
+    content_selectors = [
+        # Try article text containers first
+        'div[class*="content"] p',
+        'div[class*="article"] p', 
+        'div[class*="post"] p',
+        'section[class*="content"] p',
+        'main p',
+        # Fallback to any substantial paragraph content
+        'div p',
+        'p'
+    ]
+    
+    for selector in content_selectors:
+        try:
+            elements = soup.select(selector)
+            candidate_paragraphs = []
+            
+            for element in elements:
+                text = element.get_text(strip=True)
+                
+                # Skip short text and navigation elements
+                if len(text) < 50:
+                    continue
+                    
+                # Skip obvious navigation content
+                nav_indicators = ['firstprevious', 'nextpage', 'autoflip', 'fullscreen', 'thumbnails', 'zoom in', 'social share']
+                if any(nav in text.lower() for nav in nav_indicators):
+                    continue
+                
+                # Look for article content indicators
+                content_indicators = ['genesis', 'g80', 'sedan', 'luxury', 'vehicle', 'car', 'auto', 'review', 'christopher', 'randazzo']
+                if expected_topic:
+                    content_indicators.extend(expected_topic.lower().split())
+                    
+                if any(indicator in text.lower() for indicator in content_indicators):
+                    candidate_paragraphs.append(text)
+            
+            if candidate_paragraphs:
+                article_text = '\n\n'.join(candidate_paragraphs)
+                logger.info(f"Found content using selector '{selector}': {len(article_text)} characters")
+                break
+                
+        except Exception as e:
+            logger.debug(f"Selector '{selector}' failed: {e}")
+            continue
+    
+    # Final fallback: look for any substantial text blocks
+    if not article_text:
+        logger.info("No content container found, searching for text blocks with vehicle mentions")
+        all_text = soup.get_text(separator=' ', strip=True)
+        
+        # Look for paragraphs that mention vehicles or automotive content
+        paragraphs = [p.strip() for p in all_text.split('\n') if len(p.strip()) > 100]
+        vehicle_paragraphs = []
+        
+        for para in paragraphs:
+            # Skip navigation content
+            if any(nav in para.lower() for nav in ['firstprevious', 'nextpage', 'autoflip', 'fullscreen']):
+                continue
+                
+            # Include paragraphs with automotive keywords
+            if any(keyword in para.lower() for keyword in ['vehicle', 'car', 'sedan', 'suv', 'mpg', 'horsepower', 'engine']):
+                vehicle_paragraphs.append(para)
+        
+        if vehicle_paragraphs:
+            article_text = '\n\n'.join(vehicle_paragraphs)
+            logger.info(f"Found automotive content via text search: {len(article_text)} characters")
+    
+    if not article_text:
+        logger.info("No specific container found, attempting full-page text extraction")
+        # Last resort: get all text and hope for the best
+        article_text = soup.get_text(separator=' ', strip=True)
+        if article_text:
+            article_text = re.sub(r'\s+', ' ', article_text).strip()
+    
+    if article_text:
+        logger.info(f"Successfully extracted {len(article_text)} characters for spotlightepnews.com")
+        return article_text
+    else:
+        logger.warning("Could not find content container for spotlightepnews.com")
+        return ""
 
 def _extract_with_basic_methods(soup: BeautifulSoup, url: str) -> str:
     """
@@ -459,10 +748,30 @@ def is_content_quality_poor(extracted_content: str, url: str, expected_topic: st
     Returns:
         True if content quality is poor and should be re-extracted
     """
-    if not extracted_content or len(extracted_content.strip()) < 200:
+    if not extracted_content or len(extracted_content.strip()) == 0:
+        return True
+    
+    # For FlipHTML5 sites (like spotlightepnews.com), allow shorter content
+    # since the extraction from flipbooks might be legitimately shorter
+    from urllib.parse import urlparse
+    domain = urlparse(url).netloc.lower()
+    min_length = 100 if 'spotlightepnews.com' in domain else 200
+    
+    if len(extracted_content.strip()) < min_length:
         return True
     
     content_lower = extracted_content.lower()
+    
+    # Check for FlipHTML5 navigation controls that indicate failed extraction
+    fliphtml5_nav_indicators = [
+        'firstprevious page', 'nextpagelast', 'return homezoom', 'thumbnailsauto flip',
+        'social sharefullscreen', 'emailmoremore'
+    ]
+    
+    # If content is mostly FlipHTML5 navigation controls, it's poor quality
+    nav_count = sum(1 for indicator in fliphtml5_nav_indicators if indicator in content_lower.replace(' ', ''))
+    if nav_count >= 2:
+        return True
     
     # Check for obvious sidebar/navigation content
     sidebar_indicators = [
