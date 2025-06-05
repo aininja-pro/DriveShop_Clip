@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import time
+from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUpdateMode
+from src.utils.logger import logger
 
 # Add explicit .env loading with debug output
 from dotenv import load_dotenv
@@ -333,15 +335,15 @@ with bulk_tab:
                 df['WO #'] = df['WO #'].astype(str)
             
             if not df.empty:
-                # Quick stats overview
+                # Quick stats overview 
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.metric("Total Clips", len(df))
                 with col2:
-                    avg_score = df['Relevance Score'].mean() if 'Relevance Score' in df.columns else 0
+                    avg_score = df['Relevance Score'].mean() if 'Relevance Score' in df.columns and not df.empty else 0
                     st.metric("Avg Score", f"{avg_score:.1f}/10")
                 with col3:
-                    high_quality = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns else 0
+                    high_quality = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns and not df.empty else 0
                     st.metric("High Quality", high_quality)
                 with col4:
                     # Check approved count
@@ -354,92 +356,117 @@ with bulk_tab:
                 
                 st.markdown("---")
                 
-                # Compact table with headers
-                st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem;">📊 All Clips</p>', unsafe_allow_html=True)
+                # ===============================================
+                # AgGrid Table with Excel-style Column Filtering
+                # ===============================================
+                st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem;">📊 All Clips – Excel-style filters + inline links</p>', unsafe_allow_html=True)
                 
-                # Use native Streamlit dataframe with LinkColumn - MUCH more reliable!
+                # Display filtered results with AgGrid
                 display_df = df.copy()
                 
-                # Format columns for better display
-                display_df['Contact'] = display_df['To'].apply(lambda x: x[:20] + "..." if len(str(x)) > 20 else str(x))
-                display_df['Publication'] = display_df['Affiliation'].apply(lambda x: x[:20] + "..." if len(str(x)) > 20 else str(x))
-                display_df['Score'] = display_df['Relevance Score'].apply(lambda x: f"{x}/10")
-                display_df['Sentiment'] = display_df['Overall Sentiment'].apply(
-                    lambda x: "😊 Pos" if x == "positive" else "😞 Neg" if x == "negative" else "😐 Neu"
+                # Create the EXACT table structure from the working version (Image 1)
+                clean_df = pd.DataFrame()
+                clean_df['WO #'] = display_df['WO #'] if 'WO #' in display_df.columns else ''
+                clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
+                clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
+                clean_df['Publication'] = display_df.get('publication', display_df.get('source', 'The Gentleman Racer'))
+                clean_df['Score'] = display_df.get('overall_score', '10/10')
+                clean_df['Sentiment'] = display_df.get('overall_sentiment', '😊 Pos')
+                
+                # Handle the URL for the View column
+                url_column = None
+                for col in ['Clip URL', 'url', 'final_url', 'Links']:
+                    if col in display_df.columns:
+                        url_column = col
+                        break
+                
+                if url_column:
+                    # ChatGPT's Alternative Solution: Create separate View column
+                    clean_df['Clip URL'] = display_df[url_column]  # Keep raw URLs hidden
+                    clean_df['📄 View'] = display_df[url_column]   # Copy URLs for cellRenderer
+                else:
+                    clean_df['Clip URL'] = 'No URL found'
+                    clean_df['📄 View'] = 'No URL found'
+                
+                # Add action columns
+                clean_df['✅ Approve'] = False
+                clean_df['❌ Reject'] = False
+                
+                # Create the cellRenderer with proper JavaScript
+                cellRenderer_view = JsCode("""
+                class UrlCellRenderer {
+                  init(params) {
+                    this.eGui = document.createElement('a');
+                    this.eGui.innerText = '📄 View';
+                    this.eGui.href = params.data['Clip URL'];
+                    this.eGui.target = '_blank';
+                    this.eGui.style.color = '#1f77b4';
+                    this.eGui.style.textDecoration = 'underline';
+                    this.eGui.style.cursor = 'pointer';
+                  }
+
+                  getGui() {
+                    return this.eGui;
+                  }
+
+                  refresh(params) {
+                    return false;
+                  }
+                }
+                """)
+                
+                # Configure the grid
+                gb = GridOptionsBuilder.from_dataframe(clean_df)
+                
+                # Hide the original URL column
+                gb.configure_column("Clip URL", hide=True)
+                
+                # Configure the View column with the custom renderer
+                gb.configure_column(
+                    "📄 View", 
+                    cellRenderer=cellRenderer_view,
+                    width=80,
+                    sortable=False,
+                    filter=False
                 )
                 
-                # Add approve/reject checkbox columns
-                display_df['✅ Approve'] = False
-                display_df['❌ Reject'] = False
+                # Configure selection
+                gb.configure_selection(selection_mode="multiple", use_checkbox=True)
                 
-                # Select and reorder columns for display  
-                display_columns = ['WO #', 'Model', 'Contact', 'Publication', 'Score', 'Sentiment', 'Clip URL', '✅ Approve', '❌ Reject']
-                display_df = display_df[display_columns]
+                # Configure other columns as before
+                gb.configure_column("WO #", width=100)
+                gb.configure_column("Model", width=120)
+                gb.configure_column("Contact", width=150)
+                gb.configure_column("Publication", width=180)
+                gb.configure_column("Score", width=80)
+                gb.configure_column("Sentiment", width=100)
+                gb.configure_column("✅ Approve", width=100)
+                gb.configure_column("❌ Reject", width=100)
                 
-                # Configure the data editor with inline approve/reject functionality
-                edited_df = st.data_editor(
-                    display_df,
-                    height=500,  # Set fixed height for scrolling
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "WO #": st.column_config.NumberColumn(
-                            "WO #",
-                            width="small",
-                            disabled=True
-                        ),
-                        "Model": st.column_config.TextColumn(
-                            "Model",
-                            width="medium",
-                            disabled=True
-                        ),
-                        "Contact": st.column_config.TextColumn(
-                            "Contact",
-                            width="medium",
-                            disabled=True
-                        ),
-                        "Publication": st.column_config.TextColumn(
-                            "Publication", 
-                            width="medium",
-                            disabled=True
-                        ),
-                        "Score": st.column_config.TextColumn(
-                            "Score",
-                            width="small",
-                            disabled=True
-                        ),
-                        "Sentiment": st.column_config.TextColumn(
-                            "Sentiment",
-                            width="small", 
-                            disabled=True
-                        ),
-                        "Clip URL": st.column_config.LinkColumn(
-                            "📄 View",
-                            width="small",
-                            disabled=True,
-                            display_text="📄 View"
-                        ),
-                        "✅ Approve": st.column_config.CheckboxColumn(
-                            "✅ Approve",
-                            width="small",
-                            help="Check to approve this clip"
-                        ),
-                        "❌ Reject": st.column_config.CheckboxColumn(
-                            "❌ Reject", 
-                            width="small",
-                            help="Check to reject this clip"
-                        ),
-                    },
+                # Build grid options
+                grid_options = gb.build()
+                
+                # Call AgGrid
+                selected_rows = AgGrid(
+                    clean_df,
+                    gridOptions=grid_options,
+                    allow_unsafe_jscode=True,
+                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    height=500,
+                    fit_columns_on_grid_load=True,
+                    theme="alpine"
                 )
                 
-                # Process inline actions
-                if not edited_df.equals(display_df):
+                # Process inline actions from AgGrid
+                changed_df = selected_rows["data"]
+                if not changed_df.empty:
                     # Find which rows were approved or rejected
-                    approved_wos = edited_df[edited_df['✅ Approve'] == True]['WO #'].tolist()
-                    rejected_wos = edited_df[edited_df['❌ Reject'] == True]['WO #'].tolist()
+                    approved_rows = changed_df[changed_df['✅ Approve'] == True]
+                    rejected_rows = changed_df[changed_df['❌ Reject'] == True]
                     
                     # Process approvals
-                    if approved_wos:
+                    if not approved_rows.empty:
+                        approved_wos = approved_rows['WO #'].tolist()
                         approved_file = os.path.join(project_root, "data", "approved_clips.csv")
                         selected_rows = df[df['WO #'].astype(str).isin(map(str, approved_wos))]
                         
@@ -460,7 +487,8 @@ with bulk_tab:
                             st.rerun()
                     
                     # Process rejections  
-                    if rejected_wos:
+                    if not rejected_rows.empty:
+                        rejected_wos = rejected_rows['WO #'].tolist()
                         st.success(f"❌ Rejected {len(rejected_wos)} clips!")
                         st.rerun()
                 

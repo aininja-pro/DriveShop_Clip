@@ -44,3 +44,6 @@ def setup_logger(name, level=logging.INFO):
         logger.addHandler(file_handler)
     
     return logger 
+
+# Create a default logger that can be imported directly
+logger = setup_logger('clip_tracking') 
