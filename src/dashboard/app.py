@@ -366,11 +366,18 @@ with bulk_tab:
                 
                 # Create the EXACT table structure from the working version (Image 1)
                 clean_df = pd.DataFrame()
+                clean_df['Office'] = display_df['Office'] if 'Office' in display_df.columns else 'N/A'
                 clean_df['WO #'] = display_df['WO #'] if 'WO #' in display_df.columns else ''
                 clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
                 clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
                 clean_df['Publication'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else 'N/A'
-                clean_df['Score'] = display_df['Overall Score'] if 'Overall Score' in display_df.columns else 'N/A'
+                
+                # Format relevance score as "8/10" format
+                if 'Overall Score' in display_df.columns:
+                    clean_df['Relevance'] = display_df['Overall Score'].apply(lambda x: f"{x}/10" if pd.notna(x) and x != 'N/A' else 'N/A')
+                else:
+                    clean_df['Relevance'] = 'N/A'
+                
                 clean_df['Sentiment'] = display_df['Overall Sentiment'] if 'Overall Sentiment' in display_df.columns else 'N/A'
                 
                 # Handle the URL for the View column
@@ -431,14 +438,15 @@ with bulk_tab:
                 )
                 
                 # Configure selection
-                gb.configure_selection(selection_mode="multiple", use_checkbox=True)
+                gb.configure_selection(selection_mode="multiple", use_checkbox=False)
                 
                 # Configure other columns as before
+                gb.configure_column("Office", width=100)
                 gb.configure_column("WO #", width=100)
                 gb.configure_column("Model", width=120)
                 gb.configure_column("Contact", width=150)
                 gb.configure_column("Publication", width=180)
-                gb.configure_column("Score", width=80)
+                gb.configure_column("Relevance", width=80)
                 gb.configure_column("Sentiment", width=100)
                 gb.configure_column("✅ Approve", width=100)
                 gb.configure_column("❌ Reject", width=100)
