@@ -107,12 +107,24 @@ def determine_vehicle_make(model: str) -> str:
         if model_lower.startswith(toyota_model) or toyota_model in model_lower:
             return 'Toyota'
     
-    # Honda models
+    # Honda models (ADDED PROLOGUE)
     honda_models = ['civic', 'accord', 'cr-v', 'pilot', 'passport', 'ridgeline', 'odyssey', 
-                    'hr-v', 'insight', 'fit']
+                    'hr-v', 'insight', 'fit', 'prologue']
     for honda_model in honda_models:
         if model_lower.startswith(honda_model) or honda_model in model_lower:
             return 'Honda'
+    
+    # Acura models (ADDED RDX and other missing models)
+    acura_models = ['rdx', 'mdx', 'tlx', 'ilx', 'nsx', 'zdx', 'integra']
+    for acura_model in acura_models:
+        if model_lower.startswith(acura_model) or acura_model in model_lower:
+            return 'Acura'
+    
+    # Mazda models (ADDED MAZDA3 and other models)
+    mazda_models = ['mazda3', 'mazda6', 'cx-3', 'cx-5', 'cx-9', 'cx-30', 'cx-50', 'cx-70', 'cx-90', 'mx-5', 'mx-30']
+    for mazda_model in mazda_models:
+        if model_lower.startswith(mazda_model) or mazda_model in model_lower:
+            return 'Mazda'
     
     # Ford models
     ford_models = ['f-150', 'f-250', 'f-350', 'mustang', 'explorer', 'escape', 'edge', 
@@ -161,7 +173,8 @@ def determine_vehicle_make(model: str) -> str:
         known_makes = ['toyota', 'honda', 'ford', 'chevrolet', 'chevy', 'bmw', 'mercedes', 
                        'audi', 'lexus', 'cadillac', 'buick', 'gmc', 'nissan', 'hyundai', 
                        'kia', 'mazda', 'subaru', 'volkswagen', 'vw', 'volvo', 'jaguar', 
-                       'land rover', 'porsche', 'tesla', 'jeep', 'dodge', 'ram', 'chrysler']
+                       'land rover', 'porsche', 'tesla', 'jeep', 'dodge', 'ram', 'chrysler',
+                       'acura']  # ADDED ACURA
         
         if first_word in known_makes:
             # Capitalize properly
@@ -445,17 +458,39 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         
         # ENHANCEMENT: Create flexible model variations including both short and full names
         model_variations = [
-            model,  # Original: "4runner"
-            model_full,  # Full: "toyota 4runner"
-            model.replace('3', ' 3'),  # Add space before number: "mazda 3"
-            model.replace('mazda3', 'mazda 3'),  # Specific case: "mazda 3"
-            model.replace('civic', 'civic'),  # Keep as is
-            model.replace('corolla', 'corolla'),  # Keep as is
+            model,  # Original: "cx-50"
+            model_full,  # Full: "mazda cx-50"
         ]
+        
+        # Handle hyphen/space variations (CX-50 vs CX 50)
+        if '-' in model:
+            model_variations.append(model.replace('-', ' '))  # "cx-50" -> "cx 50"
+            model_variations.append(model.replace('-', ''))   # "cx-50" -> "cx50"
+        if ' ' in model:
+            model_variations.append(model.replace(' ', '-'))  # "cx 50" -> "cx-50"
+            model_variations.append(model.replace(' ', ''))   # "cx 50" -> "cx50"
+        
+        # Handle number variations (add/remove spaces before numbers)
+        import re
+        # Add space before numbers: "mazda3" -> "mazda 3"
+        model_with_space = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', model)
+        if model_with_space != model:
+            model_variations.append(model_with_space)
+        
+        # Remove spaces before numbers: "mazda 3" -> "mazda3"
+        model_no_space = re.sub(r'([a-zA-Z])\s+(\d)', r'\1\2', model)
+        if model_no_space != model:
+            model_variations.append(model_no_space)
         
         # Add make + model combinations for better matching
         if make and model_full != f"{make} {model}":
-            model_variations.append(f"{make} {model}")  # "toyota 4runner"
+            model_variations.append(f"{make} {model}")  # "mazda cx-50"
+            
+            # Also add variations with make for hyphen/space handling
+            if '-' in model:
+                model_variations.append(f"{make} {model.replace('-', ' ')}")  # "mazda cx 50"
+            if ' ' in model:
+                model_variations.append(f"{make} {model.replace(' ', '-')}")  # "mazda cx-50"
         
         # Remove duplicates and empty strings
         model_variations = list(set([v.strip() for v in model_variations if v.strip()]))
@@ -498,222 +533,77 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         # If no relevant video found by title, check transcripts with flexible matching
         logger.info("No title match found, checking transcripts for content...")
         
-        # OPTIMIZATION: Skip transcript checking if it consistently fails
-        # Instead, go directly to Google Search fallback which is faster and more reliable
-        logger.info("Skipping transcript checking (often fails) - going directly to Google Search fallback...")
+        # Re-enabled transcript checking - this was working before the "optimization"
+        logger.info("Checking transcripts for vehicle mentions (re-enabled after regression fix)...")
         
-        # Comment out the transcript checking loop since it's slow and error-prone
-        # for video in videos:
-        #     video_id = video['video_id']
-        #     transcript = get_transcript(video_id)
-        #     
-        #     if not transcript:
-        #         continue
-        #         
-        #     # Check if transcript mentions the vehicle with flexible matching
-        #     transcript_lower = transcript.lower()
-        #     if make in transcript_lower:
-        #         for model_var in model_variations:
-        #             if model_var in transcript_lower:
-        #                 logger.info(f"✅ Found relevant video by transcript content ('{model_var}'): {video['title']}")
-        #                 return {
-        #                     'url': video['url'],
-        #                     'content': transcript,
-        #                     'content_type': 'video',
-        #                     'title': video['title']
-        #                 }
+        for video in videos:
+            video_id = video['video_id']
+            transcript = get_transcript(video_id)
+            
+            if not transcript:
+                continue
+                
+            # Check if transcript mentions the vehicle with flexible matching
+            transcript_lower = transcript.lower()
+            if make in transcript_lower:
+                for model_var in model_variations:
+                    if model_var in transcript_lower:
+                        logger.info(f"✅ Found relevant video by transcript content ('{model_var}'): {video['title']}")
+                        return {
+                            'url': video['url'],
+                            'content': transcript,
+                            'content_type': 'video',
+                            'title': video['title']
+                        }
         
         logger.info(f"No relevant videos found for {make} {model} in channel {channel_id}")
         
-        # Fallback 1: Try ScrapingBee to scrape the full YouTube channel page
-        logger.info("RSS feed didn't find relevant videos. Trying ScrapingBee to scrape full channel...")
-        try:
-            from src.utils.youtube_handler import scrape_channel_videos_with_scrapingbee
-            
-            # Use ScrapingBee to scrape the channel videos page
-            scraped_videos = scrape_channel_videos_with_scrapingbee(url, make, model)
-            
-            if scraped_videos:
-                logger.info(f"🎯 ScrapingBee found {len(scraped_videos)} relevant videos!")
-                
-                # Try to get content from the first relevant video
-                for video in scraped_videos[:3]:  # Try top 3 relevant videos
-                    logger.info(f"Trying ScrapingBee-found video: {video['title']}")
-                    video_id = video['video_id']
-                    
-                    # Try to get transcript first
-                    transcript = get_transcript(video_id)
-                    
-                    content_text = None
-                    source_title = video['title']  # Use ScrapingBee-extracted title
-                    
-                    if transcript:
-                        content_text = f"Video Title: {video['title']}\nTranscript: {transcript}"
-                        logger.info(f"✅ Using transcript for ScrapingBee-found video: {video['title']}")
-                    else:
-                        logger.info(f"No transcript for ScrapingBee-found video {video_id}, trying metadata fallback")
-                        
-                        # Enhanced metadata fallback using ScrapingBee title
-                        metadata = get_video_metadata_fallback(video_id)
-                        if metadata:
-                            # Use ScrapingBee title if metadata extraction failed
-                            if metadata['title'] == f"YouTube Video {video_id}":
-                                metadata['title'] = video['title']
-                                metadata['content_text'] = f"Title: {video['title']}\nChannel: {metadata.get('channel_name', 'Unknown')}\nViews: {metadata.get('view_count', '0')}\nDescription: {metadata.get('description', 'Not available')}"
-                            
-                            content_text = metadata['content_text']
-                            source_title = metadata['title']
-                            logger.info(f"✅ Using enhanced metadata for ScrapingBee-found video: {video['title']}")
-                        else:
-                            # Fallback: Use just the ScrapingBee title and basic info
-                            content_text = f"Title: {video['title']}\nVideo URL: {video['url']}\nChannel: TheCarCareNutReviews\nThis is a 2025 Mazda 3 vehicle review video by a professional mechanic."
-                            logger.info(f"✅ Using ScrapingBee title-only fallback for: {video['title']}")
-                    
-                    if content_text:
-                        return {
-                            'url': video['url'],
-                            'content': content_text,
-                            'content_type': 'video_metadata',
-                            'title': source_title,
-                            'channel_name': 'TheCarCareNutReviews',
-                            'view_count': '223,173'  # Known from logs
-                        }
-                
-                logger.info("ScrapingBee found videos but couldn't extract usable content")
-            else:
-                logger.info("ScrapingBee didn't find any relevant videos either")
-            
-        except Exception as e:
-            logger.error(f"Error processing ScrapingBee YouTube response: {e}")
+        # NEW: Try ScrapingBee channel search as fallback when RSS feed fails
+        logger.info(f"🔄 Falling back to ScrapingBee channel search for {make} {model}")
         
-        # Fallback 2: Use Google Search to find YouTube videos on this channel
-        logger.info("ScrapingBee also failed. Trying Google Search fallback...")
         try:
-            # Extract channel name from URL for better search
-            channel_name = ""
-            if "@" in url:
-                # Extract from @ChannelName format
-                channel_name = url.split("@")[1].split("/")[0]
-            elif "channel/" in url:
-                # For channel ID URLs, use a more generic search
-                channel_name = ""
+            # Use ScrapingBee to search the full channel content
+            channel_videos = scrape_channel_videos_with_scrapingbee(url, make, model)
             
-            # Build proper YouTube search queries
-            # ENHANCEMENT: Use the same model variations we built earlier for consistency
-            # This replaces the hardcoded ['mazda 3', 'mazda3'] with dynamic variations
-            
-            search_queries = []
-            if channel_name:
-                # Channel-specific searches - PRIORITIZE 2025 VIDEOS FIRST & EXCLUDE OLD YEARS
-                for model_var in model_variations:
-                    search_queries.extend([
-                        f'site:youtube.com "{channel_name}" "2025 {model_var}" review -2023 -2022 -2021',  # EXCLUDE old years!
-                        f'site:youtube.com "{channel_name}" "{model_var}" 2025 review -2023 -2022',  # Alternative order with exclusions
-                        f'site:youtube.com "{channel_name}" "should you buy" "2025 {model_var}" -2023',  # Specific title format, exclude 2023
-                        f'site:youtube.com "{channel_name}" "2025 {model_var}" -"2023" -"latest" -"comprehensive"',  # Exclude terms from old video
-                    ])
-            
-            # Generic YouTube searches as fallback - ALSO PRIORITIZE 2025 WITH EXCLUSIONS
-            for model_var in model_variations:
-                search_queries.extend([
-                    f'site:youtube.com "2025 {model_var}" review -2023 -2022',  # 2025 first with exclusions
-                    f'site:youtube.com "{make}" "2025 {model_var}" review -2023',  # With make and 2025, exclude 2023
-                    f'site:youtube.com "{model_var}" review 2025 -"latest" -"comprehensive"',  # Exclude terms from the problematic video
-                ])
-            
-            # Try each search query
-            found_url = None
-            for i, search_query in enumerate(search_queries[:8], 1):  # Limit to 8 searches
-                logger.info(f"YouTube Google search attempt {i}: {search_query}")
+            if channel_videos:
+                logger.info(f"✅ ScrapingBee found {len(channel_videos)} relevant videos in channel")
                 
-                try:
-                    # Use Google Custom Search API
-                    api_key = os.environ.get('GOOGLE_SEARCH_API_KEY')
-                    search_engine_id = os.environ.get('GOOGLE_SEARCH_ENGINE_ID')
-                    
-                    if not api_key or not search_engine_id:
-                        logger.warning("Google Search API not configured for YouTube fallback")
-                        break
-                    
-                    params = {
-                        'key': api_key,
-                        'cx': search_engine_id,
-                        'q': search_query,
-                        'num': 5
-                    }
-                    
-                    response = requests.get('https://www.googleapis.com/customsearch/v1', params=params, timeout=10)
-                    response.raise_for_status()
-                    data = response.json()
-                    
-                    if 'items' in data:
-                        for item in data['items']:
-                            result_url = item.get('link', '')
-                            title = item.get('title', '')
-                            
-                            # CRITICAL: Only accept YouTube URLs
-                            if 'youtube.com/watch' in result_url or 'youtu.be/' in result_url:
-                                # Check if title contains our model variation
-                                title_lower = title.lower()
-                                if any(model_var.lower() in title_lower for model_var in model_variations):
-                                    logger.info(f"✅ Found YouTube video: {title}")
-                                    logger.info(f"✅ YouTube URL: {result_url}")
-                                    found_url = result_url
-                                    break
+                # Use the first relevant video found by ScrapingBee
+                for video_info in channel_videos:
+                    video_id = video_info.get('video_id')
+                    if video_id:
+                        transcript = get_transcript(video_id)
                         
-                        if found_url:
-                            break
-                    else:
-                        logger.info(f"No results for YouTube search: {search_query}")
-                        
-                except Exception as e:
-                    logger.error(f"Error in YouTube Google search: {e}")
-                    continue
-                    
-                # Rate limit between searches
-                time.sleep(0.5)
-            
-            if found_url:
-                logger.info(f"✅ Google Search found YouTube video: {found_url}")
-                
-                # Extract video ID from the found URL
-                found_video_id = extract_video_id(found_url)
-                if found_video_id:
-                    # Try to get transcript from the found video
-                    transcript = get_transcript(found_video_id)
-                    if transcript:
-                        # Get video title for logging
-                        metadata = get_video_metadata_fallback(found_video_id)
-                        title = metadata.get('title', found_url) if metadata else found_url
-                        
-                        logger.info(f"✅ Successfully got transcript from Google-found video: {title}")
-                        return {
-                            'url': found_url,
-                            'content': transcript,
-                            'content_type': 'video',
-                            'title': title
-                        }
-                    else:
-                        # Fallback to metadata
-                        logger.info(f"No transcript for Google-found video {found_video_id}, trying metadata fallback")
-                        metadata = get_video_metadata_fallback(found_video_id)
-                        if metadata and metadata.get('content_text'):
-                            logger.info(f"✅ Using metadata fallback for Google-found video: {metadata.get('title', 'No title')}")
+                        if transcript:
+                            logger.info(f"✅ ScrapingBee + transcript success: {video_info['title']}")
                             return {
-                                'url': found_url,
-                                'content': metadata['content_text'],
-                                'content_type': 'video_metadata',
-                                'title': metadata.get('title', found_url),
-                                'channel_name': metadata.get('channel_name', ''),
-                                'view_count': metadata.get('view_count', '0')
+                                'url': video_info['url'],
+                                'content': transcript,
+                                'content_type': 'video',
+                                'title': video_info['title']
                             }
-                else:
-                    logger.warning(f"Could not extract video ID from found URL: {found_url}")
+                        else:
+                            # Fallback to metadata
+                            metadata = get_video_metadata_fallback(video_id)
+                            if metadata and metadata.get('content_text'):
+                                logger.info(f"✅ ScrapingBee + metadata success: {video_info['title']}")
+                                return {
+                                    'url': video_info['url'],
+                                    'content': metadata['content_text'],
+                                    'content_type': 'video_metadata',
+                                    'title': metadata.get('title', video_info['title']),
+                                    'channel_name': metadata.get('channel_name', ''),
+                                    'view_count': metadata.get('view_count', '0')
+                                }
             else:
-                logger.info("Google Search fallback did not find relevant YouTube videos")
+                logger.info(f"ScrapingBee found no relevant videos for {make} {model} in channel")
                 
         except Exception as e:
-            logger.error(f"Error in Google Search fallback for YouTube: {e}")
+            logger.warning(f"ScrapingBee channel search failed: {e}")
+        
+        # Only return None if both RSS and ScrapingBee failed
+        logger.info(f"❌ No relevant videos found for {make} {model} in the specified channel {channel_id}")
+        logger.info(f"🔒 Staying within specified channel - not searching other YouTube channels")
         
         return None
         

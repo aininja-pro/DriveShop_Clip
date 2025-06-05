@@ -13,7 +13,7 @@ class ScrapingBeeClient:
     """ScrapingBee API client for scraping JS-heavy websites"""
     
     def __init__(self):
-        self.api_key = os.environ.get('SCRAPINGBEE_API_KEY')
+        self.api_key = os.environ.get('SCRAPINGBEE_API_KEY', '').strip()
         self.base_url = "https://app.scrapingbee.com/api/v1/"
         self.max_retries = 3
         self.retry_delay = 2  # seconds

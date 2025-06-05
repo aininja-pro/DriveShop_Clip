@@ -369,9 +369,9 @@ with bulk_tab:
                 clean_df['WO #'] = display_df['WO #'] if 'WO #' in display_df.columns else ''
                 clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
                 clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
-                clean_df['Publication'] = display_df.get('publication', display_df.get('source', 'The Gentleman Racer'))
-                clean_df['Score'] = display_df.get('overall_score', '10/10')
-                clean_df['Sentiment'] = display_df.get('overall_sentiment', '😊 Pos')
+                clean_df['Publication'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else 'N/A'
+                clean_df['Score'] = display_df['Overall Score'] if 'Overall Score' in display_df.columns else 'N/A'
+                clean_df['Sentiment'] = display_df['Overall Sentiment'] if 'Overall Sentiment' in display_df.columns else 'N/A'
                 
                 # Handle the URL for the View column
                 url_column = None
