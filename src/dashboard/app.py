@@ -373,8 +373,8 @@ with bulk_tab:
                 clean_df['Publication'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else 'N/A'
                 
                 # Format relevance score as "8/10" format
-                if 'Overall Score' in display_df.columns:
-                    clean_df['Relevance'] = display_df['Overall Score'].apply(lambda x: f"{x}/10" if pd.notna(x) and x != 'N/A' else 'N/A')
+                if 'Relevance Score' in display_df.columns:
+                    clean_df['Relevance'] = display_df['Relevance Score'].apply(lambda x: f"{x}/10" if pd.notna(x) and x != 'N/A' else 'N/A')
                 else:
                     clean_df['Relevance'] = 'N/A'
                 

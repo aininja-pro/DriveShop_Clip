@@ -530,32 +530,6 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                     'view_count': metadata.get('view_count', '0')
                                 }
         
-        # If no relevant video found by title, check transcripts with flexible matching
-        logger.info("No title match found, checking transcripts for content...")
-        
-        # Re-enabled transcript checking - this was working before the "optimization"
-        logger.info("Checking transcripts for vehicle mentions (re-enabled after regression fix)...")
-        
-        for video in videos:
-            video_id = video['video_id']
-            transcript = get_transcript(video_id)
-            
-            if not transcript:
-                continue
-                
-            # Check if transcript mentions the vehicle with flexible matching
-            transcript_lower = transcript.lower()
-            if make in transcript_lower:
-                for model_var in model_variations:
-                    if model_var in transcript_lower:
-                        logger.info(f"✅ Found relevant video by transcript content ('{model_var}'): {video['title']}")
-                        return {
-                            'url': video['url'],
-                            'content': transcript,
-                            'content_type': 'video',
-                            'title': video['title']
-                        }
-        
         logger.info(f"No relevant videos found for {make} {model} in channel {channel_id}")
         
         # NEW: Try ScrapingBee channel search as fallback when RSS feed fails
@@ -572,8 +546,22 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                 for video_info in channel_videos:
                     video_id = video_info.get('video_id')
                     if video_id:
-                        transcript = get_transcript(video_id)
+                        # Try metadata fallback first since transcript fetching is consistently failing
+                        logger.info(f"Trying metadata fallback first for ScrapingBee video: {video_info['title']}")
+                        metadata = get_video_metadata_fallback(video_id)
+                        if metadata and metadata.get('content_text'):
+                            logger.info(f"✅ ScrapingBee + metadata success: {video_info['title']}")
+                            return {
+                                'url': video_info['url'],
+                                'content': metadata['content_text'],
+                                'content_type': 'video_metadata',
+                                'title': metadata.get('title', video_info['title']),
+                                'channel_name': metadata.get('channel_name', ''),
+                                'view_count': metadata.get('view_count', '0')
+                            }
                         
+                        # Only try transcript as fallback if metadata failed
+                        transcript = get_transcript(video_id)
                         if transcript:
                             logger.info(f"✅ ScrapingBee + transcript success: {video_info['title']}")
                             return {
@@ -582,19 +570,6 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                 'content_type': 'video',
                                 'title': video_info['title']
                             }
-                        else:
-                            # Fallback to metadata
-                            metadata = get_video_metadata_fallback(video_id)
-                            if metadata and metadata.get('content_text'):
-                                logger.info(f"✅ ScrapingBee + metadata success: {video_info['title']}")
-                                return {
-                                    'url': video_info['url'],
-                                    'content': metadata['content_text'],
-                                    'content_type': 'video_metadata',
-                                    'title': metadata.get('title', video_info['title']),
-                                    'channel_name': metadata.get('channel_name', ''),
-                                    'view_count': metadata.get('view_count', '0')
-                                }
             else:
                 logger.info(f"ScrapingBee found no relevant videos for {make} {model} in channel")
                 
