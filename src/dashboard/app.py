@@ -422,6 +422,96 @@ with bulk_tab:
                 }
                 """)
                 
+                # Create checkbox cell renderer for Approve column
+                cellRenderer_approve = JsCode("""
+                class ApproveCellRenderer {
+                  init(params) {
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.display = 'flex';
+                    this.eGui.style.justifyContent = 'flex-start';
+                    this.eGui.style.alignItems = 'center';
+                    this.eGui.style.height = '100%';
+                    this.eGui.style.paddingLeft = '8px';
+                    
+                    this.checkbox = document.createElement('input');
+                    this.checkbox.type = 'checkbox';
+                    this.checkbox.checked = params.value === true;
+                    this.checkbox.style.cursor = 'pointer';
+                    this.checkbox.style.transform = 'scale(1.2)';
+                    
+                    this.checkbox.addEventListener('change', () => {
+                      if (this.checkbox.checked) {
+                        // If approve is checked, uncheck reject
+                        const rowNode = params.node;
+                        rowNode.setDataValue('❌ Reject', false);
+                      }
+                      params.setValue(this.checkbox.checked);
+                      params.api.refreshCells({
+                        force: true,
+                        columns: ['✅ Approve', '❌ Reject'],
+                        rowNodes: [params.node]
+                      });
+                    });
+                    
+                    this.eGui.appendChild(this.checkbox);
+                  }
+
+                  getGui() {
+                    return this.eGui;
+                  }
+
+                  refresh(params) {
+                    this.checkbox.checked = params.value === true;
+                    return true;
+                  }
+                }
+                """)
+                
+                # Create checkbox cell renderer for Reject column
+                cellRenderer_reject = JsCode("""
+                class RejectCellRenderer {
+                  init(params) {
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.display = 'flex';
+                    this.eGui.style.justifyContent = 'flex-start';
+                    this.eGui.style.alignItems = 'center';
+                    this.eGui.style.height = '100%';
+                    this.eGui.style.paddingLeft = '8px';
+                    
+                    this.checkbox = document.createElement('input');
+                    this.checkbox.type = 'checkbox';
+                    this.checkbox.checked = params.value === true;
+                    this.checkbox.style.cursor = 'pointer';
+                    this.checkbox.style.transform = 'scale(1.2)';
+                    
+                    this.checkbox.addEventListener('change', () => {
+                      if (this.checkbox.checked) {
+                        // If reject is checked, uncheck approve
+                        const rowNode = params.node;
+                        rowNode.setDataValue('✅ Approve', false);
+                      }
+                      params.setValue(this.checkbox.checked);
+                      params.api.refreshCells({
+                        force: true,
+                        columns: ['✅ Approve', '❌ Reject'],
+                        rowNodes: [params.node]
+                      });
+                    });
+                    
+                    this.eGui.appendChild(this.checkbox);
+                  }
+
+                  getGui() {
+                    return this.eGui;
+                  }
+
+                  refresh(params) {
+                    this.checkbox.checked = params.value === true;
+                    return true;
+                  }
+                }
+                """)
+                
                 # Configure the grid
                 gb = GridOptionsBuilder.from_dataframe(clean_df)
                 
@@ -448,8 +538,24 @@ with bulk_tab:
                 gb.configure_column("Publication", width=180)
                 gb.configure_column("Relevance", width=80)
                 gb.configure_column("Sentiment", width=100)
-                gb.configure_column("✅ Approve", width=100)
-                gb.configure_column("❌ Reject", width=100)
+                
+                # Configure Approve and Reject columns with checkbox renderers
+                gb.configure_column(
+                    "✅ Approve", 
+                    cellRenderer=cellRenderer_approve,
+                    width=100,
+                    editable=True,
+                    sortable=False,
+                    filter=False
+                )
+                gb.configure_column(
+                    "❌ Reject", 
+                    cellRenderer=cellRenderer_reject,
+                    width=100,
+                    editable=True,
+                    sortable=False,
+                    filter=False
+                )
                 
                 # Build grid options
                 grid_options = gb.build()
