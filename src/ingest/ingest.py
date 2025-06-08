@@ -29,13 +29,14 @@ import csv
 import pandas as pd
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import requests
 import asyncio
 import logging
 import re
 import argparse
+import dateutil.parser
 
 # Import local modules
 from src.utils.logger import setup_logger
@@ -44,11 +45,67 @@ from src.utils.youtube_handler import get_channel_id, get_latest_videos, get_tra
 from src.utils.escalation import crawling_strategy
 from src.utils.enhanced_crawler_manager import EnhancedCrawlerManager
 from src.analysis.gpt_analysis import analyze_clip
+from src.utils.date_extractor import extract_date_from_html, extract_youtube_upload_date, parse_date_string
 
 logger = setup_logger(__name__)
 
 # Initialize the enhanced crawler manager (it will be reused for all URLs)
 crawler_manager = EnhancedCrawlerManager()
+
+def parse_start_date(date_str: str) -> Optional[datetime]:
+    """
+    Parse a date string from the Start Date column.
+    Handles various date formats commonly found in spreadsheets.
+    
+    Args:
+        date_str: Date string from the spreadsheet
+        
+    Returns:
+        datetime object or None if parsing fails
+    """
+    if not date_str or pd.isna(date_str):
+        return None
+    
+    try:
+        # Convert to string if it's not already
+        date_str = str(date_str).strip()
+        
+        # Handle empty strings
+        if not date_str:
+            return None
+        
+        # Use dateutil parser which handles many formats automatically
+        parsed_date = dateutil.parser.parse(date_str)
+        return parsed_date
+    
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Could not parse date '{date_str}': {e}")
+        return None
+
+def is_content_within_date_range(content_date: Optional[datetime], 
+                                start_date: Optional[datetime], 
+                                days_forward: int = 90) -> bool:
+    """
+    Check if content publication date is within the acceptable range.
+    Content should be published AFTER the loan start date (not before).
+    
+    Args:
+        content_date: When the content was published
+        start_date: Loan start date (reference point)
+        days_forward: How many days forward from start_date to allow
+        
+    Returns:
+        True if content is within range, False otherwise
+    """
+    if not content_date or not start_date:
+        # If we can't determine dates, allow the content (better than filtering out everything)
+        return True
+    
+    # Calculate the latest acceptable date (start_date + days_forward)
+    latest_date = start_date + timedelta(days=days_forward)
+    
+    # Content should be published AFTER the start date and before the end of the window
+    return start_date <= content_date <= latest_date
 
 def determine_vehicle_make_from_both(model_full: str, model_short: str) -> str:
     """
@@ -359,6 +416,16 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
                         loan['urls'].append(url_text)
                         logger.debug(f"Added single URL: {url_text}")
             
+            # Add Start Date for date filtering
+            loan['start_date'] = None
+            if 'Start Date' in df.columns and pd.notna(row['Start Date']):
+                parsed_date = parse_start_date(row['Start Date'])
+                if parsed_date:
+                    loan['start_date'] = parsed_date
+                    logger.debug(f"Parsed start date for {loan['work_order']}: {parsed_date.strftime('%Y-%m-%d')}")
+                else:
+                    logger.warning(f"Could not parse start date for {loan['work_order']}: {row['Start Date']}")
+            
             # Add additional fields that might be helpful later
             for field in ['To', 'Affiliation', 'Office']:
                 if field in df.columns and pd.notna(row[field]):
@@ -379,7 +446,8 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
 
 def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Process a YouTube URL to extract video content.
+    Process a YouTube URL to extract video content with date filtering.
+    Implements graceful degradation: 90 days -> 180 days if nothing found.
     
     Args:
         url: YouTube URL (channel or video)
@@ -396,13 +464,50 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         video_id = extract_video_id(url)
         
         if video_id:
-            # Direct video URL - get transcript first
+            # Direct video URL - get metadata first to check upload date
             logger.info(f"Processing YouTube video: {url}")
+            metadata = get_video_metadata_fallback(video_id)
+            
+            # Check video upload date against loan start date
+            start_date = loan.get('start_date')
+            video_date = extract_youtube_upload_date(metadata) if metadata else None
+            
+            # Apply date filtering with graceful degradation (forward from start date)
+            is_within_range = False
+            days_attempted = [90, 180]
+            
+            for days_forward in days_attempted:
+                if is_content_within_date_range(video_date, start_date, days_forward):
+                    if video_date and start_date:
+                        if video_date >= start_date:
+                            days_diff = (video_date - start_date).days
+                            logger.info(f"✅ Video is within {days_forward}-day range: uploaded {days_diff} days after start date")
+                        else:
+                            days_diff = (start_date - video_date).days
+                            logger.warning(f"⚠️ Video uploaded {days_diff} days BEFORE start date, but allowing due to fallback")
+                    else:
+                        logger.info(f"✅ Video accepted (date filtering skipped - missing date info)")
+                    is_within_range = True
+                    break
+            
+            if not is_within_range and video_date and start_date:
+                if video_date < start_date:
+                    days_diff = (start_date - video_date).days
+                    # Only reject videos that are extremely old (more than 365 days before start)
+                    if days_diff > 365:
+                        logger.warning(f"❌ Video too old: uploaded {days_diff} days BEFORE start date (videos should be after loan placement)")
+                        return None
+                    else:
+                        logger.info(f"⚠️ Allowing slightly old video: uploaded {days_diff} days before start date")
+                else:
+                    days_diff = (video_date - start_date).days
+                    logger.warning(f"❌ Video too far in future: uploaded {days_diff} days after start date (max: 180 days)")
+                    return None
+            
+            # If date is acceptable, proceed with content extraction
             transcript = get_transcript(video_id)
             
             if transcript:
-                # Try to get video title for better logging
-                metadata = get_video_metadata_fallback(video_id)
                 title = metadata.get('title', f"YouTube Video {video_id}") if metadata else f"YouTube Video {video_id}"
                 
                 return {
@@ -414,7 +519,6 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
             else:
                 logger.info(f"No transcript available for video {video_id}, trying metadata fallback")
                 # Fallback to video metadata (title + description)
-                metadata = get_video_metadata_fallback(video_id)
                 if metadata and metadata.get('content_text'):
                     logger.info(f"Using video metadata fallback for {video_id}: {metadata.get('title', 'No title')}")
                     return {
@@ -497,38 +601,72 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         
         logger.info(f"Looking for videos with make='{make}' and model variations: {model_variations}")
         
-        for video in videos:
-            video_title = video.get('title', '').lower()
-            logger.info(f"Checking video: {video['title']}")
+        # Apply date filtering with graceful degradation (forward from start date)
+        start_date = loan.get('start_date')
+        days_attempted = [90, 180]  # Graceful degradation: 90 days forward, then 180 days forward
+        
+        for days_forward in days_attempted:
+            logger.info(f"Looking for YouTube videos within {days_forward} days forward of start date")
             
-            # Check if title mentions the make and any model variation
-            if make in video_title:
-                for model_var in model_variations:
-                    if model_var in video_title:
-                        logger.info(f"✅ Found relevant video by title match ('{model_var}'): {video['title']}")
-                        video_id = video['video_id']
-                        transcript = get_transcript(video_id)
-                        
-                        if transcript:
-                            return {
-                                'url': video['url'],
-                                'content': transcript,
-                                'content_type': 'video',
-                                'title': video['title']
-                            }
+            for video in videos:
+                video_title = video.get('title', '').lower()
+                logger.info(f"Checking video: {video['title']}")
+                
+                # Extract video upload date
+                video_date = None
+                if 'published' in video:
+                    video_date = parse_date_string(str(video['published']))
+                
+                # Check if video is within acceptable date range
+                if not is_content_within_date_range(video_date, start_date, days_forward):
+                    if video_date and start_date:
+                        if video_date < start_date:
+                            days_diff = (start_date - video_date).days
+                            logger.info(f"⏭️ Skipping video (too old): {days_diff} days BEFORE start date (limit: {days_forward} days forward)")
                         else:
-                            # Fallback to metadata if no transcript
-                            logger.info(f"No transcript for {video_id}, trying metadata fallback")
-                            metadata = get_video_metadata_fallback(video_id)
-                            if metadata and metadata.get('content_text'):
+                            days_diff = (video_date - start_date).days
+                            logger.info(f"⏭️ Skipping video (too far future): {days_diff} days after start date (limit: {days_forward})")
+                    continue
+                
+                # Check if title mentions the make and any model variation
+                if make in video_title:
+                    for model_var in model_variations:
+                        if model_var in video_title:
+                            if video_date and start_date:
+                                days_diff = (video_date - start_date).days
+                                logger.info(f"✅ Found relevant video within date range ('{model_var}', {days_diff} days after start): {video['title']}")
+                            else:
+                                logger.info(f"✅ Found relevant video by title match ('{model_var}'): {video['title']}")
+                            
+                            video_id = video['video_id']
+                            transcript = get_transcript(video_id)
+                            
+                            if transcript:
                                 return {
                                     'url': video['url'],
-                                    'content': metadata['content_text'],
-                                    'content_type': 'video_metadata',
-                                    'title': metadata.get('title', video['title']),
-                                    'channel_name': metadata.get('channel_name', ''),
-                                    'view_count': metadata.get('view_count', '0')
+                                    'content': transcript,
+                                    'content_type': 'video',
+                                    'title': video['title']
                                 }
+                            else:
+                                # Fallback to metadata if no transcript
+                                logger.info(f"No transcript for {video_id}, trying metadata fallback")
+                                metadata = get_video_metadata_fallback(video_id)
+                                if metadata and metadata.get('content_text'):
+                                    return {
+                                        'url': video['url'],
+                                        'content': metadata['content_text'],
+                                        'content_type': 'video_metadata',
+                                        'title': metadata.get('title', video['title']),
+                                        'channel_name': metadata.get('channel_name', ''),
+                                        'view_count': metadata.get('view_count', '0')
+                                    }
+            
+            # If we found something in this time window, stop looking
+            if days_forward == 90:
+                logger.info(f"No relevant videos found in {days_forward} days forward, trying {days_attempted[1]} days...")
+            else:
+                logger.info(f"No relevant videos found in {days_forward} days forward either")
         
         logger.info(f"No relevant videos found for {make} {model} in channel {channel_id}")
         
@@ -588,7 +726,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
 
 def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Process a web URL to extract article content.
+    Process a web URL to extract article content with date filtering.
+    Implements graceful degradation: 90 days -> 180 days if nothing found.
     
     Args:
         url: Web article URL
@@ -608,22 +747,87 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Get person name for caching if available
         person_name = loan.get('to', loan.get('affiliation', ''))
         
-        # Use the new enhanced crawler with 5-tier escalation and hierarchical search
-        result = crawler_manager.crawl_url(
-            url=url,
-            make=make,
-            model=search_model,  # Use the hierarchical search model
-            person_name=person_name
-        )
+        # Try to crawl with date filtering (graceful degradation: 90 -> 180 days forward)
+        start_date = loan.get('start_date')
+        content_result = None
+        days_attempted = [90, 180]  # Graceful degradation: 90 days forward, then 180 days forward
         
-        if not result['success']:
-            error_msg = result.get('error', 'Unknown error')
-            logger.warning(f"Error crawling {url}: {error_msg} (Method: {result.get('tier_used', 'Unknown')})")
-            return None
+        for days_forward in days_attempted:
+            logger.info(f"Attempting to find content within {days_forward} days forward of start date")
             
-        if not result.get('content'):
-            logger.warning(f"No content retrieved from {url}")
+            # Use the new enhanced crawler with 5-tier escalation and hierarchical search
+            result = crawler_manager.crawl_url(
+                url=url,
+                make=make,
+                model=search_model,  # Use the hierarchical search model
+                person_name=person_name
+            )
+            
+            if not result['success']:
+                error_msg = result.get('error', 'Unknown error')
+                logger.warning(f"Error crawling {url}: {error_msg} (Method: {result.get('tier_used', 'Unknown')})")
+                continue
+                
+            if not result.get('content'):
+                logger.warning(f"No content retrieved from {url}")
+                continue
+            
+            # Extract publication date from the HTML content
+            # The content field contains the HTML when using ScrapingBee or Enhanced HTTP
+            html_content = result.get('content', '')
+            final_url = result.get('url', url)
+            
+            if html_content:
+                content_date = extract_date_from_html(html_content, final_url)
+                
+                # Check if content is within the acceptable date range
+                if is_content_within_date_range(content_date, start_date, days_forward):
+                    if content_date and start_date:
+                        days_diff = (content_date - start_date).days
+                        logger.info(f"✅ Content found within date range: published {days_diff} days after start date")
+                    else:
+                        logger.info(f"✅ Content accepted (date filtering skipped - missing date info)")
+                    
+                    content_result = result
+                    break
+                else:
+                    if content_date and start_date:
+                        if content_date < start_date:
+                            days_diff = (start_date - content_date).days
+                            logger.info(f"❌ Content too old: published {days_diff} days BEFORE start date (articles should be after loan placement)")
+                        else:
+                            days_diff = (content_date - start_date).days
+                            logger.info(f"❌ Content too far in future: published {days_diff} days after start date (limit: {days_forward})")
+                        
+                        # If this is our last attempt (180 days), only allow if it's not extremely old
+                        if days_forward == 180:
+                            if content_date and start_date and content_date < start_date:
+                                days_old = (start_date - content_date).days
+                                # BALANCED: Allow content within 120 days before start (blocks ancient content but keeps recent relevant articles)
+                                if days_old <= 120:
+                                    logger.info(f"⚠️ Final attempt - allowing slightly old content ({days_old} days before start)")
+                                    content_result = result
+                                    break
+                                else:
+                                    logger.info(f"❌ Content is too old even for final attempt ({days_old} days before start date) - blocking ancient content to save credits")
+                            else:
+                                # For content with unknown dates, allow it in final attempt (might be recent)
+                                logger.info(f"⚠️ Final attempt - allowing content with unknown publication date")
+                                content_result = result
+                                break
+                    else:
+                        logger.info(f"⚠️ Could not determine content date, trying next time window")
+            else:
+                # No HTML content available for date extraction
+                logger.info(f"⚠️ No HTML content available for date extraction, allowing content")
+                content_result = result
+                break
+        
+        if not content_result:
+            logger.warning(f"No content found within acceptable date ranges for {url}")
             return None
+        
+        result = content_result
             
         # Log which tier was successful
         tier_used = result.get('tier_used', 'Unknown')

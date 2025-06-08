@@ -146,6 +146,11 @@ class BingSearchClient:
                 snippet = item.get('snippet', '')
                 
                 if self._is_article_url(url, title):
+                    # Check for obvious old dates in URL BEFORE scoring/crawling
+                    if self._is_url_too_old(url):
+                        logger.info(f"❌ Bing skipping old URL (detected from path): {url}")
+                        continue
+                        
                     score = self._score_result(title, snippet, search_terms)
                     scored_results.append((score, url, title))
                     logger.info(f"🔍 Bing candidate: {title} | Score: {score}")
@@ -184,6 +189,12 @@ class BingSearchClient:
         from src.utils.google_search import GoogleSearchClient
         google_client = GoogleSearchClient()
         return google_client._is_article_url(url, title)
+
+    def _is_url_too_old(self, url: str) -> bool:
+        """Check if URL contains obvious old date patterns (reuse Google's logic)"""
+        from src.utils.google_search import GoogleSearchClient
+        google_client = GoogleSearchClient()
+        return google_client._is_url_too_old(url)
     
     def _generate_model_variations(self, model: str) -> List[str]:
         """Generate model name variations for search optimization"""
@@ -405,6 +416,11 @@ class GoogleSearchClient:
                 snippet = item.get('snippet', '')
                 
                 if self._is_article_url(url, title):
+                    # Check for obvious old dates in URL BEFORE scoring/crawling
+                    if self._is_url_too_old(url):
+                        logger.info(f"❌ Skipping old URL (detected from path): {url}")
+                        continue
+                        
                     score = self._score_result(title, snippet, search_terms)
                     scored_results.append((score, url, title))
                     logger.info(f"Candidate: {title} | Score: {score} | URL: {url}")
@@ -573,6 +589,40 @@ class GoogleSearchClient:
         
         # If no clear indicators but it's not in skip list, consider it valid
         return True
+
+    def _is_url_too_old(self, url: str) -> bool:
+        """Check if URL contains obvious old date patterns that make it not worth crawling"""
+        import re
+        from datetime import datetime
+        
+        # Extract 4-digit years from URL path
+        year_pattern = r'/(\d{4})[-/]'
+        matches = re.findall(year_pattern, url)
+        
+        if matches:
+            try:
+                url_year = int(matches[0])
+                current_year = datetime.now().year
+                
+                # Reject articles older than 2 years (configurable threshold)
+                if url_year < (current_year - 1):  # 2023 and older are rejected in 2025
+                    logger.debug(f"URL contains old year {url_year}: {url}")
+                    return True
+            except ValueError:
+                pass
+        
+        # Additional patterns for known old content
+        old_patterns = [
+            '/2019/', '/2020/', '/2021/', '/2022/', '/2023/',  # Specific old years
+            '2019-', '2020-', '2021-', '2022-', '2023-'       # Year in filename
+        ]
+        
+        for pattern in old_patterns:
+            if pattern in url:
+                logger.debug(f"URL matches old pattern '{pattern}': {url}")
+                return True
+                
+        return False
 
     def _generate_model_variations(self, model: str) -> List[str]:
         """Generate model name variations for search optimization"""
