@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import time
+import json
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUpdateMode
 from src.utils.logger import logger
 
@@ -55,6 +56,58 @@ def load_env():
     from dotenv import load_dotenv
     load_dotenv()
     return os.environ.get("STREAMLIT_PASSWORD", "password")
+
+# Helper function to parse URL tracking data
+def parse_url_tracking(df_row):
+    """Parse URL tracking data from the backend to show multiple URL information"""
+    try:
+        # Check if URL_Tracking column exists and has data
+        if 'URL_Tracking' in df_row and pd.notna(df_row['URL_Tracking']):
+            # Try to parse as JSON if it's a string
+            if isinstance(df_row['URL_Tracking'], str):
+                url_tracking_str = df_row['URL_Tracking']
+                
+                # Handle Python-style single quotes by converting to valid JSON
+                # Replace single quotes with double quotes, but be careful about quotes inside strings
+                try:
+                    # First try direct JSON parsing (in case it's already valid JSON)
+                    url_tracking = json.loads(url_tracking_str)
+                except json.JSONDecodeError:
+                    # If that fails, try using Python's eval (safe since it's our own data)
+                    # This handles Python-style single quotes
+                    url_tracking = eval(url_tracking_str)
+            else:
+                url_tracking = df_row['URL_Tracking']
+            
+            return url_tracking
+        else:
+            # Fallback: infer from available data
+            urls_processed = df_row.get('URLs_Processed', 1)
+            urls_successful = df_row.get('URLs_Successful', 1)
+            
+            # Create a simple tracking structure
+            return [{
+                'original_url': df_row.get('Links', df_row.get('Clip URL', '')),
+                'actual_url': df_row.get('Clip URL', ''),
+                'success': True,
+                'relevance_score': df_row.get('Relevance Score', 0),
+                'content_type': 'inferred'
+            }]
+    except Exception as e:
+        # If parsing fails, return basic structure
+        return [{
+            'original_url': df_row.get('Links', df_row.get('Clip URL', '')),
+            'actual_url': df_row.get('Clip URL', ''),
+            'success': True,
+            'relevance_score': df_row.get('Relevance Score', 0),
+            'content_type': 'inferred'
+        }]
+
+# Initialize session state for popup management
+if 'show_url_popup' not in st.session_state:
+    st.session_state.show_url_popup = False
+if 'popup_data' not in st.session_state:
+    st.session_state.popup_data = {}
 
 # Page configuration
 st.set_page_config(
@@ -192,6 +245,24 @@ st.markdown("""
         text-align: center;
         font-size: 0.7rem;
         line-height: 1.2;
+    }
+    
+    /* URL popup styling */
+    .url-popup {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin: 0.5rem 0;
+    }
+    
+    .url-item {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .url-item:last-child {
+        border-bottom: none;
     }
     
     /* Better button targeting - all buttons in action columns */
@@ -395,6 +466,94 @@ with bulk_tab:
                     clean_df['Clip URL'] = 'No URL found'
                     clean_df['📄 View'] = 'No URL found'
                 
+                # ===== NEW: Add URL tracking columns =====
+                # Add URLs count column (e.g., "2/2", "1/1")
+                def get_url_count(row):
+                    try:
+                        # Check if new URL tracking fields exist
+                        if 'URLs_Processed' in row and pd.notna(row['URLs_Processed']):
+                            urls_processed = int(row['URLs_Processed'])
+                            urls_successful = int(row.get('URLs_Successful', 1))
+                            return f"{urls_successful}/{urls_processed}"
+                        else:
+                            # Fallback for old data format - infer from Links field
+                            links = str(row.get('Links', ''))
+                            if ',' in links or ';' in links:
+                                # Multiple URLs in Links field
+                                separator = ',' if ',' in links else ';'
+                                url_count = len([u for u in links.split(separator) if u.strip()])
+                                return f"1/{url_count}"  # We know 1 was successful (this row exists)
+                            else:
+                                return "1/1"  # Single URL
+                    except:
+                        return "1/1"
+                
+                clean_df['URLs'] = display_df.apply(get_url_count, axis=1)
+                
+                # Add Other URLs column with direct clickable links
+                def get_other_urls_html(row):
+                    try:
+                        if 'URL_Tracking' in row and pd.notna(row['URL_Tracking']):
+                            url_tracking = parse_url_tracking(row)
+                            successful_urls = [u for u in url_tracking if u.get('success', False)]
+                            
+                            if len(successful_urls) <= 1:
+                                return "—"
+                            else:
+                                # Get the main URL (already shown in View column)
+                                main_url = row.get('Clip URL', '')
+                                other_urls = [u for u in successful_urls if u.get('actual_url') != main_url]
+                                
+                                if len(other_urls) == 0:
+                                    return "—"
+                                
+                                # Create clickable links for other URLs
+                                link_parts = []
+                                for url_data in other_urls[:2]:  # Show max 2 additional links
+                                    url = url_data.get('actual_url', url_data.get('original_url', ''))
+                                    content_type = url_data.get('content_type', 'web')
+                                    icon = "🎥" if "youtube" in content_type.lower() else "📄"
+                                    
+                                    # Create short name for link
+                                    if "motor1" in url.lower():
+                                        name = "Motor1"
+                                    elif "youtube" in url.lower():
+                                        name = "YouTube"
+                                    elif "caranddriver" in url.lower():
+                                        name = "C&D"
+                                    elif "autoblog" in url.lower():
+                                        name = "Autoblog"
+                                    else:
+                                        name = "Link"
+                                    
+                                    link_parts.append(f'<a href="{url}" target="_blank" style="color: #1f77b4; text-decoration: none;">{icon} {name}</a>')
+                                
+                                # If there are more than 2 additional URLs, show count
+                                if len(other_urls) > 2:
+                                    extra_count = len(other_urls) - 2
+                                    link_parts.append(f'+{extra_count} more')
+                                
+                                return ' | '.join(link_parts)
+                        else:
+                            # Fallback for old data format
+                            links = str(row.get('Links', ''))
+                            if ',' in links or ';' in links:
+                                separator = ',' if ',' in links else ';'
+                                urls = [u.strip() for u in links.split(separator) if u.strip()]
+                                if len(urls) > 1:
+                                    return f"+{len(urls)-1} more*"
+                                else:
+                                    return "—"
+                            else:
+                                return "—"
+                    except Exception as e:
+                        return "—"
+                
+                clean_df['Other URLs'] = display_df.apply(get_other_urls_html, axis=1)
+                
+                # Store the full URL tracking data for popup (hidden column)
+                clean_df['URL_Tracking_Data'] = display_df.apply(lambda row: json.dumps(parse_url_tracking(row)), axis=1)
+                
                 # Add action columns
                 clean_df['✅ Approve'] = False
                 clean_df['❌ Reject'] = False
@@ -512,17 +671,62 @@ with bulk_tab:
                 }
                 """)
                 
+                # Create HTML cell renderer for Other URLs column (clickable links)
+                cellRenderer_other_urls = JsCode("""
+                class OtherUrlsCellRenderer {
+                  init(params) {
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.display = 'flex';
+                    this.eGui.style.justifyContent = 'center';
+                    this.eGui.style.alignItems = 'center';
+                    this.eGui.style.height = '100%';
+                    this.eGui.style.fontSize = '0.8rem';
+                    
+                    const htmlContent = params.value;
+                    if (htmlContent && htmlContent !== '—') {
+                      // Render HTML content directly (contains clickable links)
+                      this.eGui.innerHTML = htmlContent;
+                    } else {
+                      // Show plain text for "—"
+                      this.eGui.innerText = htmlContent;
+                      this.eGui.style.color = '#6c757d';
+                    }
+                  }
+
+                  getGui() {
+                    return this.eGui;
+                  }
+
+                  refresh(params) {
+                    return false;
+                  }
+                }
+                """)
+                
                 # Configure the grid
                 gb = GridOptionsBuilder.from_dataframe(clean_df)
                 
-                # Hide the original URL column
+                # Hide the original URL column and tracking data
                 gb.configure_column("Clip URL", hide=True)
+                gb.configure_column("URL_Tracking_Data", hide=True)
                 
                 # Configure the View column with the custom renderer
                 gb.configure_column(
                     "📄 View", 
                     cellRenderer=cellRenderer_view,
                     width=80,
+                    sortable=False,
+                    filter=False
+                )
+                
+                # Configure URLs column
+                gb.configure_column("URLs", width=70)
+                
+                # Configure Other URLs column with HTML renderer
+                gb.configure_column(
+                    "Other URLs", 
+                    cellRenderer=cellRenderer_other_urls,
+                    width=150,  # Wider to accommodate multiple links
                     sortable=False,
                     filter=False
                 )
@@ -570,6 +774,8 @@ with bulk_tab:
                     fit_columns_on_grid_load=True,
                     theme="alpine"
                 )
+                
+                # Note: URLs are now clickable directly in the "Other URLs" column
                 
                 # Process inline actions from AgGrid
                 changed_df = selected_rows["data"]
