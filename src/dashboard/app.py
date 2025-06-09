@@ -448,7 +448,7 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_tab, analysis_tab = st.tabs(["📋 Bulk Review", "🔍 Detailed Analysis"])
+bulk_tab, rejected_tab, analysis_tab = st.tabs(["📋 Bulk Review", "⚠️ Rejected/Issues", "🔍 Detailed Analysis"])
 
 # ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_tab:
@@ -912,6 +912,221 @@ with bulk_tab:
             st.error(f"Error loading clips: {e}")
     else:
         st.info("No results file found. Upload and process loans to begin.")
+
+# ========== REJECTED/ISSUES TAB (Transparency Dashboard) ==========
+with rejected_tab:
+    st.markdown("## ⚠️ Rejected/Issues Dashboard")
+    st.markdown("*Complete transparency: See everything that was processed but didn't make the cut*")
+    
+    # Try to load rejected records file
+    rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
+    if os.path.exists(rejected_file):
+        try:
+            rejected_df = pd.read_csv(rejected_file)
+            
+            # Ensure WO # is treated as string for consistency
+            if 'WO #' in rejected_df.columns:
+                rejected_df['WO #'] = rejected_df['WO #'].astype(str)
+            
+            if not rejected_df.empty:
+                # Summary metrics for rejected records
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("📝 Total Rejected", len(rejected_df))
+                with col2:
+                    urls_processed = rejected_df['URLs_Processed'].sum() if 'URLs_Processed' in rejected_df.columns else 0
+                    st.metric("🔗 URLs Attempted", urls_processed)
+                with col3:
+                    # Count by rejection reason
+                    rejection_counts = rejected_df['Rejection_Reason'].value_counts() if 'Rejection_Reason' in rejected_df.columns else {}
+                    top_reason = rejection_counts.index[0] if len(rejection_counts) > 0 else "None"
+                    st.metric("🚫 Top Issue", top_reason[:20] + "..." if len(top_reason) > 20 else top_reason)
+                with col4:
+                    # Processing efficiency
+                    total_attempted = len(rejected_df)
+                    failed_crawls = len(rejected_df[rejected_df['Rejection_Reason'].str.contains('No relevant clips|Low relevance', case=False, na=False)]) if 'Rejection_Reason' in rejected_df.columns else 0
+                    st.metric("⚡ Technical Issues", f"{total_attempted - failed_crawls}/{total_attempted}")
+                
+                st.markdown("---")
+                
+                # Create AgGrid table (same format as bulk review but for rejected records)
+                clean_df = rejected_df.copy()
+                
+                # Prepare columns for display
+                if 'WO #' in clean_df.columns:
+                    clean_df['WO #'] = clean_df['WO #'].astype(str)
+                
+                # Add Office column if it exists
+                if 'Office' in rejected_df.columns:
+                    pass  # Keep original name
+                
+                # Rename columns for better display
+                column_mapping = {
+                    'Office': 'Office',  # Add office column first
+                    'WO #': 'WO #',
+                    'Model': 'Model', 
+                    'To': 'Media Contact',
+                    'Affiliation': 'Publication',
+                    'Links': '🔗 Original URLs',
+                    'URLs_Processed': 'URLs',
+                    'Rejection_Reason': '⚠️ Rejection Reason',
+                    'URL_Details': '📋 Details',
+                    'Processed_Date': '📅 Processed'
+                }
+                
+                # Only keep columns that exist
+                display_columns = []
+                for old_col, new_col in column_mapping.items():
+                    if old_col in clean_df.columns:
+                        if old_col != new_col:
+                            clean_df = clean_df.rename(columns={old_col: new_col})
+                        display_columns.append(new_col)
+                
+                # Create HTML cell renderer for Original URLs column (clickable links - same as bulk review)
+                cellRenderer_original_urls = JsCode("""
+                class OriginalUrlsCellRenderer {
+                  init(params) {
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.display = 'flex';
+                    this.eGui.style.justifyContent = 'flex-start';
+                    this.eGui.style.alignItems = 'center';
+                    this.eGui.style.height = '100%';
+                    this.eGui.style.fontSize = '0.8rem';
+                    this.eGui.style.lineHeight = '1.3';
+                    
+                    const urlsValue = params.value;
+                    if (urlsValue && urlsValue.trim() !== '') {
+                      // Split URLs by semicolon and create clickable links
+                      const urls = urlsValue.split(';').map(url => url.trim()).filter(url => url);
+                      const links = urls.map(url => {
+                        try {
+                          const domain = new URL(url).hostname.replace('www.', '');
+                          return `<a href="${url}" target="_blank" style="color: #1f77b4; text-decoration: underline; margin-right: 8px;">${domain}</a>`;
+                        } catch (e) {
+                          // Fallback for invalid URLs
+                          const domain = url.replace(/^https?:\\/\\//g, '').replace(/^www\\./g, '').split('/')[0];
+                          return `<a href="${url}" target="_blank" style="color: #1f77b4; text-decoration: underline; margin-right: 8px;">${domain}</a>`;
+                        }
+                      });
+                      this.eGui.innerHTML = links.join('<br/>');
+                    } else {
+                      this.eGui.innerText = '—';
+                      this.eGui.style.color = '#6c757d';
+                    }
+                  }
+
+                  getGui() {
+                    return this.eGui;
+                  }
+
+                  refresh(params) {
+                    return false;
+                  }
+                }
+                """)
+                
+                # Configure AgGrid for rejected records (no pagination for full transparency)
+                gb = GridOptionsBuilder.from_dataframe(clean_df[display_columns])
+                # Removed pagination to show all rejected records at once
+                gb.configure_side_bar()
+                gb.configure_default_column(editable=False, groupable=True, value=True, enableRowGroup=True, enablePivot=True, enableValue=True)
+                
+                # Configure specific columns
+                if "Office" in display_columns:
+                    gb.configure_column("Office", width=90, pinned='left')
+                gb.configure_column("WO #", width=100, pinned='left')
+                gb.configure_column("Model", width=120)
+                gb.configure_column("Media Contact", width=120)
+                gb.configure_column("Publication", width=120)
+                
+                # Configure Original URLs column with clickable links
+                gb.configure_column(
+                    "🔗 Original URLs", 
+                    cellRenderer=cellRenderer_original_urls,
+                    width=200, 
+                    wrapText=True, 
+                    autoHeight=True,
+                    sortable=False,
+                    filter=False
+                )
+                
+                gb.configure_column("URLs", width=60, type=["numericColumn"])
+                gb.configure_column("⚠️ Rejection Reason", width=150, wrapText=True, autoHeight=True)
+                gb.configure_column("📋 Details", width=250, wrapText=True, autoHeight=True)
+                gb.configure_column("📅 Processed", width=120)
+                
+                # Build grid options
+                grid_options = gb.build()
+                
+                # Display AgGrid table for rejected records
+                st.markdown("### 📋 Rejected Records Table")
+                st.markdown(f"*Showing all {len(clean_df)} rejected records*")
+                selected_rejected = AgGrid(
+                    clean_df[display_columns],
+                    gridOptions=grid_options,
+                    allow_unsafe_jscode=True,  # Required for custom cellRenderer
+                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    height=700,  # Increased height to show more records without pagination
+                    fit_columns_on_grid_load=True,
+                    theme="alpine"
+                )
+                
+                # Export rejected records option
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if st.button("📄 Export Rejected Records"):
+                        csv_data = rejected_df.to_csv(index=False)
+                        st.download_button(
+                            label="💾 Download Rejected Records CSV",
+                            data=csv_data,
+                            file_name=f"rejected_records_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
+                
+                with col2:
+                    # Rejection reason breakdown
+                    if st.button("📊 View Rejection Breakdown"):
+                        if 'Rejection_Reason' in rejected_df.columns:
+                            reason_counts = rejected_df['Rejection_Reason'].value_counts()
+                            st.markdown("#### Rejection Reason Breakdown:")
+                            for reason, count in reason_counts.items():
+                                st.write(f"- **{reason}**: {count} records")
+                
+                with col3:
+                    if st.button("🔄 Refresh Rejected Data"):
+                        st.rerun()
+                        
+                # Summary insights
+                st.markdown("---")
+                st.markdown("### 💡 Processing Insights")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**🔍 What This Shows:**")
+                    st.markdown("""
+                    - Every loan that was processed but didn't result in an approved clip
+                    - Detailed reasons for why each loan was rejected
+                    - URL-level details showing what was attempted
+                    - Processing timestamps for audit purposes
+                    """)
+                
+                with col2:
+                    st.markdown("**📈 Business Value:**")
+                    st.markdown("""
+                    - **Complete Transparency**: Account for all 60+ daily loans
+                    - **Process Improvement**: Identify common failure patterns
+                    - **Media Partner Insights**: See which sources aren't producing content
+                    - **Quality Assurance**: Verify strict filtering is working correctly
+                    """)
+                
+            else:
+                st.info("No rejected records found. All processed loans resulted in approved clips!")
+                
+        except Exception as e:
+            st.error(f"Error loading rejected records: {e}")
+    else:
+        st.info("No rejected records file found. Process loans to see transparency data.")
 
 # ========== DETAILED ANALYSIS TAB (Existing 40/60 Interface) ==========
 with analysis_tab:

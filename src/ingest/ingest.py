@@ -52,6 +52,42 @@ logger = setup_logger(__name__)
 # Initialize the enhanced crawler manager (it will be reused for all URLs)
 crawler_manager = EnhancedCrawlerManager()
 
+# Global list to track rejected records for transparency dashboard
+REJECTED_RECORDS = []
+
+def clear_rejected_records():
+    """Clear the global rejected records list (called at start of each processing run)"""
+    global REJECTED_RECORDS
+    REJECTED_RECORDS = []
+
+def add_rejected_record(loan: Dict[str, Any], rejection_reason: str, url_details: str = ""):
+    """
+    Add a rejected record to the global list for transparency tracking.
+    
+    Args:
+        loan: Original loan data
+        rejection_reason: Why the loan was rejected
+        url_details: Details about URLs processed (optional)
+    """
+    global REJECTED_RECORDS
+    
+    rejected_record = {
+        'WO #': loan.get('work_order', ''),
+        'Model': loan.get('model', ''),
+        'To': loan.get('to', ''),
+        'Affiliation': loan.get('affiliation', ''),
+        'Links': loan.get('links', ''),
+        'URLs_Processed': len(loan.get('links', '').split(';')) if loan.get('links') else 0,
+        'URLs_Successful': 0,  # If rejected, none were successful
+        'Rejection_Reason': rejection_reason,
+        'URL_Details': url_details,
+        'Processed_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'Loan_Start_Date': loan.get('start_date', '')
+    }
+    
+    REJECTED_RECORDS.append(rejected_record)
+    logger.info(f"📝 Added rejected record: {loan.get('work_order')} - {rejection_reason}")
+
 def parse_start_date(date_str: str) -> Optional[datetime]:
     """
     Parse a date string from the Start Date column.
@@ -1000,11 +1036,17 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Business requirement: Only relevant content should make it to Bulk Review
         if best_relevance <= 0:
             logger.warning(f"❌ Rejecting loan {work_order}: best relevance score {best_relevance}/10 does not meet minimum threshold (>0)")
-            # Even for failed loans, we want to track what was attempted
+            # Track rejection with detailed URL information
+            url_details = ""
             if url_tracking:
                 logger.info(f"📊 URL Summary for {work_order}: 0/{len(url_tracking)} URLs successful (relevance filter)")
+                url_details_list = []
                 for attempt in url_tracking:
                     logger.info(f"  ❌ {attempt['original_url']} → {attempt['reason']} (below relevance threshold)")
+                    url_details_list.append(f"{attempt['original_url']}: {attempt['reason']}")
+                url_details = "; ".join(url_details_list)
+            
+            add_rejected_record(loan, f"Low relevance score ({best_relevance}/10)", url_details)
             return None
             
         logger.info(f"Best clip for {work_order} has relevance {best_relevance}")
@@ -1021,11 +1063,19 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             logger.info(f"  {status} {attempt['original_url']} → {attempt['reason']}")
     else:
         logger.warning(f"No relevant clips found for {work_order}")
-        # Even for failed loans, we want to track what was attempted
+        # Track rejection with detailed URL information
+        url_details = ""
         if url_tracking:
             logger.info(f"📊 URL Summary for {work_order}: 0/{len(url_tracking)} URLs successful")
+            url_details_list = []
             for attempt in url_tracking:
                 logger.info(f"  ❌ {attempt['original_url']} → {attempt['reason']}")
+                url_details_list.append(f"{attempt['original_url']}: {attempt['reason']}")
+            url_details = "; ".join(url_details_list)
+        else:
+            url_details = "No URLs to process"
+        
+        add_rejected_record(loan, "No relevant clips found", url_details)
         
     return best_clip
 
@@ -1070,6 +1120,43 @@ def save_results(results: List[Dict[str, Any]], output_file: str) -> bool:
         logger.error(f"Error saving results to {output_file}: {e}")
         return False
 
+def save_rejected_records(rejected_records: List[Dict[str, Any]], output_file: str) -> bool:
+    """
+    Save rejected records with detailed rejection reasons for transparency.
+    
+    Args:
+        rejected_records: List of rejected record dictionaries
+        output_file: Path to the rejected records CSV file
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Create output directory if it doesn't exist
+        output_dir = os.path.dirname(output_file)
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # If no rejected records, create empty file with headers
+        if not rejected_records:
+            logger.info(f"No rejected records to save. Creating empty file: {output_file}")
+            with open(output_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['WO #', 'Model', 'To', 'Affiliation', 'Links', 'URLs_Processed', 'URLs_Successful',
+                                'Rejection_Reason', 'URL_Details', 'Processed_Date', 'Loan_Start_Date'])
+            return True
+        
+        # Convert to DataFrame for easier CSV handling
+        df = pd.DataFrame(rejected_records)
+        
+        # Save to CSV
+        df.to_csv(output_file, index=False)
+        logger.info(f"Rejected records saved to {output_file}: {len(rejected_records)} records")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error saving rejected records to {output_file}: {e}")
+        return False
+
 def run_ingest(input_file: str, output_file: Optional[str] = None) -> bool:
     """
     Run the full ingestion pipeline.
@@ -1089,6 +1176,9 @@ def run_ingest(input_file: str, output_file: Optional[str] = None) -> bool:
             project_root = Path(__file__).parent.parent.parent
             output_file = os.path.join(project_root, 'data', 'loan_results.csv')
         
+        # Clear rejected records from previous run
+        clear_rejected_records()
+        
         # Load loans data
         loans = load_loans_data(input_file)
         
@@ -1104,11 +1194,17 @@ def run_ingest(input_file: str, output_file: Optional[str] = None) -> bool:
             if result:
                 results.append(result)
         
-        # Save results
-        if save_results(results, output_file):
+        # Save results and rejected records
+        results_saved = save_results(results, output_file)
+        
+        # Save rejected records for transparency
+        rejected_file = os.path.join(os.path.dirname(output_file), 'rejected_clips.csv')
+        rejected_saved = save_rejected_records(REJECTED_RECORDS, rejected_file)
+        
+        if results_saved and rejected_saved:
             elapsed_time = time.time() - start_time
-            message = (f"✅ Clip Tracking: Processed {len(loans)} loans, found {len(results)} clips "
-                      f"in {elapsed_time:.1f} seconds")
+            message = (f"✅ Clip Tracking: Processed {len(loans)} loans, found {len(results)} clips, "
+                      f"rejected {len(REJECTED_RECORDS)} records in {elapsed_time:.1f} seconds")
             logger.info(message)
             # send_slack_message(message)
             return True
@@ -1215,6 +1311,9 @@ def run_ingest_concurrent(input_file: str, output_file: Optional[str] = None) ->
             project_root = Path(__file__).parent.parent.parent
             output_file = os.path.join(project_root, 'data', 'loan_results.csv')
         
+        # Clear rejected records from previous run
+        clear_rejected_records()
+        
         # Load loans data (same as before)
         loans = load_loans_data(input_file)
         
@@ -1225,11 +1324,17 @@ def run_ingest_concurrent(input_file: str, output_file: Optional[str] = None) ->
         # Process loans concurrently (this is the only change!)
         results = asyncio.run(process_loans_concurrent(loans))
         
-        # Save results (same as before)
-        if save_results(results, output_file):
+        # Save results and rejected records
+        results_saved = save_results(results, output_file)
+        
+        # Save rejected records for transparency
+        rejected_file = os.path.join(os.path.dirname(output_file), 'rejected_clips.csv')
+        rejected_saved = save_rejected_records(REJECTED_RECORDS, rejected_file)
+        
+        if results_saved and rejected_saved:
             elapsed_time = time.time() - start_time
-            message = (f"✅ Clip Tracking (Concurrent): Processed {len(loans)} loans, found {len(results)} clips "
-                      f"in {elapsed_time:.1f} seconds")
+            message = (f"✅ Clip Tracking (Concurrent): Processed {len(loans)} loans, found {len(results)} clips, "
+                      f"rejected {len(REJECTED_RECORDS)} records in {elapsed_time:.1f} seconds")
             logger.info(message)
             return True
         else:
