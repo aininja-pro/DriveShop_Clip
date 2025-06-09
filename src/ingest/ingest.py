@@ -875,6 +875,9 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     best_clip = None
     best_relevance = -1
     
+    # NEW: Track all URL processing attempts for transparency
+    url_tracking = []
+    
     # Process each URL
     for url in loan.get('urls', []):
         if not url:
@@ -882,30 +885,55 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             
         logger.info(f"Processing URL: {url}")
         
+        # NEW: Initialize tracking for this URL attempt
+        url_attempt = {
+            'original_url': url,
+            'success': False,
+            'reason': 'Unknown',
+            'actual_url': url,
+            'relevance_score': 0,
+            'content_type': 'unknown',
+            'processing_method': 'unknown'
+        }
+        
         # Determine URL type (YouTube or web)
         if 'youtube.com' in url or 'youtu.be' in url:
+            url_attempt['content_type'] = 'youtube'
+            url_attempt['processing_method'] = 'YouTube API'
             clip_data = process_youtube_url(url, loan)
         else:
+            url_attempt['content_type'] = 'web'
+            url_attempt['processing_method'] = 'Web Crawler'
             clip_data = process_web_url(url, loan)
             
         if not clip_data or not clip_data.get('content'):
+            url_attempt['reason'] = 'No content found or date filtered'
+            url_tracking.append(url_attempt)
             logger.warning(f"No content found for URL: {url}")
             continue
             
         # Get the actual URL where content was found
         actual_url = clip_data.get('url', url)
+        url_attempt['actual_url'] = actual_url
         logger.info(f"Analyzing content from URL: {actual_url}")
         analysis = analyze_clip(clip_data['content'], make, model, url=actual_url)
         
         # Check if analysis succeeded
         if analysis is None:
+            url_attempt['reason'] = 'GPT analysis failed'
+            url_tracking.append(url_attempt)
             logger.warning(f"GPT analysis failed for URL: {actual_url} - skipping this clip")
             continue
         
         # Check relevance
         relevance = analysis.get('relevance_score', 0)
+        url_attempt['relevance_score'] = relevance
         
         if relevance > best_relevance:
+            # NEW: Mark this URL as successful
+            url_attempt['success'] = True
+            url_attempt['reason'] = f'Best match (relevance: {relevance}/10)'
+            
             # Add analysis to clip data
             clip_data.update(analysis)
             
@@ -952,16 +980,40 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 best_clip['Office'] = loan['office']
             
             best_relevance = relevance
-            
-            # If we found a highly relevant clip, stop processing further URLs
-            if relevance >= 8:
-                logger.info(f"Found highly relevant clip (score {relevance}) for {make} {model}")
-                break
+        else:
+            # NEW: Mark as lower relevance but still processed
+            url_attempt['success'] = True
+            url_attempt['reason'] = f'Lower relevance (score: {relevance}/10)'
+        
+        # NEW: Add this URL attempt to tracking
+        url_tracking.append(url_attempt)
+        
+        # Continue processing all URLs for comprehensive coverage
+        # (removed early exit logic to capture all relevant sources)
+        if relevance >= 8:
+            logger.info(f"Found highly relevant clip (score {relevance}) for {make} {model} - continuing to process remaining URLs for complete coverage")
     
+    # NEW: Add URL tracking data to the result
     if best_clip:
         logger.info(f"Best clip for {work_order} has relevance {best_relevance}")
+        # Add URL tracking summary to the result
+        best_clip['URL_Tracking'] = url_tracking
+        best_clip['URLs_Processed'] = len(url_tracking)
+        best_clip['URLs_Successful'] = len([u for u in url_tracking if u['success']])
+        
+        # Log URL processing summary for transparency
+        success_count = len([u for u in url_tracking if u['success']])
+        logger.info(f"📊 URL Summary for {work_order}: {success_count}/{len(url_tracking)} URLs successful")
+        for attempt in url_tracking:
+            status = "✅" if attempt['success'] else "❌"
+            logger.info(f"  {status} {attempt['original_url']} → {attempt['reason']}")
     else:
         logger.warning(f"No relevant clips found for {work_order}")
+        # Even for failed loans, we want to track what was attempted
+        if url_tracking:
+            logger.info(f"📊 URL Summary for {work_order}: 0/{len(url_tracking)} URLs successful")
+            for attempt in url_tracking:
+                logger.info(f"  ❌ {attempt['original_url']} → {attempt['reason']}")
         
     return best_clip
 
