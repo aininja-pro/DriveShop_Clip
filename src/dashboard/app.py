@@ -124,30 +124,27 @@ st.title("DriveShop Clip Tracking Dashboard")
 # Custom CSS for better styling
 st.markdown("""
 <style>
-    /* Modern, tighter typography */
+    /* ULTRA COMPACT layout - maximum table space */
     .main > div {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-        padding-top: 1.5rem !important;
+        padding-top: 0.5rem !important;
     }
     
     .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 1rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        max-width: 100% !important;
     }
     
-    /* Fix main title visibility */
+    /* Compact main title */
     h1 {
-        font-size: 1.8rem !important;
+        font-size: 1.4rem !important;
         font-weight: 600 !important;
-        line-height: 1.3 !important;
-        margin-bottom: 1rem !important;
-        margin-top: 0.5rem !important;
-        padding-top: 0.5rem !important;
+        line-height: 1.2 !important;
+        margin-bottom: 0.3rem !important;
+        margin-top: 0 !important;
+        padding: 0 !important;
         color: #1a1a1a !important;
-        display: block !important;
-        visibility: visible !important;
-        position: relative !important;
-        z-index: 999 !important;
     }
     
     /* Ensure title container has space */
@@ -168,17 +165,52 @@ st.markdown("""
         text-align: center;
     }
     
-    /* FIXED metrics targeting - make numbers VISIBLE but bigger */
+    /* ULTRA COMPACT metrics */
     div[data-testid="metric-container"] {
         background-color: #f8f9fa !important;
         border: 1px solid #e9ecef !important;
-        padding: 0.3rem 0.4rem !important;
+        padding: 0.2rem 0.3rem !important;
         border-radius: 0.2rem !important;
-        margin: 0.15rem 0 !important;
+        margin: 0.1rem 0 !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
         height: auto !important;
-        min-height: 2.5rem !important;
-        max-height: 3.5rem !important;
+        min-height: 2rem !important;
+        max-height: 2.5rem !important;
+    }
+    
+    /* Compact tabs */
+    .stTabs {
+        margin: 0.2rem 0 !important;
+    }
+    
+    .stTabs > div > div > div > div {
+        padding: 0.3rem 0.8rem !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Remove excessive margins everywhere */
+    .element-container {
+        margin: 0.2rem 0 !important;
+    }
+    
+    /* Compact columns */
+    .row-widget {
+        margin: 0.1rem 0 !important;
+    }
+    
+    /* Remove divider spacing */
+    hr {
+        margin: 0.3rem 0 !important;
+    }
+    
+    /* Make everything more compact */
+    .stMarkdown {
+        margin: 0.1rem 0 !important;
+    }
+    
+    /* Compact table area */
+    .ag-theme-alpine {
+        font-size: 0.8rem !important;
     }
     
     /* Target ALL metric text elements but keep READABLE */
@@ -415,15 +447,11 @@ with st.sidebar:
             else:
                 st.error("❌ Failed")
 
-# Main content area with tabs for different workflows
-st.markdown("---")
-
-# Create tabs for different user workflows
+# Create tabs for different user workflows  
 bulk_tab, analysis_tab = st.tabs(["📋 Bulk Review", "🔍 Detailed Analysis"])
 
-# ========== BULK REVIEW TAB (New Worker Interface) ==========
+# ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_tab:
-    st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">📋 Quick Clip Review</p>', unsafe_allow_html=True)
     
     # Try to load results file
     results_file = os.path.join(project_root, "data", "loan_results.csv")
@@ -454,13 +482,6 @@ with bulk_tab:
                         approved_df = pd.read_csv(approved_file)
                         approved_count = len(approved_df)
                     st.metric("Approved", approved_count)
-                
-                st.markdown("---")
-                
-                # ===============================================
-                # AgGrid Table with Excel-style Column Filtering
-                # ===============================================
-                st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem;">📊 All Clips – Excel-style filters + inline links</p>', unsafe_allow_html=True)
                 
                 # Display filtered results with AgGrid
                 display_df = df.copy()

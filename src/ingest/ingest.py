@@ -97,9 +97,10 @@ def is_content_within_date_range(content_date: Optional[datetime],
     Returns:
         True if content is within range, False otherwise
     """
+    # FIXED: If we can't determine dates, REJECT the content (don't bypass date filtering)
+    # This prevents generic/navigation content from passing through
     if not content_date or not start_date:
-        # If we can't determine dates, allow the content (better than filtering out everything)
-        return True
+        return False
     
     # Calculate the latest acceptable date (start_date + days_forward)
     latest_date = start_date + timedelta(days=days_forward)
@@ -786,7 +787,7 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                         days_diff = (content_date - start_date).days
                         logger.info(f"✅ Content found within date range: published {days_diff} days after start date")
                     else:
-                        logger.info(f"✅ Content accepted (date filtering skipped - missing date info)")
+                        logger.info(f"✅ Content found within date range (dates available)")
                     
                     content_result = result
                     break
@@ -995,6 +996,17 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     
     # NEW: Add URL tracking data to the result
     if best_clip:
+        # FIXED: Apply minimum relevance threshold to prevent 0/10 scores from being saved
+        # Business requirement: Only relevant content should make it to Bulk Review
+        if best_relevance <= 0:
+            logger.warning(f"❌ Rejecting loan {work_order}: best relevance score {best_relevance}/10 does not meet minimum threshold (>0)")
+            # Even for failed loans, we want to track what was attempted
+            if url_tracking:
+                logger.info(f"📊 URL Summary for {work_order}: 0/{len(url_tracking)} URLs successful (relevance filter)")
+                for attempt in url_tracking:
+                    logger.info(f"  ❌ {attempt['original_url']} → {attempt['reason']} (below relevance threshold)")
+            return None
+            
         logger.info(f"Best clip for {work_order} has relevance {best_relevance}")
         # Add URL tracking summary to the result
         best_clip['URL_Tracking'] = url_tracking
