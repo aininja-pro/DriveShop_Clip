@@ -114,7 +114,7 @@ st.set_page_config(
     page_title="DriveShop Clip Tracking",
     page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # DEVELOPMENT MODE: Skip password check
@@ -351,39 +351,69 @@ st.markdown("""
     .scrollable-table::-webkit-scrollbar-thumb:hover {
         background: #a8a8a8;
     }
+    
+    /* Compact sidebar styling */
+    .css-1d391kg {
+        width: 250px !important;
+        min-width: 250px !important;
+    }
+    
+    /* Make sidebar content more compact */
+    .css-1d391kg .stMarkdown p {
+        margin: 0.2rem 0 !important;
+        font-size: 0.9rem !important;
+    }
+    
+    .css-1d391kg .stButton button {
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.8rem !important;
+        margin: 0.1rem 0 !important;
+    }
+    
+    .css-1d391kg .stFileUploader {
+        margin: 0.2rem 0 !important;
+    }
+    
+    .css-1d391kg .stFileUploader > div {
+        padding: 0.3rem !important;
+        font-size: 0.8rem !important;
+    }
+    
+    /* Compact success/error messages in sidebar */
+    .css-1d391kg .stAlert {
+        padding: 0.3rem !important;
+        font-size: 0.8rem !important;
+        margin: 0.2rem 0 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar for uploading files and running ingestion
+# Compact sidebar
 with st.sidebar:
-    st.header("Upload and Process")
-    uploaded_file = st.file_uploader("Upload Loans without Clips CSV", type=['csv', 'xlsx'])
+    st.markdown("**🔄 Process**")
+    uploaded_file = st.file_uploader("CSV/XLSX", type=['csv', 'xlsx'], label_visibility="collapsed")
     
     if uploaded_file is not None:
-        # Save the uploaded file temporarily
         temp_file_path = os.path.join(project_root, "data", "fixtures", "temp_upload.csv")
         with open(temp_file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
-        # Run ingestion button
-        if st.button("Process Uploaded File"):
-            with st.spinner("Processing loans..."):
+        if st.button("🚀 Process", use_container_width=True):
+            with st.spinner("Processing..."):
                 success = run_ingest_concurrent(temp_file_path)
                 if success:
-                    st.success("Processing complete!")
+                    st.success("✅ Done!")
                 else:
-                    st.error("Processing failed. Check logs for details.")
+                    st.error("❌ Failed")
     
-    # Alternatively, run the existing file
-    st.divider()
-    if st.button("Process Existing Data"):
-        with st.spinner("Processing existing loan data..."):
+    if st.button("🔄 Process Existing", use_container_width=True):
+        with st.spinner("Processing..."):
             default_file = os.path.join(project_root, "data", "fixtures", "Loans_without_Clips.csv")
             success = run_ingest_concurrent(default_file)
             if success:
-                st.success("Processing complete!")
+                st.success("✅ Done!")
             else:
-                st.error("Processing failed. Check logs for details.")
+                st.error("❌ Failed")
 
 # Main content area with tabs for different workflows
 st.markdown("---")
