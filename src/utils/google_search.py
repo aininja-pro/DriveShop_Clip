@@ -480,12 +480,23 @@ class GoogleSearchClient:
         
         # HIGH PRIORITY: Vehicle mentioned in title (not just sidebar)
         if search_terms.get('model'):
-            model_lower = search_terms['model'].lower()
-            model_words = model_lower.replace('"', '').split()
+            model_lower = search_terms['model'].lower().replace('"', '')
+            model_words = model_lower.split()
+            
+            # STRICT MODEL VERIFICATION: ALL model words must be present
             title_matches = sum(1 for word in model_words if word in title_lower)
-            if title_matches >= len(model_words) * 0.7:  # 70% of model words in title
+            match_percentage = title_matches / len(model_words) if model_words else 0
+            
+            if match_percentage >= 1.0:  # 100% of model words must match (was 70%)
                 score += 100
-                logger.debug(f"Title match bonus: +100 for {search_terms['model']}")
+                logger.debug(f"Title match bonus: +100 for exact model '{search_terms['model']}'")
+            elif match_percentage >= 0.7:  # Partial match gets lower score
+                score += 30
+                logger.debug(f"Partial title match: +30 for {match_percentage:.0%} of '{search_terms['model']}'")
+            else:
+                # PENALTY for wrong model (e.g., searching Odyssey but finding Civic)
+                score -= 50
+                logger.debug(f"Wrong model penalty: -50 (only {match_percentage:.0%} match for '{search_terms['model']}')")
         
         # MEDIUM PRIORITY: Author in title, snippet, or URL path
         if search_terms.get('author'):

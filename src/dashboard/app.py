@@ -1070,7 +1070,7 @@ with bulk_tab:
                     gridOptions=grid_options,
                     allow_unsafe_jscode=True,
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
-                    height=500,
+                    height=650,  # Increased height for better viewing
                     fit_columns_on_grid_load=True,
                     theme="alpine",
                     enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes

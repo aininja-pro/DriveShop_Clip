@@ -81,6 +81,8 @@ class CacheManager:
         """
         Get cached scraping result if it exists and hasn't expired.
         
+        CACHE DISABLED: Always returns None to force fresh searches for reliable results.
+        
         Args:
             person_id: Unique identifier for the media contact
             domain: Domain name (e.g., "motortrend.com")
@@ -88,51 +90,12 @@ class CacheManager:
             model: Vehicle model (e.g., "Q6 e-tron")
             
         Returns:
-            Dict with cached data or None if not found/expired
+            Always None - cache disabled for reliability
         """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Clean up expired entries first
-                self._cleanup_expired_entries(cursor)
-                
-                # Look for valid cached entry
-                cursor.execute('''
-                    SELECT url, content, metadata, cached_at
-                    FROM scraping_cache 
-                    WHERE person_id = ? AND domain = ? AND make = ? AND model = ?
-                    AND expires_at > CURRENT_TIMESTAMP
-                ''', (person_id, domain, make, model))
-                
-                result = cursor.fetchone()
-                
-                if result:
-                    url, content, metadata_json, cached_at = result
-                    
-                    # Parse metadata JSON
-                    try:
-                        metadata = json.loads(metadata_json) if metadata_json else {}
-                    except json.JSONDecodeError:
-                        logger.warning(f"Invalid JSON in cached metadata for {person_id}/{domain}")
-                        metadata = {}
-                    
-                    cache_data = {
-                        'url': url,
-                        'content': content,
-                        'metadata': metadata,
-                        'cached_at': cached_at
-                    }
-                    
-                    logger.info(f"Cache HIT for {person_id}/{domain}/{make}/{model}")
-                    return cache_data
-                
-                logger.info(f"Cache MISS for {person_id}/{domain}/{make}/{model}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error getting cached result: {e}")
-            return None
+        # CACHE DISABLED: Always return None to force fresh searches
+        # This ensures consistent, reliable results without cache-related bugs
+        logger.info(f"Cache DISABLED - forcing fresh search for {person_id}/{domain}/{make}/{model}")
+        return None
     
     def store_result(self, person_id: str, domain: str, make: str, model: str, 
                     url: str, content: str, metadata: Optional[Dict[str, Any]] = None):

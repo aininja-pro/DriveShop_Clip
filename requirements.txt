@@ -39,6 +39,7 @@ packaging==24.2
 pandas==2.2.3
 parsel==1.10.0
 pillow==11.2.1
+playwright==1.50.0
 propcache==0.3.1
 Protego==0.4.0
 protobuf==6.31.0

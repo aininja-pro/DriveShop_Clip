@@ -144,144 +144,7 @@ def is_content_within_date_range(content_date: Optional[datetime],
     # Content should be published AFTER the start date and before the end of the window
     return start_date <= content_date <= latest_date
 
-def determine_vehicle_make_from_both(model_full: str, model_short: str) -> str:
-    """
-    Determine the actual vehicle make from BOTH model columns (C & M).
-    This uses both the full model name and short model name for better accuracy.
-    
-    Args:
-        model_full: Full model name from Column C (e.g., "LX 700h F Sport")
-        model_short: Short model name from Column M (e.g., "LX")
-        
-    Returns:
-        Vehicle make (e.g., "Lexus", "Toyota", "Honda")
-    """
-    # Try with the short model name first (usually more reliable)
-    if model_short:
-        make_from_short = determine_vehicle_make(model_short)
-        if make_from_short:
-            return make_from_short
-    
-    # Fall back to full model name
-    if model_full:
-        make_from_full = determine_vehicle_make(model_full)
-        if make_from_full:
-            return make_from_full
-    
-    # If neither worked, return empty
-    logger.warning(f"Could not determine vehicle make from full: '{model_full}', short: '{model_short}'")
-    return ''
-
-def determine_vehicle_make(model: str) -> str:
-    """
-    Determine the actual vehicle make from the model name.
-    This replaces using Fleet business category data.
-    
-    Args:
-        model: Vehicle model name (e.g., "LX 700h F Sport", "Camry", "Civic Type R")
-        
-    Returns:
-        Vehicle make (e.g., "Lexus", "Toyota", "Honda")
-    """
-    if not model:
-        return ''
-    
-    model_lower = model.lower().strip()
-    
-    # Lexus models (these are often confused with Toyota in business data)
-    lexus_models = ['lx', 'gx', 'rx', 'nx', 'ux', 'ls', 'es', 'gs', 'is', 'lc', 'rc']
-    for lexus_model in lexus_models:
-        if model_lower.startswith(lexus_model + ' ') or model_lower == lexus_model:
-            return 'Lexus'
-    
-    # Toyota models
-    toyota_models = ['camry', 'corolla', 'prius', 'rav4', 'highlander', '4runner', 'tacoma', 
-                     'tundra', 'sienna', 'sequoia', 'land cruiser', 'avalon', 'venza', 'chr']
-    for toyota_model in toyota_models:
-        if model_lower.startswith(toyota_model) or toyota_model in model_lower:
-            return 'Toyota'
-    
-    # Honda models (ADDED PROLOGUE)
-    honda_models = ['civic', 'accord', 'cr-v', 'pilot', 'passport', 'ridgeline', 'odyssey', 
-                    'hr-v', 'insight', 'fit', 'prologue']
-    for honda_model in honda_models:
-        if model_lower.startswith(honda_model) or honda_model in model_lower:
-            return 'Honda'
-    
-    # Acura models (ADDED RDX and other missing models)
-    acura_models = ['rdx', 'mdx', 'tlx', 'ilx', 'nsx', 'zdx', 'integra']
-    for acura_model in acura_models:
-        if model_lower.startswith(acura_model) or acura_model in model_lower:
-            return 'Acura'
-    
-    # Mazda models (ADDED MAZDA3 and other models)
-    mazda_models = ['mazda3', 'mazda6', 'cx-3', 'cx-5', 'cx-9', 'cx-30', 'cx-50', 'cx-70', 'cx-90', 'mx-5', 'mx-30']
-    for mazda_model in mazda_models:
-        if model_lower.startswith(mazda_model) or mazda_model in model_lower:
-            return 'Mazda'
-    
-    # Ford models
-    ford_models = ['f-150', 'f-250', 'f-350', 'mustang', 'explorer', 'escape', 'edge', 
-                   'expedition', 'bronco', 'ranger', 'maverick', 'transit']
-    for ford_model in ford_models:
-        if model_lower.startswith(ford_model) or ford_model in model_lower:
-            return 'Ford'
-    
-    # Chevrolet models
-    chevy_models = ['silverado', 'tahoe', 'suburban', 'equinox', 'traverse', 'malibu', 
-                    'camaro', 'corvette', 'colorado', 'trailblazer']
-    for chevy_model in chevy_models:
-        if model_lower.startswith(chevy_model) or chevy_model in model_lower:
-            return 'Chevrolet'
-    
-    # Volkswagen models (THIS WAS MISSING!)
-    volkswagen_models = ['jetta', 'passat', 'golf', 'beetle', 'tiguan', 'atlas', 'arteon', 
-                         'id.4', 'taos', 'gli', 'gti', 'cc', 'touareg']
-    for vw_model in volkswagen_models:
-        if model_lower.startswith(vw_model) or vw_model in model_lower:
-            return 'Volkswagen'
-    
-    # BMW models (usually start with letters/numbers)
-    if re.match(r'^[xz]?[1-8][0-9]*', model_lower) or model_lower.startswith('i'):
-        return 'BMW'
-    
-    # Mercedes models (usually start with class letters)
-    if re.match(r'^[a-z]-class|^[gcse]l[skc]|^amg', model_lower):
-        return 'Mercedes-Benz'
-    
-    # Audi models (usually start with A, Q, R, S, RS, TT)
-    if re.match(r'^[aqr][1-9]|^s[1-9]|^rs[1-9]|^tt|^e-tron', model_lower):
-        return 'Audi'
-    
-    # Cadillac models
-    cadillac_models = ['escalade', 'xt4', 'xt5', 'xt6', 'ct4', 'ct5', 'vistiq', 'lyriq']
-    for cadillac_model in cadillac_models:
-        if model_lower.startswith(cadillac_model) or cadillac_model in model_lower:
-            return 'Cadillac'
-    
-    # If no match found, try to extract from the model string itself
-    # Sometimes models include the make (e.g., "Toyota Camry")
-    words = model_lower.split()
-    if len(words) > 1:
-        first_word = words[0]
-        known_makes = ['toyota', 'honda', 'ford', 'chevrolet', 'chevy', 'bmw', 'mercedes', 
-                       'audi', 'lexus', 'cadillac', 'buick', 'gmc', 'nissan', 'hyundai', 
-                       'kia', 'mazda', 'subaru', 'volkswagen', 'vw', 'volvo', 'jaguar', 
-                       'land rover', 'porsche', 'tesla', 'jeep', 'dodge', 'ram', 'chrysler',
-                       'acura']  # ADDED ACURA
-        
-        if first_word in known_makes:
-            # Capitalize properly
-            if first_word == 'chevy':
-                return 'Chevrolet'
-            elif first_word == 'vw':
-                return 'Volkswagen'
-            else:
-                return first_word.title()
-    
-    # If still no match, return empty string (we'll log this)
-    logger.warning(f"Could not determine vehicle make for model: {model}")
-    return ''
+# NOTE: Make guessing functions removed - now using direct Make column from CSV
 
 def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -338,6 +201,11 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
         # Check if required columns exist
         required_columns = ['WO #']
         
+        # Check for Make column (REQUIRED!)
+        if 'Make' not in df.columns:
+            raise ValueError(f"Make column is required. Available columns: {df.columns.tolist()}")
+        required_columns.append('Make')
+
         # Check for model columns (prefer Model Short Name for cleaner searches)
         model_column = None
         model_columns = ['Model Short Name', 'Model']  # Prefer Short Name first!
@@ -375,7 +243,10 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
                 'urls': []
             }
             
-            # Determine vehicle make from BOTH model columns (Column C & M)
+                        # Get Make directly from CSV column (SIMPLIFIED!)
+            loan['make'] = row['Make'] if pd.notna(row['Make']) else ''
+
+            # Get Model from model columns
             model_value = ''
             model_short_value = ''
             
@@ -384,18 +255,14 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
                 loan['model'] = model_value
             else:
                 loan['model'] = ''
-            
-            # ENHANCEMENT: Also get Model Short Name (Column M) for make detection
+
+            # ENHANCEMENT: Also get Model Short Name (Column M) for search variations
             if 'Model Short Name' in df.columns:
                 model_short_value = row['Model Short Name'] if pd.notna(row['Model Short Name']) else ''
-            
-            # Use BOTH columns for smart make detection
-            detected_make = determine_vehicle_make_from_both(model_value, model_short_value)
-            loan['make'] = detected_make
-            
-            # Log the detected make for verification
+
+            # Log the vehicle for verification
             if loan['make'] and loan['model']:
-                logger.info(f"Detected vehicle: {loan['make']} {loan['model']} (from Model: '{model_value}', Short: '{model_short_value}')")
+                logger.info(f"Vehicle: {loan['make']} {loan['model']} (from Make column + Model: '{model_value}', Short: '{model_short_value}')")
             
             # ENHANCEMENT: Build hierarchical model name for smarter searching
             # The goal is to create the most specific model name possible, which our
