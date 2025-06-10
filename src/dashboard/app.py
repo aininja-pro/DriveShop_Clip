@@ -8,6 +8,10 @@ import time
 import json
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUpdateMode
 from src.utils.logger import logger
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 # Add explicit .env loading with debug output
 from dotenv import load_dotenv
@@ -102,6 +106,217 @@ def parse_url_tracking(df_row):
             'relevance_score': df_row.get('Relevance Score', 0),
             'content_type': 'inferred'
         }]
+
+def create_client_excel_report(df, approved_df=None):
+    """Create a professional Excel report for client presentation"""
+    
+    # Create workbook with multiple sheets
+    wb = Workbook()
+    
+    # Remove default sheet
+    wb.remove(wb.active)
+    
+    # 1. Executive Summary Sheet
+    summary_ws = wb.create_sheet("Executive Summary")
+    
+    # Header styling
+    header_font = Font(bold=True, size=14, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    
+    # Summary metrics (using Bulk Review column names)
+    clips_found = len(df)  # This is the successful clips count
+    relevance_col = 'Relevance Score' if 'Relevance Score' in df.columns else 'Relevance'
+    
+    # Try to get total original records by checking for rejected clips file
+    try:
+        import os
+        project_root = Path(__file__).parent.parent.parent
+        rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
+        if os.path.exists(rejected_file):
+            rejected_df = pd.read_csv(rejected_file)
+            clips_not_found = len(rejected_df)
+        else:
+            clips_not_found = 0
+    except:
+        clips_not_found = 0
+    
+    # Calculate total records
+    total_records = clips_found + clips_not_found
+    
+    # Other metrics
+    avg_relevance = df[relevance_col].mean() if relevance_col in df.columns and len(df) > 0 else 0
+    high_quality = len(df[df[relevance_col] >= 8]) if relevance_col in df.columns else 0
+    positive_sentiment = len(df[df['Sentiment'] == 'positive']) if 'Sentiment' in df.columns else 0
+    
+    # Add summary data
+    summary_data = [
+        ["DriveShop Media Monitoring Report", ""],
+        ["Report Generated", datetime.now().strftime("%B %d, %Y at %I:%M %p")],
+        ["", ""],
+        ["EXECUTIVE SUMMARY", ""],
+        ["Total Records Processed", total_records],
+        ["Clips Found", clips_found],
+        ["Not Found/Rejected", clips_not_found],
+        ["Success Rate", f"{(clips_found/total_records*100):.1f}%" if total_records > 0 else "0%"],
+        ["", ""],
+        ["QUALITY METRICS", ""],
+        ["Average Relevance Score", f"{avg_relevance:.1f}/10"],
+        ["High Quality Clips (8+)", high_quality],
+        ["Positive Sentiment", positive_sentiment]
+    ]
+    
+    for row_idx, row_data in enumerate(summary_data, 1):
+        for col_idx, value in enumerate(row_data, 1):
+            cell = summary_ws.cell(row=row_idx, column=col_idx, value=value)
+            if row_idx == 1:  # Title row
+                cell.font = Font(bold=True, size=16, color="366092")
+            elif row_idx == 4 or (isinstance(value, str) and value.isupper()):  # Section headers
+                cell.font = Font(bold=True, size=12, color="366092")
+    
+    # Auto-size columns
+    for col in summary_ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        summary_ws.column_dimensions[column].width = adjusted_width
+    
+    # 2. Detailed Results Sheet
+    results_ws = wb.create_sheet("Detailed Results")
+    
+    # Use the same column names as Bulk Review (exclude Approve/Reject columns)
+    bulk_review_columns = [
+        'Office', 'WO #', 'Model', 'Contact', 'Publication', 
+        'Relevance', 'Sentiment', 'URLs', 'Other URLs'
+    ]
+    
+    # Map our data columns to Bulk Review column names
+    column_mapping = {
+        'Office': 'Office',
+        'WO #': 'WO #',
+        'Model': 'Model',
+        'To': 'Contact',
+        'Affiliation': 'Publication',
+        'Relevance Score': 'Relevance',
+        'Overall Sentiment': 'Sentiment',  # Fix: Use the correct sentiment column
+        'Clip URL': 'URLs',
+        'Links': 'Other URLs'
+    }
+    
+    # Create export dataframe with Bulk Review column structure
+    export_df = pd.DataFrame()
+    
+    for bulk_col in bulk_review_columns:
+        # Find the corresponding column in our data
+        source_col = None
+        for data_col, bulk_name in column_mapping.items():
+            if bulk_name == bulk_col and data_col in df.columns:
+                source_col = data_col
+                break
+        
+        if source_col:
+            export_df[bulk_col] = df[source_col]
+        else:
+            # Fill with empty if column doesn't exist
+            export_df[bulk_col] = ''
+    
+    # Add header row
+    headers = list(export_df.columns)
+    results_ws.append(headers)
+    
+    # Add data rows with clickable URLs and formatted sentiment
+    for idx, row in export_df.iterrows():
+        row_data = []
+        for col_idx, (col_name, value) in enumerate(row.items()):
+            # Format sentiment with abbreviations and emojis
+            if col_name == 'Sentiment' and value:
+                sentiment_map = {
+                    'positive': 'POS 😊',
+                    'negative': 'NEG 😞',
+                    'neutral': 'NEU 😐',
+                    'pos': 'POS 😊',
+                    'neg': 'NEG 😞', 
+                    'neu': 'NEU 😐'
+                }
+                # Clean the value and try multiple formats
+                cleaned_value = str(value).lower().strip()
+                formatted_value = sentiment_map.get(cleaned_value, f"{cleaned_value} 😐")
+                row_data.append(formatted_value)
+            # Check if this is a URL column and make it clickable
+            elif col_name in ['URLs', 'Other URLs'] and value and str(value).startswith('http'):
+                # We'll handle URL linking after adding the data
+                row_data.append(str(value))
+            else:
+                row_data.append(value)
+        results_ws.append(row_data)
+    
+    # Style the header row
+    for cell in results_ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Make URLs clickable and style data rows
+    from openpyxl.styles import Font as XLFont
+    url_font = XLFont(color="0000FF", underline="single")
+    
+    for row_idx in range(2, results_ws.max_row + 1):  # Start from row 2 (after header)
+        for col_idx, col_name in enumerate(headers, 1):
+            cell = results_ws.cell(row=row_idx, column=col_idx)
+            
+            # Make URL columns clickable
+            if col_name in ['URLs', 'Other URLs'] and cell.value and str(cell.value).startswith('http'):
+                url = str(cell.value)
+                cell.hyperlink = url
+                cell.font = url_font
+                cell.value = url  # Keep full URL visible
+    
+    # Auto-size columns
+    for col in results_ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        results_ws.column_dimensions[column].width = adjusted_width
+    
+    # 3. Approved Clips Sheet (if available)
+    if approved_df is not None and len(approved_df) > 0:
+        approved_ws = wb.create_sheet("Approved Clips")
+        
+        # Add approved clips data
+        for r in dataframe_to_rows(approved_df, index=False, header=True):
+            approved_ws.append(r)
+        
+        # Style header
+        for cell in approved_ws[1]:
+            cell.font = header_font
+            cell.fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Auto-size columns
+        for col in approved_ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            approved_ws.column_dimensions[column].width = adjusted_width
+    
+    return wb
 
 # Initialize session state for popup management
 if 'show_url_popup' not in st.session_state:
@@ -500,7 +715,22 @@ with bulk_tab:
                 else:
                     clean_df['Relevance'] = 'N/A'
                 
-                clean_df['Sentiment'] = display_df['Overall Sentiment'] if 'Overall Sentiment' in display_df.columns else 'N/A'
+                # Format sentiment with abbreviations and emojis for display
+                if 'Overall Sentiment' in display_df.columns:
+                    def format_sentiment(sentiment):
+                        if pd.isna(sentiment) or sentiment == 'N/A':
+                            return 'N/A'
+                        sentiment_map = {
+                            'positive': 'POS 😊',
+                            'negative': 'NEG 😞',
+                            'neutral': 'NEU 😐'
+                        }
+                        cleaned_sentiment = str(sentiment).lower().strip()
+                        return sentiment_map.get(cleaned_sentiment, str(sentiment))
+                    
+                    clean_df['Sentiment'] = display_df['Overall Sentiment'].apply(format_sentiment)
+                else:
+                    clean_df['Sentiment'] = 'N/A'
                 
                 # Handle the URL for the View column
                 url_column = None
@@ -757,6 +987,25 @@ with bulk_tab:
                 # Configure the grid
                 gb = GridOptionsBuilder.from_dataframe(clean_df)
                 
+                # *** RESTORE ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
+                gb.configure_side_bar()  # Enable filtering sidebar
+                gb.configure_default_column(
+                    filter="agSetColumnFilter",  # CHECKBOX FILTERS with search
+                    sortable=True,  # Enable sorting
+                    resizable=True,  # Enable column resizing
+                    editable=False, 
+                    groupable=True, 
+                    value=True, 
+                    enableRowGroup=True, 
+                    enablePivot=True, 
+                    enableValue=True,
+                    filterParams={
+                        "buttons": ["reset", "apply"],
+                        "closeOnApply": True,
+                        "newRowsAction": "keep"
+                    }
+                )
+                
                 # Hide the original URL column and tracking data
                 gb.configure_column("Clip URL", hide=True)
                 gb.configure_column("URL_Tracking_Data", hide=True)
@@ -815,7 +1064,7 @@ with bulk_tab:
                 # Build grid options
                 grid_options = gb.build()
                 
-                # Call AgGrid
+                # Call AgGrid with Enterprise modules enabled for Set Filters
                 selected_rows = AgGrid(
                     clean_df,
                     gridOptions=grid_options,
@@ -823,7 +1072,8 @@ with bulk_tab:
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     height=500,
                     fit_columns_on_grid_load=True,
-                    theme="alpine"
+                    theme="alpine",
+                    enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
                 )
                 
                 # Note: URLs are now clickable directly in the "Other URLs" column
@@ -1029,7 +1279,22 @@ with rejected_tab:
                 gb = GridOptionsBuilder.from_dataframe(clean_df[display_columns])
                 # Removed pagination to show all rejected records at once
                 gb.configure_side_bar()
-                gb.configure_default_column(editable=False, groupable=True, value=True, enableRowGroup=True, enablePivot=True, enableValue=True)
+                gb.configure_default_column(
+                    filter="agSetColumnFilter",  # CHECKBOX FILTERS with search
+                    sortable=True,  # Enable sorting
+                    resizable=True,  # Enable column resizing
+                    editable=False, 
+                    groupable=True, 
+                    value=True, 
+                    enableRowGroup=True, 
+                    enablePivot=True, 
+                    enableValue=True,
+                    filterParams={
+                        "buttons": ["reset", "apply"],
+                        "closeOnApply": True,
+                        "newRowsAction": "keep"
+                    }
+                )
                 
                 # Configure specific columns
                 if "Office" in display_columns:
@@ -1068,7 +1333,8 @@ with rejected_tab:
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
                     height=700,  # Increased height to show more records without pagination
                     fit_columns_on_grid_load=True,
-                    theme="alpine"
+                    theme="alpine",
+                    enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
                 )
                 
                 # Export rejected records option
@@ -1236,6 +1502,71 @@ with analysis_tab:
                             use_container_width=True,
                             key="download_detailed"
                         )
+                    
+                    # CLIENT EXPORT SECTION
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">🎯 Client Reports</p>', unsafe_allow_html=True)
+                    
+                    if st.button("📊 Professional Excel Report", use_container_width=True, key="client_excel"):
+                        try:
+                            # Load approved clips if available
+                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                            approved_df = None
+                            if os.path.exists(approved_file):
+                                approved_df = pd.read_csv(approved_file)
+                            
+                            # Create professional Excel report
+                            wb = create_client_excel_report(df, approved_df)
+                            
+                            # Save to bytes
+                            excel_buffer = io.BytesIO()
+                            wb.save(excel_buffer)
+                            excel_buffer.seek(0)
+                            
+                            st.download_button(
+                                label="📥 Download Excel Report",
+                                data=excel_buffer.getvalue(),
+                                file_name=f"DriveShop_Media_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True,
+                                key="download_client_excel"
+                            )
+                        except Exception as e:
+                            st.error(f"Error creating Excel report: {e}")
+                    
+                    if st.button("📈 Executive Summary", use_container_width=True, key="exec_summary"):
+                        # Create executive summary data
+                        summary_data = {
+                            'Metric': [
+                                'Total Vehicles Monitored',
+                                'Media Clips Found',
+                                'Average Relevance Score',
+                                'High-Quality Clips (8+)',
+                                'Coverage Rate',
+                                'Positive Sentiment',
+                                'Brand Alignment Rate'
+                            ],
+                            'Value': [
+                                len(df),
+                                len(df[df['Relevance Score'] > 0]) if 'Relevance Score' in df.columns else len(df),
+                                f"{df['Relevance Score'].mean():.1f}/10" if 'Relevance Score' in df.columns else "N/A",
+                                len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns else 0,
+                                f"{(len(df[df['Relevance Score'] > 0])/len(df)*100):.1f}%" if 'Relevance Score' in df.columns and len(df) > 0 else "0%",
+                                len(df[df['Sentiment'] == 'positive']) if 'Sentiment' in df.columns else 0,
+                                f"{(len(df[df['Brand Alignment'] == True])/len(df)*100):.1f}%" if 'Brand Alignment' in df.columns and len(df) > 0 else "N/A"
+                            ]
+                        }
+                        
+                        summary_df = pd.DataFrame(summary_data)
+                        csv_data = summary_df.to_csv(index=False)
+                        
+                        st.download_button(
+                            label="📥 Download Executive Summary",
+                            data=csv_data,
+                            file_name=f"Executive_Summary_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                            key="download_exec_summary"
+                        )
                 else:
                     st.info("No data available. Process loans to see summary.")
             except Exception as e:
@@ -1402,3 +1733,5 @@ with analysis_tab:
             
             # Add extra bottom spacing
             st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True) 
+
+ 
