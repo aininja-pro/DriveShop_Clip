@@ -46,23 +46,61 @@ class ScrapingBeeClient:
             logger.error("No URL provided to scrape")
             return None
         
-        # Special handling for YouTube URLs - they need more time and premium proxies
+        # Special handling for different URL types
         is_youtube = 'youtube.com' in url
-        timeout = 60 if is_youtube else 30  # 60 seconds for YouTube
-        wait_time = 5000 if is_youtube else 3000  # 5 seconds wait for YouTube
+        is_spotlight_category = 'spotlightepnews.com/category/' in url
         
-        # Prepare API parameters
-        params = {
-            'api_key': self.api_key,
-            'url': url,
-            'render_js': str(render_js).lower(),
-            'premium_proxy': str(premium_proxy or is_youtube).lower(),  # Use premium for YouTube
-            'country_code': 'us',  # Use US proxies for automotive sites
-            'wait': wait_time,  # Wait longer for YouTube JS to load
-            'wait_for': '#content, #main, article, .content' if not is_youtube else '#contents',  # YouTube-specific selector
-            'block_ads': 'true',  # Block ads to speed up loading
-            'block_resources': 'false'  # Don't block CSS/JS as we need rendered content
-        }
+        # Set timeouts based on URL type
+        if is_youtube:
+            timeout = 60
+            wait_time = 5000
+        elif is_spotlight_category:
+            timeout = 45  # Longer timeout for category pages  
+            wait_time = 8000  # Wait 8 seconds for article list to fully load
+        else:
+            timeout = 30
+            wait_time = 3000
+        
+        # Prepare API parameters with special handling for spotlightepnews category pages
+        if is_spotlight_category:
+            params = {
+                'api_key': self.api_key,
+                'url': url,
+                'render_js': str(render_js).lower(),
+                'premium_proxy': str(premium_proxy).lower(),
+                'country_code': 'us',
+                'wait': wait_time,  # Wait 8 seconds for article list to load
+                'wait_for': '.post-title, .entry-title, .article-title, .post, article, .content-area',  # Article-specific selectors
+                'block_ads': 'true',
+                'block_resources': 'false',
+                'window_width': 1920,  # Desktop viewport to ensure full content
+                'window_height': 1080,
+                'extract_rules': '{"article_links": "a[href*=\\"/\\"]:not([href*=\\"youtube\\"])"}' # Extract actual article links, not YouTube
+            }
+        elif is_youtube:
+            params = {
+                'api_key': self.api_key,
+                'url': url,
+                'render_js': str(render_js).lower(),
+                'premium_proxy': str(premium_proxy or is_youtube).lower(),  # Use premium for YouTube
+                'country_code': 'us',
+                'wait': wait_time,
+                'wait_for': '#contents',  # YouTube-specific selector
+                'block_ads': 'true',
+                'block_resources': 'false'
+            }
+        else:
+            params = {
+                'api_key': self.api_key,
+                'url': url,
+                'render_js': str(render_js).lower(),
+                'premium_proxy': str(premium_proxy).lower(),
+                'country_code': 'us',
+                'wait': wait_time,
+                'wait_for': '#content, #main, article, .content',
+                'block_ads': 'true',
+                'block_resources': 'false'
+            }
         
         logger.info(f"ScrapingBee request params: {dict(list(params.items())[:-1])}")  # Log params except API key
         

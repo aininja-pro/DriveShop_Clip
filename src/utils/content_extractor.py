@@ -117,20 +117,51 @@ def extract_fliphtml5(html: str) -> Optional[str]:
             'div[class*="text"]',
             '.page-content',
             '.article-content',
-            '.text-content'
+            '.text-content',
+            # More aggressive selectors for FlipHTML5 content
+            'div[style*="position: absolute"]',  # FlipHTML5 often uses positioned divs
+            'span[style*="position: absolute"]',
+            'div p',  # Any paragraphs in divs
+            'p'       # All paragraphs as fallback
         ]
         
         extracted_content = ""
+        article_paragraphs = []
+        
+        # Try each selector and collect substantial text
         for selector in article_selectors:
             elements = soup.select(selector)
             for element in elements:
                 text = element.get_text(" ", strip=True)
-                # Skip if it's just navigation controls
-                if not any(indicator.lower() in text.lower() for indicator in fliphtml5_indicators):
-                    extracted_content += " " + text
+                
+                # Skip navigation controls and very short text
+                if len(text) < 30:
+                    continue
+                    
+                # Skip if it's navigation controls
+                is_navigation = any(indicator.lower() in text.lower() for indicator in fliphtml5_indicators)
+                if is_navigation:
+                    continue
+                
+                # Look for automotive content indicators
+                automotive_keywords = ['vehicle', 'car', 'sedan', 'suv', 'mpg', 'horsepower', 'engine', 'review', 'drive', 'performance']
+                has_automotive_content = any(keyword in text.lower() for keyword in automotive_keywords)
+                
+                # Include text that's substantial and potentially automotive-related
+                if has_automotive_content or len(text) > 100:
+                    article_paragraphs.append(text)
         
-        if extracted_content and len(extracted_content.strip()) > 100:
-            logger.info(f"✅ Extracted {len(extracted_content)} chars from FlipHTML5 article selectors")
+        # Combine unique paragraphs
+        unique_paragraphs = []
+        for para in article_paragraphs:
+            # Avoid duplicates
+            if not any(para[:50] in existing[:50] for existing in unique_paragraphs):
+                unique_paragraphs.append(para)
+        
+        extracted_content = "\n\n".join(unique_paragraphs)
+        
+        if extracted_content and len(extracted_content.strip()) > 200:
+            logger.info(f"✅ Extracted {len(extracted_content)} chars from FlipHTML5 enhanced selectors")
             return extracted_content.strip()
         
         # If specific selectors don't work, try title-based extraction
@@ -225,9 +256,16 @@ def extract_article_content(html: str, url: str, expected_topic: str = "") -> st
     
     # Step 1: Try site-specific extraction first
     site_specific_content = try_site_specific_extraction(soup, url, expected_topic)
-    if site_specific_content and not is_content_quality_poor(site_specific_content, url, expected_topic):
-        log_content_excerpt(site_specific_content, "Site-Specific")
-        return site_specific_content
+    if site_specific_content:
+        # For SpotlightEP, if we got any content from site-specific extraction, use it
+        # (site-specific already handles FlipHTML5 detection and quality checks)
+        if "spotlightepnews.com" in url and len(site_specific_content) > 200:
+            logger.info(f"Using SpotlightEP content ({len(site_specific_content)} chars) - site-specific extraction succeeded")
+            log_content_excerpt(site_specific_content, "SpotlightEP-Specific")
+            return site_specific_content
+        elif not is_content_quality_poor(site_specific_content, url, expected_topic):
+            log_content_excerpt(site_specific_content, "Site-Specific")
+            return site_specific_content
     
     # Step 2: Try basic extraction (site-specific or generic)
     basic_extracted = _extract_with_basic_methods(soup, url)
@@ -421,12 +459,19 @@ def extract_spotlightepnews_content(soup: BeautifulSoup, url: str, expected_topi
     """
     logger.info("Using spotlightepnews.com-specific content extraction")
     
-    # FIRST: Try FlipHTML5 extraction if this is a flipbook
+    # FIRST: Check if this is a category/index page - extract article links instead of returning empty
+    if '/category/' in url or url.endswith('/automotive/') or url.endswith('/automotive'):
+        logger.info("🔍 Detected category page - extracting article links from ScrapingBee content")
+        return extract_article_links_from_category(soup, url, expected_topic)
+    
+    # SECOND: Try FlipHTML5 extraction if this is a flipbook article
     original_html = str(soup)  # Get the full HTML for FlipHTML5 detection
     fliphtml5_content = extract_fliphtml5(original_html)
-    if fliphtml5_content:
+    if fliphtml5_content and len(fliphtml5_content) > 200:  # Require substantial content
         logger.info(f"✅ FlipHTML5 extraction successful: {len(fliphtml5_content)} characters")
-        return fliphtml5_content
+        return fliphtml5_content  # Return immediately, don't continue to generic extraction
+    elif fliphtml5_content:
+        logger.warning(f"FlipHTML5 extracted only {len(fliphtml5_content)} chars - trying enhanced extraction")
     
     # FALLBACK: Use existing extraction methods for non-flipbook content
     logger.info("No FlipHTML5 content found, trying standard spotlightepnews extraction")
@@ -712,6 +757,190 @@ def calculate_content_score(container: Any, title_text: str) -> float:
     logger.debug(f"Content score breakdown: paragraphs={paragraph_score}, length={length_score}, sentences={sentence_count}, nav_penalty={nav_count*3}")
     
     return max(score, 0.0)  # Don't return negative scores
+
+def extract_article_links_from_category(soup: BeautifulSoup, url: str, expected_topic: str = "") -> str:
+    """
+    Extract individual article links from a category page and trigger Index Page Discovery.
+    This function should return empty content to trigger the enhanced crawler manager's 
+    Index Page Discovery process which properly crawls individual articles.
+    """
+    logger.info(f"🔍 Detected category page - extracting article links from ScrapingBee content")
+    logger.info(f"Extracting article links from category page for topic: {expected_topic}")
+    
+    # **COMPREHENSIVE DEBUG ANALYSIS**
+    logger.info("="*80)
+    logger.info("🔍 DETAILED PAGE ANALYSIS")
+    logger.info("="*80)
+    
+    # 1. Basic HTML structure analysis
+    logger.info(f"📄 HTML size: {len(str(soup))} characters")
+    logger.info(f"📄 Page title: {soup.title.get_text() if soup.title else 'No title'}")
+    
+    # 2. Look for FlipHTML5 structure (common on spotlightepnews.com)
+    fliphtml_elements = soup.find_all(['div', 'iframe'], class_=lambda c: c and ('fliphtml' in str(c).lower() or 'flip' in str(c).lower()))
+    if fliphtml_elements:
+        logger.info(f"📖 Found {len(fliphtml_elements)} FlipHTML5 elements")
+        for i, elem in enumerate(fliphtml_elements[:3]):
+            logger.info(f"   FlipHTML5 element {i+1}: {elem.name} with class='{elem.get('class', '')}'")
+    
+    # 3. Comprehensive link analysis
+    all_links = soup.find_all('a', href=True)
+    logger.info(f"🔗 Found {len(all_links)} total <a> tags")
+    
+    if len(all_links) == 0:
+        logger.error("❌ CRITICAL: No <a> tags found! Page may not be fully loaded.")
+        # Show raw HTML structure to debug
+        all_divs = soup.find_all('div')
+        logger.info(f"📦 Found {len(all_divs)} div elements instead")
+        for i, div in enumerate(all_divs[:10]):
+            div_class = div.get('class', [])
+            div_id = div.get('id', '')
+            logger.info(f"   Div {i+1}: class={div_class}, id='{div_id}'")
+        
+        # Show first 1000 chars of HTML 
+        html_preview = str(soup)[:1000]
+        logger.info(f"📄 HTML Preview:\n{html_preview}")
+        return ""
+    
+    # 4. Categorize all links for debugging
+    youtube_links = []
+    internal_links = []
+    external_links = []
+    category_links = []
+    potential_articles = []
+    
+    for i, link in enumerate(all_links):
+        href = link.get('href', '')
+        link_text = link.get_text(strip=True)
+        parent_element = link.parent.name if link.parent else 'unknown'
+        parent_class = ' '.join(link.parent.get('class', [])) if link.parent and link.parent.get('class') else ''
+        
+        # Show first 50 links with full details
+        if i < 50:
+            logger.info(f"🔗 Link {i+1}: {href}")
+            logger.info(f"   Text: '{link_text[:80]}'")
+            logger.info(f"   Parent: <{parent_element} class='{parent_class}'/>")
+        
+        # Categorize link
+        if 'youtube.com' in href or 'youtu.be' in href:
+            youtube_links.append((href, link_text))
+        elif href.startswith('/') or 'spotlightepnews.com' in href:
+            if '/category/' in href:
+                category_links.append((href, link_text))
+            else:
+                internal_links.append((href, link_text))
+                
+                # Check if this could be an article
+                if (len(href) > 10 and 
+                    not href.endswith('/') and 
+                    '/tag/' not in href and 
+                    '/author/' not in href and
+                    '/search' not in href and
+                    '#' not in href):
+                    potential_articles.append((href, link_text))
+        elif href.startswith('http'):
+            external_links.append((href, link_text))
+    
+    # 5. Link summary
+    logger.info("📊 LINK ANALYSIS SUMMARY:")
+    logger.info(f"   🎥 YouTube links: {len(youtube_links)}")
+    logger.info(f"   🏠 Internal links: {len(internal_links)}")
+    logger.info(f"   🌐 External links: {len(external_links)}")
+    logger.info(f"   📁 Category links: {len(category_links)}")
+    logger.info(f"   📰 Potential articles: {len(potential_articles)}")
+    
+    # 6. **DIRECT SEARCH FOR KNOWN ARTICLES**
+    logger.info("="*50)
+    logger.info("🎯 SEARCHING FOR KNOWN ARTICLES")
+    logger.info("="*50)
+    
+    # Search for the exact Camry and CX-5 articles we know exist
+    known_articles = {
+        'Toyota Camry Hybrid': [
+            '/all-new-2025-toyota-camry-goes-hybrid-fulltime/',
+            'toyota', 'camry', 'hybrid', '2025'
+        ],
+        'Mazda CX-5': [
+            '/success-hasnt-spoiled-the-mazda-cx-5/',
+            'mazda', 'cx-5', 'success', 'spoiled'
+        ]
+    }
+    
+    found_articles = []
+    for article_name, search_terms in known_articles.items():
+        url_pattern = search_terms[0]  # First term is the URL pattern
+        keywords = search_terms[1:]     # Rest are keywords
+        
+        logger.info(f"🔍 Searching for {article_name}:")
+        logger.info(f"   URL pattern: {url_pattern}")
+        logger.info(f"   Keywords: {keywords}")
+        
+        # Search in all links
+        for href, link_text in internal_links + potential_articles:
+            href_lower = href.lower()
+            text_lower = link_text.lower()
+            
+            # Check URL pattern match
+            url_match = url_pattern.lower() in href_lower
+            
+            # Check keyword matches
+            keyword_matches = sum(1 for kw in keywords if kw in href_lower or kw in text_lower)
+            
+            if url_match or keyword_matches >= 2:
+                found_articles.append((article_name, href, link_text, url_match, keyword_matches))
+                logger.info(f"   ✅ FOUND! {href}")
+                logger.info(f"      Text: '{link_text}'")
+                logger.info(f"      URL match: {url_match}, Keyword matches: {keyword_matches}")
+    
+    # 7. Topic-specific search
+    if expected_topic:
+        logger.info("="*50)
+        logger.info(f"🎯 SEARCHING FOR TOPIC: {expected_topic}")
+        logger.info("="*50)
+        
+        topic_words = expected_topic.lower().split()
+        topic_matches = []
+        
+        for href, link_text in potential_articles:
+            href_lower = href.lower()
+            text_lower = link_text.lower()
+            
+            url_matches = sum(1 for word in topic_words if word in href_lower)
+            text_matches = sum(1 for word in topic_words if word in text_lower)
+            total_matches = url_matches + text_matches
+            
+            if total_matches > 0:
+                topic_matches.append((href, link_text, url_matches, text_matches, total_matches))
+                
+        # Sort by total matches (best first)
+        topic_matches.sort(key=lambda x: x[4], reverse=True)
+        
+        logger.info(f"🔍 Found {len(topic_matches)} links matching topic '{expected_topic}':")
+        for i, (href, text, url_m, text_m, total) in enumerate(topic_matches[:10]):
+            logger.info(f"   {i+1}. {href} (URL:{url_m}, Text:{text_m})")
+            logger.info(f"      Text: '{text[:60]}'")
+    
+    # 8. Final summary
+    total_potential = len(potential_articles)
+    logger.info("="*50)
+    logger.info("📋 FINAL SUMMARY")
+    logger.info("="*50)
+    logger.info(f"✅ Found {len(found_articles)} known articles")
+    logger.info(f"📰 Found {total_potential} potential article links")
+    logger.info(f"🔗 Total links analyzed: {len(all_links)}")
+    
+    if found_articles:
+        logger.info("🎉 SUCCESS: Found known articles!")
+        for article_name, href, text, url_match, kw_matches in found_articles:
+            logger.info(f"   {article_name}: {href}")
+    elif total_potential > 0:
+        logger.info("⚠️ No exact matches, but found potential articles")
+    else:
+        logger.error("❌ CRITICAL: No article links found at all!")
+    
+    # Always return empty to trigger Index Page Discovery
+    logger.info("🔄 Returning empty content to trigger Index Page Discovery")
+    return ""
 
 def clean_text(text: str) -> str:
     """Clean extracted text."""

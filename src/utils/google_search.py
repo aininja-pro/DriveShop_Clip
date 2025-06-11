@@ -196,49 +196,6 @@ class BingSearchClient:
         google_client = GoogleSearchClient()
         return google_client._is_url_too_old(url)
     
-    def _generate_model_variations(self, model: str) -> List[str]:
-        """Generate model name variations for search optimization"""
-        variations = [model]  # Always include original
-        
-        # Handle hyphenated models more specifically (like CX-5 vs CX-90)
-        if '-' in model:
-            # For CX-5: try "CX-5", "CX 5", "CX5"
-            base_part = model.split('-')[0]  # "CX"
-            number_part = model.split('-')[1]  # "5"
-            
-            variations.extend([
-                f"{base_part} {number_part}",      # "CX 5"
-                f"{base_part}{number_part}",       # "CX5"
-                f'"{model}"',                      # "CX-5" with quotes for exact match
-                f"{model} review",                 # "CX-5 review"
-                f"{model} test",                   # "CX-5 test"
-            ])
-        
-        # Handle models with spaces
-        if ' ' in model:
-            variations.append(model.replace(' ', '-'))  # "Q6 e-tron" -> "Q6 e-tron"
-            variations.append(model.replace(' ', ''))   # "Q6 e-tron" -> "Q6etron"
-        
-        # Add common automotive terms
-        base_variations = [
-            f"{model} review",
-            f"{model} test drive", 
-            f"{model} first drive",
-            f"2025 {model}",
-            f"2024 {model}",
-        ]
-        variations.extend(base_variations)
-        
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_variations = []
-        for v in variations:
-            if v not in seen:
-                seen.add(v)
-                unique_variations.append(v)
-        
-        return unique_variations[:10]  # Limit to top 10 to avoid too many API calls
-
 class GoogleSearchClient:
     """Google Custom Search API client with graduated fallback queries"""
     
@@ -267,124 +224,77 @@ class GoogleSearchClient:
         Returns:
             Best matching article URL or None if not found
         """
+        logger.info(f"🔍 Google Search called with: make='{make}', model='{model}', year='{year}', author='{author}', domain='{domain}'")
+        
         if not self.api_key or not self.search_engine_id:
             logger.error("Google Search API not configured properly")
             return None
         
-        # Generate hierarchical model variations (from most specific to most general)
-        model_variations = self._generate_model_variations(model)
-        logger.info(f"Generated {len(model_variations)} model variations: {model_variations}")
+        # Generate exactly 3 simple search queries (no model variations)
+        queries = self._generate_search_queries(domain, make, model, year, author)
         
-        # Try each model variation in hierarchical order
-        for i, current_model in enumerate(model_variations):
-            logger.info(f"Hierarchical search attempt {i+1}/{len(model_variations)}: trying model '{current_model}'")
+        best_url = None
+        best_score = 0
+        
+        for i, query in enumerate(queries, 1):
+            logger.info(f"Google search attempt {i}/{len(queries)}: {query}")
             
-            # Generate search queries for this specific model variation
-            queries = self._generate_search_queries(domain, make, current_model, year, author)
-            
-            best_url = None
-            best_score = 0
-            
-            for j, query in enumerate(queries, 1):
-                logger.info(f"Google search attempt {j}/{len(queries)}: {query}")
-                
-                try:
-                    url = self._execute_search(query)
-                    if url:
-                        # Score the result quality
-                        score = self._score_url_relevance(url, make, current_model, author)
-                        logger.info(f"Found article URL: {url} (quality score: {score})")
-                        
-                        # Verify author in content if specified
-                        if author and not self._verify_author_in_content(url, author):
-                            logger.warning(f"Article doesn't contain author {author}, reducing score: {url}")
-                            score = max(10, score - 30)  # Reduce score instead of completely blocking
-                        
-                        if score > best_score:
-                            best_score = score
-                            best_url = url
-                        
-                        # If we found a high-quality result, use it immediately
-                        if score >= 80:  # High confidence threshold
-                            logger.info(f"✅ Found high-quality article with model variation '{current_model}': {url}")
-                            return url
-                            
-                    else:
-                        logger.info(f"No results for query: {query}")
-                        
-                except Exception as e:
-                    logger.error(f"Error in search attempt {j}: {e}")
-                    continue
+            try:
+                url = self._execute_search(query)
+                if url:
+                    # Score the result quality
+                    score = self._score_url_relevance(url, make, model, author)
+                    logger.info(f"Found article URL: {url} (quality score: {score})")
                     
-                # Rate limit: wait between queries
-                time.sleep(0.5)
-            
-            # If Google Search found something decent for this model variation, use it
-            if best_url and best_score >= 50:
-                logger.info(f"✅ Found good article with model variation '{current_model}': {best_url} (score: {best_score})")
-                return best_url
-            
-            logger.info(f"No good results for model variation '{current_model}', trying next variation...")
+                    # Verify author in content if specified
+                    if author and not self._verify_author_in_content(url, author):
+                        logger.warning(f"Article doesn't contain author {author}, reducing score: {url}")
+                        score = max(10, score - 30)  # Reduce score instead of completely blocking
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_url = url
+                    
+                    # If we found a high-quality result, use it immediately
+                    if score >= 80:  # High confidence threshold
+                        logger.info(f"✅ Found high-quality article: {url}")
+                        return url
+                        
+                else:
+                    logger.info(f"No results for query: {query}")
+                    
+            except Exception as e:
+                logger.error(f"Error in search attempt {i}: {e}")
+                continue
+                
+            # Rate limit: wait between queries
+            time.sleep(0.5)
         
-        logger.warning(f"❌ No articles found for any model variation of {make} {model} by {author or 'any author'} on {domain}")
+        # Return best result found, if any
+        if best_url and best_score >= 50:
+            logger.info(f"✅ Found good article: {best_url} (score: {best_score})")
+            return best_url
+        
+        logger.warning(f"❌ No articles found for {make} {model} by {author or 'any author'} on {domain}")
         return None
     
     def _generate_search_queries(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> List[str]:
-        """Generate graduated search queries from specific to broad"""
+        """Generate exactly 3 simple search queries: Domain+Make+Model+Author, Domain+Make+Model, Domain+Model"""
         queries = []
         
-        # Clean up model name for search
-        clean_model = model.replace(" Prestige", "").replace(" Premium", "").strip()
+        # Use the exact model name as provided (no cleaning, no hardcoding)
         
-        # Clean up author name if provided
-        clean_author = author.strip() if author else None
+        # Attempt 1: Domain Make Model Author (if author provided)
+        if author:
+            queries.append(f'site:{domain} "{make} {model}" "{author}"')
         
-        # For inurl parameter, use full model for hyphenated models, otherwise first word
-        if '-' in clean_model:
-            inurl_term = clean_model.lower().replace(' ', '-')  # "CX-5" -> "cx-5"
-        else:
-            inurl_term = clean_model.split()[0].lower()  # "Jetta GLI" -> "jetta"
+        # Attempt 2: Domain Make Model  
+        queries.append(f'site:{domain} "{make} {model}"')
         
-        # Tier 1: Author + vehicle + site (HIGHEST PRIORITY - author-specific reviews)
-        if clean_author:
-            queries.append(f'site:{domain} "{make} {clean_model}" "{clean_author}" inurl:{inurl_term}')
-            if year:
-                queries.append(f'site:{domain} "{year} {make} {clean_model}" "{clean_author}" review')
-                queries.append(f'site:{domain} "{year} {make} {clean_model}" "{clean_author}" "first test"')
-            queries.append(f'site:{domain} "{make} {clean_model}" "{clean_author}" review')
-            queries.append(f'site:{domain} "{make} {clean_model}" "{clean_author}" "first test"')
+        # Attempt 3: Domain Model
+        queries.append(f'site:{domain} "{model}"')
         
-        # Tier 2: Try exact article title format (without author)
-        if year:
-            queries.append(f'site:{domain} "{year} {make} {clean_model} Review"')
-            queries.append(f'site:{domain} "{year} {make} {clean_model}" "Review:"')
-        queries.append(f'site:{domain} "{make} {clean_model} Review:"')
-        queries.append(f'site:{domain} "{make} {clean_model} Review"')
-        
-        # Tier 3: Exclude template content explicitly  
-        if year:
-            queries.append(f'site:{domain} "{year} {make} {clean_model}" -"Related Posts" -"Recent Posts"')
-        queries.append(f'site:{domain} "{make} {clean_model}" -"Related Posts" -"Recent Posts" review')
-        
-        # Tier 4: Site-specific without author (fallback for when NO AUTHOR specified)
-        if not clean_author:  # Only add these if no author was specified
-            if year:
-                queries.append(f'site:{domain} "{year} {make} {clean_model}" review')
-                queries.append(f'site:{domain} "{year} {make} {clean_model}" "first drive"')
-                
-            queries.append(f'site:{domain} "{make} {clean_model}" review')
-            queries.append(f'site:{domain} "{make} {clean_model}" "first drive"')
-            queries.append(f'site:{domain} "{make} {clean_model}" "test drive"')
-        
-        # If we have an author, add a few more author-specific searches
-        if clean_author:
-            # Try broader searches but still with author requirement
-            if year:
-                queries.append(f'"{year} {make} {clean_model}" "{clean_author}" review site:{domain}')
-            queries.append(f'"{make} {clean_model}" "{clean_author}" review OR "first drive" site:{domain}')
-            queries.append(f'"{make} {clean_model}" "{clean_author}" test OR review site:{domain}')
-        
-        logger.info(f"Generated {len(queries)} search queries (author requirement: {'YES' if clean_author else 'NO'})")
+        logger.info(f"Generated {len(queries)} simple search queries")
         return queries
     
     def _execute_search(self, query: str) -> Optional[str]:
@@ -634,49 +544,6 @@ class GoogleSearchClient:
                 return True
                 
         return False
-
-    def _generate_model_variations(self, model: str) -> List[str]:
-        """Generate model name variations for search optimization"""
-        variations = [model]  # Always include original
-        
-        # Handle hyphenated models more specifically (like CX-5 vs CX-90)
-        if '-' in model:
-            # For CX-5: try "CX-5", "CX 5", "CX5"
-            base_part = model.split('-')[0]  # "CX"
-            number_part = model.split('-')[1]  # "5"
-            
-            variations.extend([
-                f"{base_part} {number_part}",      # "CX 5"
-                f"{base_part}{number_part}",       # "CX5"
-                f'"{model}"',                      # "CX-5" with quotes for exact match
-                f"{model} review",                 # "CX-5 review"
-                f"{model} test",                   # "CX-5 test"
-            ])
-        
-        # Handle models with spaces
-        if ' ' in model:
-            variations.append(model.replace(' ', '-'))  # "Q6 e-tron" -> "Q6 e-tron"
-            variations.append(model.replace(' ', ''))   # "Q6 e-tron" -> "Q6etron"
-        
-        # Add common automotive terms
-        base_variations = [
-            f"{model} review",
-            f"{model} test drive", 
-            f"{model} first drive",
-            f"2025 {model}",
-            f"2024 {model}",
-        ]
-        variations.extend(base_variations)
-        
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_variations = []
-        for v in variations:
-            if v not in seen:
-                seen.add(v)
-                unique_variations.append(v)
-        
-        return unique_variations[:10]  # Limit to top 10 to avoid too many API calls
 
     def _score_url_relevance(self, url: str, make: str, model: str, author: Optional[str] = None) -> int:
         """Score a URL based on how well it matches our target vehicle and author"""

@@ -213,54 +213,140 @@ class EnhancedCrawlerManager:
                 'cached': True
             }
             
-        # Tier 1: Try Google Search first (ALWAYS)
-        if True:  # Always try Google Search first - removed pattern matching for scalability
-            logger.info(f"Tier 1: Trying Google Search to find specific article for {make} {model}")
+        # Tier 1: Basic HTTP (FREE - simplest approach first)
+        logger.info(f"Tier 1: Trying Basic HTTP (free) for {url}")
+        
+        basic_content = self._fetch_basic_http(url)
+        if basic_content:
+            # EXTRACT CONTENT FIRST to test quality
+            from src.utils.content_extractor import extract_article_content
+            expected_topic = f"{make} {model}"
+            extracted_content = extract_article_content(basic_content, url, expected_topic)
             
-            # Extract domain from URL
-            parsed_url = urlparse(url)
-            domain_clean = parsed_url.netloc.lower().replace('www.', '')
+            # Check if extraction was successful (not just 30 chars from 469KB)
+            min_content_length = 200  # Reasonable minimum for an article
+            extraction_successful = extracted_content and len(extracted_content.strip()) >= min_content_length
             
-            # Try to find a specific article using Google Search
-            specific_url = self.google_search.search_for_article(
-                domain=domain_clean,
-                make=make,
-                model=model,
-                year=None,
-                author=person_name
-            )
-            
-            if specific_url and specific_url != url:
-                logger.info(f"Tier 1 Success: Google Search found specific article: {specific_url}")
-                
-                # Now crawl the specific article we found
-                article_result = self._crawl_specific_url(specific_url, make, model)
-                
-                if article_result['success']:
-                    result = article_result.copy()
-                    result.update({
-                        'tier_used': 'Tier 1: Google Search + ' + article_result.get('tier_used', 'Unknown'),
+            if extraction_successful:
+                # Content extraction succeeded, now check if it's generic
+                if not self.is_generic_content(extracted_content, url, make, model):
+                    logger.info(f"Tier 1 Success: Basic HTTP + successful extraction found SPECIFIC content for {url}")
+                    result = {
+                        'success': True,
+                        'content': basic_content,  # Return original HTML for further processing
+                        'title': 'Basic HTTP Result',
+                        'url': url,
+                        'tier_used': 'Tier 1: Basic HTTP',
                         'cached': False
-                    })
+                    }
                     # Cache the result
                     self.cache_manager.store_result(
                         person_id=person_name or "unknown",
                         domain=domain,
                         make=make,
                         model=model,
-                        url=specific_url,
-                        content=article_result['content']
+                        url=url,
+                        content=basic_content
                     )
                     return result
+                else:
+                    logger.info(f"Tier 1: Content extraction succeeded but content is GENERIC, escalating to Enhanced HTTP")
+            else:
+                extracted_length = len(extracted_content.strip()) if extracted_content else 0
+                logger.info(f"Tier 1: Content extraction FAILED ({extracted_length} chars from {len(basic_content)} chars), escalating to Enhanced HTTP")
 
-        # NEW: Tier 1.5: Index Page Discovery (When Google Search fails)
-        logger.info(f"Tier 1.5: Google Search failed, trying Index Page Discovery for {make} {model}")
+        # Tier 2: Enhanced HTTP + Content Extraction Test (auto-escalation based on quality)
+        logger.info(f"Tier 2: Trying Enhanced HTTP (browser-like headers) for {url}")
+        
+        http_content = self.enhanced_http.fetch_url(url)
+        if http_content:
+            # EXTRACT CONTENT FIRST to test quality
+            from src.utils.content_extractor import extract_article_content
+            expected_topic = f"{make} {model}"
+            extracted_content = extract_article_content(http_content, url, expected_topic)
+            
+            # Check if extraction was successful (not just 30 chars from 469KB)
+            min_content_length = 200  # Reasonable minimum for an article
+            extraction_successful = extracted_content and len(extracted_content.strip()) >= min_content_length
+            
+            if extraction_successful:
+                # Content extraction succeeded, now check if it's generic
+                if not self.is_generic_content(extracted_content, url, make, model):
+                    logger.info(f"Tier 2 Success: Enhanced HTTP + successful extraction found SPECIFIC content for {url}")
+                    result = {
+                        'success': True,
+                        'content': http_content,  # Return original HTML for further processing
+                        'title': 'Enhanced HTTP Result',
+                        'url': url,
+                        'tier_used': 'Tier 2: Enhanced HTTP',
+                        'cached': False
+                    }
+                    # Cache the result
+                    self.cache_manager.store_result(
+                        person_id=person_name or "unknown",
+                        domain=domain,
+                        make=make,
+                        model=model,
+                        url=url,
+                        content=http_content
+                    )
+                    return result
+                else:
+                    logger.info(f"Tier 2: Content extraction succeeded but content is GENERIC, escalating to ScrapingBee")
+            else:
+                extracted_length = len(extracted_content.strip()) if extracted_content else 0
+                logger.info(f"Tier 2: Content extraction FAILED ({extracted_length} chars from {len(http_content)} chars), escalating to ScrapingBee")
+
+        # Tier 3: ScrapingBee (when Enhanced HTTP fails OR returns generic content)
+        logger.info(f"Tier 3: Trying ScrapingBee for {url}")
+        
+        bee_content = self.scraping_bee.scrape_url(url)
+        if bee_content:
+            # EXTRACT CONTENT FIRST to test quality (same as Enhanced HTTP)
+            from src.utils.content_extractor import extract_article_content
+            expected_topic = f"{make} {model}"
+            extracted_content = extract_article_content(bee_content, url, expected_topic)
+            
+            # Check if extraction was successful (not just 30 chars from 638KB)
+            min_content_length = 200  # Reasonable minimum for an article
+            extraction_successful = extracted_content and len(extracted_content.strip()) >= min_content_length
+            
+            if extraction_successful:
+                # Content extraction succeeded, now check if it's generic
+                if not self.is_generic_content(extracted_content, url, make, model):
+                    logger.info(f"Tier 3 Success: ScrapingBee + successful extraction found SPECIFIC content for {url}")
+                    result = {
+                        'success': True,
+                        'content': bee_content,  # Return original HTML for further processing
+                        'title': 'ScrapingBee Result',
+                        'url': url,
+                        'tier_used': 'Tier 3: ScrapingBee',
+                        'cached': False
+                    }
+                    # Cache the result
+                    self.cache_manager.store_result(
+                        person_id=person_name or "unknown",
+                        domain=domain,
+                        make=make,
+                        model=model,
+                        url=url,
+                        content=bee_content
+                    )
+                    return result
+                else:
+                    logger.info(f"Tier 3: ScrapingBee content extraction succeeded but content is GENERIC, escalating to Google Search")
+            else:
+                extracted_length = len(extracted_content.strip()) if extracted_content else 0
+                logger.info(f"Tier 3: ScrapingBee content extraction FAILED ({extracted_length} chars from {len(bee_content)} chars), escalating to Index Page Discovery")
+        
+        # Tier 3.5: Index Page Discovery (when all direct scraping fails but we have a category page)
+        logger.info(f"Tier 3.5: All direct scraping failed, trying Index Page Discovery for {make} {model}")
         index_discovery_result = self._try_index_page_discovery(url, make, model, person_name, domain)
         if index_discovery_result and index_discovery_result['success']:
-            logger.info(f"Tier 1.5 Success: Index Page Discovery found specific article")
+            logger.info(f"Tier 3.5 Success: Index Page Discovery found specific article")
             result = index_discovery_result.copy()
             result.update({
-                'tier_used': 'Tier 1.5: Index Discovery + ' + index_discovery_result.get('tier_used', 'Unknown'),
+                'tier_used': 'Tier 3.5: Index Discovery + ' + index_discovery_result.get('tier_used', 'Unknown'),
                 'cached': False
             })
             # Cache the result
@@ -273,63 +359,48 @@ class EnhancedCrawlerManager:
                 content=index_discovery_result['content']
             )
             return result
-
-        # Tier 2: Enhanced HTTP (fast and free) + QUALITY CHECK
-        logger.info(f"Tier 2: Trying Enhanced HTTP for {url}")
         
-        http_content = self.enhanced_http.fetch_url(url)
-        if http_content:
-            # Check if the content is actually useful or just generic
-            if not self.is_generic_content(http_content, url, make, model):
-                logger.info(f"Tier 2 Success: Enhanced HTTP found SPECIFIC content for {url}")
-                result = {
-                    'success': True,
-                    'content': http_content,
-                    'title': 'Enhanced HTTP Result',
-                    'url': url,
-                    'tier_used': 'Tier 2: Enhanced HTTP',
+        # Tier 4: Google Search (FALLBACK ONLY - when all direct scraping fails)
+        logger.info(f"Tier 4: All direct scraping and Index Discovery failed, trying Google Search as FALLBACK for {make} {model}")
+        
+        # Extract domain from URL
+        parsed_url = urlparse(url)
+        domain_clean = parsed_url.netloc.lower().replace('www.', '')
+        
+        # Try to find a specific article using Google Search
+        specific_url = self.google_search.search_for_article(
+            domain=domain_clean,
+            make=make,
+            model=model,
+            year=None,
+            author=person_name
+        )
+        
+        if specific_url and specific_url != url:
+            logger.info(f"Tier 4 Success: Google Search found specific article: {specific_url}")
+            
+            # Now crawl the specific article we found
+            article_result = self._crawl_specific_url(specific_url, make, model)
+            
+            if article_result['success']:
+                result = article_result.copy()
+                result.update({
+                    'tier_used': 'Tier 4: Google Search + ' + article_result.get('tier_used', 'Unknown'),
                     'cached': False
-                }
+                })
                 # Cache the result
                 self.cache_manager.store_result(
                     person_id=person_name or "unknown",
                     domain=domain,
                     make=make,
                     model=model,
-                    url=url,
-                    content=http_content
+                    url=specific_url,
+                    content=article_result['content']
                 )
                 return result
-            else:
-                logger.info(f"Tier 2: Enhanced HTTP got GENERIC content, escalating to ScrapingBee")
                 
-        # Tier 3: ScrapingBee (when Enhanced HTTP fails OR returns generic content)
-        logger.info(f"Tier 3: Trying ScrapingBee for {url}")
-        
-        bee_content = self.scraping_bee.scrape_url(url)
-        if bee_content:
-            logger.info(f"Tier 3 Success: ScrapingBee crawled {url}")
-            result = {
-                'success': True,
-                'content': bee_content,
-                'title': 'ScrapingBee Result',
-                'url': url,
-                'tier_used': 'Tier 3: ScrapingBee',
-                'cached': False
-            }
-            # Cache the result
-            self.cache_manager.store_result(
-                person_id=person_name or "unknown",
-                domain=domain,
-                make=make,
-                model=model,
-                url=url,
-                content=bee_content
-            )
-            return result
-                
-        # Tier 4: Original crawler (RSS + Playwright as last resort)
-        logger.info(f"Tier 4: Enhanced HTTP and ScrapingBee failed, using original crawler for {url}")
+        # Tier 5: Original crawler (RSS + Playwright as last resort)
+        logger.info(f"Tier 5: All direct scraping and Google Search failed, using original crawler for {url}")
         
         # Original crawler returns (content, title, error, actual_url)
         content, title, error, actual_url = self.original_crawler.crawl(
@@ -346,7 +417,7 @@ class EnhancedCrawlerManager:
                 'content': content,
                 'title': title or 'Unknown Title',
                 'url': actual_url or url,
-                'tier_used': f"Tier 4: Original Crawler",
+                'tier_used': f"Tier 5: Original Crawler",
                 'cached': False
             }
             # Cache the result
@@ -374,24 +445,37 @@ class EnhancedCrawlerManager:
     def _crawl_specific_url(self, url: str, make: str, model: str) -> Dict[str, Any]:
         """Crawl a specific URL using OPTIMIZED tier order with CONTENT QUALITY CHECK"""
         
-        # Tier 2: Try Enhanced HTTP first (FREE and FAST) + QUALITY CHECK
+        # Tier 1: Enhanced HTTP + Content Extraction Test (auto-escalation based on quality)
         logger.info(f"Trying Enhanced HTTP for specific URL: {url}")
         http_content = self.enhanced_http.fetch_url(url)
         if http_content:
-            # Check if the content is actually useful or just generic
-            if not self.is_generic_content(http_content, url, make, model):
-                logger.info(f"Enhanced HTTP found SPECIFIC content for: {url}")
-                return {
-                    'success': True,
-                    'content': http_content,
-                    'title': 'Enhanced HTTP Result',
-                    'url': url,
-                    'tier_used': 'Enhanced HTTP'
-                }
-            else:
-                logger.info(f"Enhanced HTTP got GENERIC content for {url}, escalating to ScrapingBee")
+            # EXTRACT CONTENT FIRST to test quality
+            from src.utils.content_extractor import extract_article_content
+            expected_topic = f"{make} {model}"
+            extracted_content = extract_article_content(http_content, url, expected_topic)
             
-        # Tier 3: Try ScrapingBee for ALL URLs when Enhanced HTTP fails OR returns generic content
+            # Check if extraction was successful (not just 30 chars from 469KB)
+            min_content_length = 200  # Reasonable minimum for an article
+            extraction_successful = extracted_content and len(extracted_content.strip()) >= min_content_length
+            
+            if extraction_successful:
+                # Content extraction succeeded, now check if it's generic
+                if not self.is_generic_content(extracted_content, url, make, model):
+                    logger.info(f"Enhanced HTTP + successful extraction found SPECIFIC content for: {url}")
+                    return {
+                        'success': True,
+                        'content': http_content,
+                        'title': 'Enhanced HTTP Result',
+                        'url': url,
+                        'tier_used': 'Enhanced HTTP'
+                    }
+                else:
+                    logger.info(f"Enhanced HTTP: content extraction succeeded but content is GENERIC for {url}, escalating to ScrapingBee")
+            else:
+                extracted_length = len(extracted_content.strip()) if extracted_content else 0
+                logger.info(f"Enhanced HTTP: content extraction FAILED ({extracted_length} chars from {len(http_content)} chars) for {url}, escalating to ScrapingBee")
+            
+        # Tier 2: Try ScrapingBee when Enhanced HTTP fails OR returns generic content
         logger.info(f"Trying ScrapingBee for specific URL: {url}")
         bee_content = self.scraping_bee.scrape_url(url)
         if bee_content:
@@ -406,7 +490,7 @@ class EnhancedCrawlerManager:
         else:
             logger.warning(f"ScrapingBee failed for specific URL: {url}, falling back to original crawler")
             
-        # Tiers 4-5: Use original crawler as last resort
+        # Tier 3: Use original crawler as last resort
         logger.info(f"Using original crawler for specific URL: {url}")
         content, title, error, actual_url = self.original_crawler.crawl(
             url, 
@@ -434,6 +518,30 @@ class EnhancedCrawlerManager:
                 'tier_used': 'All Failed'
             }
         
+    def _fetch_basic_http(self, url: str) -> Optional[str]:
+        """Basic HTTP request with minimal headers (Level 1)"""
+        try:
+            import requests
+            
+            headers = {
+                'User-Agent': 'DriveShopMediaMonitorBot/1.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            }
+            
+            logger.info(f"Making basic HTTP request to {url}")
+            response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+            
+            if response.status_code == 200:
+                logger.info(f"Basic HTTP success for {url} ({len(response.text)} chars)")
+                return response.text
+            else:
+                logger.warning(f"Basic HTTP failed for {url}: HTTP {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Basic HTTP error for {url}: {e}")
+            return None
+
     def close(self):
         """Clean up resources"""
         try:
@@ -488,11 +596,12 @@ class EnhancedCrawlerManager:
         # Step 4: Crawl the BEST relevant article (like YouTube specific video)
         logger.info(f"Step 4: Crawling best relevant article")
         for score, article_url, article_title in relevant_articles:
-            logger.info(f"🎯 Trying article: {article_title} (score: {score}) - {article_url}")
+            logger.info(f"🎯 INDEX DISCOVERY TRYING: {article_title} (score: {score}) - {article_url}")
+            logger.info(f"🔍 IMPORTANT: This is the article that will be crawled and checked for dates!")
             
             article_result = self._crawl_specific_url(article_url, make, model)
             if article_result['success']:
-                logger.info(f"✅ Successfully crawled specific article: {article_url}")
+                logger.info(f"✅ INDEX DISCOVERY SUCCESS: Successfully crawled specific article: {article_url}")
                 return {
                     'success': True,
                     'content': article_result['content'],
@@ -508,30 +617,138 @@ class EnhancedCrawlerManager:
                     }
                 }
             else:
-                logger.warning(f"❌ Failed to crawl article: {article_url}")
+                logger.warning(f"❌ INDEX DISCOVERY FAILED to crawl article: {article_url}")
+                logger.warning(f"❌ Reason: {article_result.get('error', 'Unknown error')}")
                 
         logger.warning(f"❌ All relevant articles failed to crawl")
         return None
 
     def _scrape_index_page(self, index_url: str) -> Optional[str]:
-        """Scrape the index page content using our available methods"""
+        """Scrape MULTIPLE PAGES of the index with PAGINATION SUPPORT"""
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin, urlparse
         
-        # Try Enhanced HTTP first (fast and free)
-        logger.info(f"Trying Enhanced HTTP for index page: {index_url}")
-        content = self.enhanced_http.fetch_url(index_url)
-        if content and len(content) > 1000:  # Reasonable content size
-            logger.info(f"✅ Enhanced HTTP got index page ({len(content)} chars)")
-            return content
+        logger.info(f"🔍 PAGINATION: Starting multi-page scraping for {index_url}")
+        
+        all_content = ""
+        page_count = 0
+        max_pages = 5  # Reasonable limit to avoid infinite loops
+        current_url = index_url
+        visited_urls = set()
+        
+        while current_url and page_count < max_pages and current_url not in visited_urls:
+            page_count += 1
+            visited_urls.add(current_url)
             
-        # Try ScrapingBee if Enhanced HTTP fails
-        logger.info(f"Enhanced HTTP failed, trying ScrapingBee for index page: {index_url}")
-        content = self.scraping_bee.scrape_url(index_url)
-        if content and len(content) > 1000:
-            logger.info(f"✅ ScrapingBee got index page ({len(content)} chars)")
-            return content
+            logger.info(f"📄 PAGINATION: Scraping page {page_count}: {current_url}")
             
-        logger.warning(f"❌ Both Enhanced HTTP and ScrapingBee failed for index page")
-        return None
+            # Try Enhanced HTTP first (fast and free)
+            page_content = self.enhanced_http.fetch_url(current_url)
+            if not page_content or len(page_content) < 1000:
+                # Try ScrapingBee if Enhanced HTTP fails
+                logger.info(f"Enhanced HTTP failed for page {page_count}, trying ScrapingBee")
+                page_content = self.scraping_bee.scrape_url(current_url)
+                
+            if page_content and len(page_content) > 1000:
+                logger.info(f"✅ PAGINATION: Got page {page_count} content ({len(page_content)} chars)")
+                all_content += page_content + "\n<!-- PAGE_BREAK -->\n"
+                
+                # Look for "Next Page" link for pagination
+                next_url = self._find_next_page_url(page_content, current_url)
+                if next_url and next_url != current_url:
+                    logger.info(f"🔗 PAGINATION: Found next page URL: {next_url}")
+                    current_url = next_url
+                else:
+                    logger.info(f"🛑 PAGINATION: No more pages found after page {page_count}")
+                    break
+            else:
+                logger.warning(f"❌ PAGINATION: Failed to get content for page {page_count}")
+                break
+                
+        if all_content:
+            logger.info(f"✅ PAGINATION: Successfully scraped {page_count} pages ({len(all_content)} total chars)")
+            return all_content
+        else:
+            logger.warning(f"❌ PAGINATION: Failed to scrape any pages")
+            return None
+    
+    def _find_next_page_url(self, html_content: str, current_url: str) -> Optional[str]:
+        """Find the 'Next Page' URL for pagination"""
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin
+        
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Common pagination selectors for WordPress and other CMS
+            next_selectors = [
+                'a.next',
+                'a[rel="next"]',
+                '.pagination a[aria-label*="next" i]',
+                '.pagination a[title*="next" i]',
+                '.nav-links a[aria-label*="next" i]',
+                '.page-numbers a.next',
+                '.pagination-next a',
+                'a:contains("Next")',
+                'a:contains("→")',
+                'a:contains("›")',
+                'a:contains("»")',
+                '.wp-pagenavi a.nextpostslink',
+                '.navigation a[title*="next" i]'
+            ]
+            
+            for selector in next_selectors:
+                try:
+                    if ':contains(' in selector:
+                        # Handle text-based selectors differently
+                        if 'Next' in selector:
+                            next_links = soup.find_all('a', string=lambda text: text and 'next' in text.lower())
+                        elif '→' in selector:
+                            next_links = soup.find_all('a', string=lambda text: text and '→' in str(text))
+                        elif '›' in selector:
+                            next_links = soup.find_all('a', string=lambda text: text and '›' in str(text))
+                        elif '»' in selector:
+                            next_links = soup.find_all('a', string=lambda text: text and '»' in str(text))
+                        else:
+                            continue
+                    else:
+                        next_links = soup.select(selector)
+                    
+                    for link in next_links:
+                        href = link.get('href', '')
+                        if href:
+                            next_url = urljoin(current_url, href)
+                            logger.info(f"🔗 PAGINATION: Found next page with selector '{selector}': {next_url}")
+                            return next_url
+                except Exception as e:
+                    logger.debug(f"Error with selector {selector}: {e}")
+                    continue
+                    
+            # Fallback: Look for numbered pagination (page/2, page/3, etc.)
+            base_url = current_url.rstrip('/')
+            if '/page/' in current_url:
+                # Extract current page number and increment
+                parts = current_url.split('/page/')
+                if len(parts) == 2:
+                    try:
+                        current_page = int(parts[1].split('/')[0])
+                        next_page_url = f"{parts[0]}/page/{current_page + 1}/"
+                        logger.info(f"🔗 PAGINATION: Generated next page URL: {next_page_url}")
+                        return next_page_url
+                    except ValueError:
+                        pass
+            else:
+                # Try adding /page/2/ to base URL
+                next_page_url = f"{base_url}/page/2/"
+                logger.info(f"🔗 PAGINATION: Trying page 2 URL: {next_page_url}")
+                return next_page_url
+                
+            logger.info(f"🛑 PAGINATION: No next page found for {current_url}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ PAGINATION: Error finding next page: {e}")
+            return None
 
     def _extract_article_links_from_index(self, html_content: str, base_url: str) -> List[str]:
         """Extract article links from index page HTML (like extracting video links from YouTube)"""
@@ -558,7 +775,8 @@ class EnhancedCrawlerManager:
                 'h2 a[href]', 
                 'h3 a[href]',
                 '.headline a[href]',
-                '.title a[href]'
+                '.title a[href]',
+                'a[href]'  # CATCH-ALL: Get ALL links, filter by domain and relevance later
             ]
             
             logger.info(f"🔍 DEBUG: Extracting article links from {base_url}")
@@ -592,148 +810,143 @@ class EnhancedCrawlerManager:
             for i, link in enumerate(links[:10]):
                 logger.info(f"  {i+1}. {link}")
                 
-            return links[:50]  # Limit to top 50 links to avoid overwhelming
+            return links[:100]  # Increased from 50 to 100 to search deeper pagination
             
         except Exception as e:
             logger.error(f"❌ Error extracting article links: {e}")
             return []
 
     def _find_relevant_articles(self, article_links: List[str], make: str, model: str, person_name: str) -> List[tuple]:
-        """Find articles relevant to the vehicle make/model (like searching YouTube transcripts)"""
+        """Find articles with FLEXIBLE Make + Model matching - BROADER SEARCH for better results"""
         relevant_articles = []
         
-        # Use hierarchical model search (like our Google Search)
-        model_variations = self._generate_model_variations(model)
-        logger.info(f"🔍 Searching with model variations: {model_variations}")
-        logger.info(f"🔍 DEBUG: Looking for articles about {make} {model} from {len(article_links)} total links")
+        make_lower = make.lower()
+        model_lower = model.lower()
+        
+        # For Camry Hybrid - split into base model and variant for more flexible search
+        model_parts = model_lower.split()
+        base_model = model_parts[0] if model_parts else model_lower  # "camry" from "camry hybrid"
+        variant = model_parts[1] if len(model_parts) > 1 else ""      # "hybrid" from "camry hybrid"
+        
+        # Create COMPREHENSIVE model variations (handle dashes, spaces, years, etc.)
+        model_variations = [
+            model_lower,                      # "camry hybrid"
+            base_model,                       # "camry" (BROADER SEARCH - key for finding more articles)
+            model_lower.replace(' ', ''),     # "camryhybrid"
+            model_lower.replace(' ', '-'),    # "camry-hybrid"
+            model_lower.replace('-', ''),     # "cx5" (for CX-5)
+            model_lower.replace('-', ' '),    # "cx 5"
+        ]
+        
+        # Add year variants for recent years (2023-2025)
+        current_year = 2025
+        for year in [current_year, current_year-1, current_year-2]:  # 2025, 2024, 2023
+            model_variations.extend([
+                f"{year} {base_model}",       # "2025 camry"
+                f"{base_model} {year}",       # "camry 2025"  
+                f"{year} {model_lower}",      # "2025 camry hybrid"
+                f"{model_lower} {year}",      # "camry hybrid 2025"
+            ])
+        
+        # Remove duplicates and filter out empty strings
+        model_variations = list(set([v for v in model_variations if v.strip()]))
+        
+        logger.info(f"🔍 FLEXIBLE SEARCH: Looking for articles about '{make}' '{model}'")
+        logger.info(f"🔍 Base model: '{base_model}', Variant: '{variant}'")
+        logger.info(f"🔍 Model variations ({len(model_variations)}): {model_variations[:15]}...")  # Show first 15
+        logger.info(f"🔍 Searching through {len(article_links)} total article links...")
         
         for i, article_url in enumerate(article_links):
             try:
-                logger.info(f"🔍 DEBUG: Processing article {i+1}/{len(article_links)}: {article_url}")
+                url_lower = article_url.lower()
+                title = self._extract_title_from_url(article_url)
+                title_lower = title.lower()
                 
-                # Score the URL and title for relevance
-                score = self._score_article_relevance(article_url, make, model_variations, person_name)
+                # TIER 1: Check for exact make + model match (perfect)
+                has_make_url = make_lower in url_lower
+                has_make_title = make_lower in title_lower
+                has_make = has_make_url or has_make_title
                 
-                if score > 0:  # Only include potentially relevant articles
-                    # Extract title from URL for display
-                    title = self._extract_title_from_url(article_url)
+                has_full_model_url = any(variation in url_lower for variation in model_variations)
+                has_full_model_title = any(variation in title_lower for variation in model_variations)
+                has_full_model = has_full_model_url or has_full_model_title
+                matching_variation = next((var for var in model_variations if var in url_lower or var in title_lower), None)
+                
+                # TIER 2: Check for base model only (broader search)
+                has_base_model_url = base_model in url_lower
+                has_base_model_title = base_model in title_lower
+                has_base_model = has_base_model_url or has_base_model_title
+                
+                # TIER 3: Check for variant only (like "hybrid")
+                has_variant_url = variant and variant in url_lower
+                has_variant_title = variant and variant in title_lower
+                has_variant = has_variant_url or has_variant_title
+                
+                if i < 30:  # Debug first 30 URLs to see what we're finding
+                    logger.info(f"🔍 {i+1}/{len(article_links)}: {article_url}")
+                    logger.info(f"  Title: '{title}'")
+                    logger.info(f"  Make '{make}' found: URL={has_make_url}, Title={has_make_title}")
+                    logger.info(f"  Full model found: URL={has_full_model_url}, Title={has_full_model_title} (variation: {matching_variation})")
+                    logger.info(f"  Base model '{base_model}' found: URL={has_base_model_url}, Title={has_base_model_title}")
+                    if variant:
+                        logger.info(f"  Variant '{variant}' found: URL={has_variant_url}, Title={has_variant_title}")
+                
+                score = 0
+                match_type = ""
+                
+                if has_make and has_full_model:
+                    # PERFECT MATCH: Make + Full Model
+                    score = 1000
+                    match_type = f"PERFECT: {make} + {matching_variation}"
+                elif has_full_model:
+                    # EXCELLENT: Full Model without make
+                    score = 800
+                    match_type = f"EXCELLENT: {matching_variation} (no make)"
+                elif has_make and has_base_model and has_variant:
+                    # VERY GOOD: Make + Base Model + Variant (e.g., Toyota + Camry + Hybrid)
+                    score = 700
+                    match_type = f"VERY GOOD: {make} + {base_model} + {variant}"
+                elif has_base_model and has_variant:
+                    # GOOD: Base Model + Variant (no make) (e.g., Camry + Hybrid)
+                    score = 600
+                    match_type = f"GOOD: {base_model} + {variant} (no make)"
+                elif has_make and has_base_model:
+                    # DECENT: Make + Base Model only (e.g., Toyota + Camry)
+                    score = 500
+                    match_type = f"DECENT: {make} + {base_model}"
+                elif has_base_model:
+                    # FAIR: Base Model only (e.g., Camry only)
+                    score = 300
+                    match_type = f"FAIR: {base_model} only"
+                    
+                if score > 0:
                     relevant_articles.append((score, article_url, title))
-                    logger.info(f"📰 Relevant: {title} (score: {score})")
-                else:
-                    logger.info(f"❌ DEBUG: Article scored {score}, not relevant: {article_url}")
+                    logger.info(f"✅ {match_type}: {title} - {article_url}")
                     
             except Exception as e:
-                logger.warning(f"❌ Error scoring article {article_url}: {e}")
+                logger.warning(f"❌ Error checking article {article_url}: {e}")
                 
         # Sort by relevance score (highest first)
         relevant_articles.sort(key=lambda x: x[0], reverse=True)
         
-        logger.info(f"🔍 DEBUG: Final relevant articles for {make} {model}:")
-        for i, (score, url, title) in enumerate(relevant_articles[:5]):
-            logger.info(f"  {i+1}. Score: {score}, Title: {title}, URL: {url}")
+        logger.info(f"🎯 FINAL SEARCH RESULTS for {make} {model}:")
+        if relevant_articles:
+            logger.info(f"📄 Found {len(relevant_articles)} relevant articles (showing top 15):")
+            for i, (score, url, title) in enumerate(relevant_articles[:15]):
+                logger.info(f"  {i+1}. Score: {score}, Title: {title}")
+                logger.info(f"       URL: {url}")
+                
+            # CRITICAL DEBUG: Show which article will be selected first
+            best_score, best_url, best_title = relevant_articles[0]
+            logger.info(f"🚨 WILL SELECT FIRST: {best_title} (Score: {best_score})")
+            logger.info(f"🚨 WILL SELECT URL: {best_url}")
+        else:
+            logger.warning(f"❌ NO RELEVANT ARTICLES FOUND for {make} {model}")
+            logger.warning(f"❌ Searched {len(article_links)} links")
+            logger.warning(f"❌ Base model: '{base_model}', Variant: '{variant}', Make: '{make}'")
+            logger.warning(f"❌ Model variations: {model_variations[:10]}...")
             
         return relevant_articles[:10]  # Return top 10 most relevant
-
-    def _generate_model_variations(self, model: str) -> List[str]:
-        """Generate model variations for searching (reuse hierarchical logic)"""
-        if not model or not model.strip():
-            return [""]
-        
-        model = model.strip()
-        variations = [model]  # Start with full model
-        
-        # Split by common separators and create variations
-        words = model.replace('-', ' ').replace('_', ' ').split()
-        
-        # Add progressively shorter variations
-        for i in range(len(words) - 1, 0, -1):
-            variation = ' '.join(words[:i])
-            if variation not in variations and len(variation) >= 2:
-                variations.append(variation)
-                
-        return variations
-
-    def _score_article_relevance(self, url: str, make: str, model_variations: List[str], person_name: str) -> int:
-        """Score how relevant an article URL is to our search (like scoring YouTube videos)"""
-        import re
-        
-        score = 0
-        url_lower = url.lower()
-        
-        # DEBUG: Log what we're trying to match
-        logger.info(f"🔍 Scoring URL for model variations {model_variations}: {url}")
-        
-        # HIGH SCORE: Make mentioned in URL
-        if make.lower() in url_lower:
-            score += 100
-            logger.info(f"✅ Make '{make}' found in URL, +100 score")
-            
-        # HIGH SCORE: Exact model variation match in URL
-        model_matched = False
-        for model_var in model_variations:
-            if not model_var or len(model_var.strip()) < 2:
-                continue
-                
-            model_lower = model_var.lower().strip()
-            logger.info(f"🔍 Trying to match model variation: '{model_var}' against URL: {url}")
-            
-            # For hyphenated models like "cx-5", "cx-90", we need exact matching
-            # Create pattern that matches the exact model with word boundaries
-            if '-' in model_lower:
-                # For hyphenated models, ensure exact match with boundaries
-                pattern = r'\b' + re.escape(model_lower) + r'\b'
-                logger.info(f"🔍 Using hyphenated pattern: {pattern}")
-                if re.search(pattern, url_lower):
-                    score += 200
-                    model_matched = True
-                    logger.info(f"✅ Exact hyphenated model match: '{model_var}' found in {url}, +200 score")
-                    break
-                else:
-                    logger.info(f"❌ Hyphenated pattern '{pattern}' did NOT match in '{url_lower}'")
-            else:
-                # For non-hyphenated models, use flexible word boundary matching
-                pattern = r'\b' + re.escape(model_lower.replace(' ', r'[-\s_]*')) + r'\b'
-                logger.info(f"🔍 Using flexible pattern: {pattern}")
-                if re.search(pattern, url_lower):
-                    score += 200
-                    model_matched = True
-                    logger.info(f"✅ Model match: '{model_var}' found in {url}, +200 score")
-                    break
-                else:
-                    logger.info(f"❌ Flexible pattern '{pattern}' did NOT match in '{url_lower}'")
-                        
-        if not model_matched:
-            logger.info(f"❌ No model match for {model_variations} in {url}")
-                
-        # MEDIUM SCORE: Review/test keywords in URL
-        review_keywords = ['review', 'test', 'drive', 'first', 'road', 'preview']
-        for keyword in review_keywords:
-            if keyword in url_lower:
-                score += 50
-                logger.info(f"✅ Review keyword '{keyword}' found, +50 score")
-                break
-                
-        # BONUS: Author/person name in URL
-        if person_name and person_name.lower().replace(' ', '-') in url_lower:
-            score += 75
-            logger.info(f"✅ Author '{person_name}' found, +75 score")
-            
-        # BONUS: Year indicators
-        for year in ['2024', '2025', '2026']:
-            if year in url_lower:
-                score += 25
-                logger.info(f"✅ Year '{year}' found, +25 score")
-                break
-                
-        # PENALTY: Category/tag pages
-        penalty_patterns = ['/category/', '/tag/', '/author/', '/search', '/archive', '/page/']
-        for pattern in penalty_patterns:
-            if pattern in url_lower:
-                score -= 150
-                logger.info(f"❌ Penalty pattern '{pattern}' found, -150 score")
-                
-        logger.info(f"🎯 Final score for {url}: {score}")
-        return score
 
     def _extract_title_from_url(self, url: str) -> str:
         """Extract a readable title from URL path"""

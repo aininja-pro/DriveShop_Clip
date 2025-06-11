@@ -651,87 +651,49 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Get person name for caching if available
         person_name = loan.get('to', loan.get('affiliation', ''))
         
-        # Try to crawl with date filtering (graceful degradation: 90 -> 180 days forward)
+        # DISABLED DATE FILTERING: Accept any successfully crawled content
+        # Date logic was buggy (showing April 2025 as "156 days BEFORE" Feb 2025)
+        # GPT can handle relevance filtering instead
+        logger.info(f"🔓 Date filtering DISABLED - accepting any successfully crawled content")
+        
+        # Get person name for caching if available
         start_date = loan.get('start_date')
-        content_result = None
-        days_attempted = [90, 180]  # Graceful degradation: 90 days forward, then 180 days forward
         
-        for days_forward in days_attempted:
-            logger.info(f"Attempting to find content within {days_forward} days forward of start date")
-            
-            # Use the new enhanced crawler with 5-tier escalation and hierarchical search
-            result = crawler_manager.crawl_url(
-                url=url,
-                make=make,
-                model=search_model,  # Use the hierarchical search model
-                person_name=person_name
-            )
-            
-            if not result['success']:
-                error_msg = result.get('error', 'Unknown error')
-                logger.warning(f"Error crawling {url}: {error_msg} (Method: {result.get('tier_used', 'Unknown')})")
-                continue
-                
-            if not result.get('content'):
-                logger.warning(f"No content retrieved from {url}")
-                continue
-            
-            # Extract publication date from the HTML content
-            # The content field contains the HTML when using ScrapingBee or Enhanced HTTP
-            html_content = result.get('content', '')
-            final_url = result.get('url', url)
-            
-            if html_content:
-                content_date = extract_date_from_html(html_content, final_url)
-                
-                # Check if content is within the acceptable date range
-                if is_content_within_date_range(content_date, start_date, days_forward):
-                    if content_date and start_date:
-                        days_diff = (content_date - start_date).days
-                        logger.info(f"✅ Content found within date range: published {days_diff} days after start date")
-                    else:
-                        logger.info(f"✅ Content found within date range (dates available)")
-                    
-                    content_result = result
-                    break
-                else:
-                    if content_date and start_date:
-                        if content_date < start_date:
-                            days_diff = (start_date - content_date).days
-                            logger.info(f"❌ Content too old: published {days_diff} days BEFORE start date (articles should be after loan placement)")
-                        else:
-                            days_diff = (content_date - start_date).days
-                            logger.info(f"❌ Content too far in future: published {days_diff} days after start date (limit: {days_forward})")
-                        
-                        # If this is our last attempt (180 days), only allow if it's not extremely old
-                        if days_forward == 180:
-                            if content_date and start_date and content_date < start_date:
-                                days_old = (start_date - content_date).days
-                                # BALANCED: Allow content within 120 days before start (blocks ancient content but keeps recent relevant articles)
-                                if days_old <= 120:
-                                    logger.info(f"⚠️ Final attempt - allowing slightly old content ({days_old} days before start)")
-                                    content_result = result
-                                    break
-                                else:
-                                    logger.info(f"❌ Content is too old even for final attempt ({days_old} days before start date) - blocking ancient content to save credits")
-                            else:
-                                # For content with unknown dates, allow it in final attempt (might be recent)
-                                logger.info(f"⚠️ Final attempt - allowing content with unknown publication date")
-                                content_result = result
-                                break
-                    else:
-                        logger.info(f"⚠️ Could not determine content date, trying next time window")
-            else:
-                # No HTML content available for date extraction
-                logger.info(f"⚠️ No HTML content available for date extraction, allowing content")
-                content_result = result
-                break
+        # Use the new enhanced crawler with 5-tier escalation and hierarchical search
+        result = crawler_manager.crawl_url(
+            url=url,
+            make=make,
+            model=search_model,  # Use the hierarchical search model
+            person_name=person_name
+        )
         
-        if not content_result:
-            logger.warning(f"No content found within acceptable date ranges for {url}")
+        if not result['success']:
+            error_msg = result.get('error', 'Unknown error')
+            logger.warning(f"Error crawling {url}: {error_msg} (Method: {result.get('tier_used', 'Unknown')})")
+            return None
+            
+        if not result.get('content'):
+            logger.warning(f"No content retrieved from {url}")
             return None
         
-        result = content_result
+        # Extract publication date for logging purposes only (not for filtering)
+        html_content = result.get('content', '')
+        final_url = result.get('url', url)
+        
+        if html_content and start_date:
+            content_date = extract_date_from_html(html_content, final_url)
+            if content_date:
+                days_diff = (content_date - start_date).days
+                if days_diff >= 0:
+                    logger.info(f"📅 Content found: published {days_diff} days after start date (date filtering disabled)")
+                else:
+                    logger.info(f"📅 Content found: published {abs(days_diff)} days before start date (date filtering disabled)")
+            else:
+                logger.info(f"📅 Content found: publication date unknown (date filtering disabled)")
+        else:
+            logger.info(f"📅 Content found: no date information available (date filtering disabled)")
+            
+        logger.info(f"✅ Successfully crawled content - bypassing date restrictions")
             
         # Log which tier was successful
         tier_used = result.get('tier_used', 'Unknown')
