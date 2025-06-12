@@ -4,6 +4,7 @@ import logging
 import time
 from typing import Optional, Dict, Any
 from urllib.parse import urlparse
+import json
 
 from src.utils.logger import setup_logger
 
@@ -84,7 +85,7 @@ class ScrapingBeeClient:
                 'render_js': str(render_js).lower(),
                 'premium_proxy': str(premium_proxy or is_youtube).lower(),  # Use premium for YouTube
                 'country_code': 'us',
-                'wait': wait_time,
+                'wait': 5000,  # YouTube-specific wait time
                 'wait_for': '#contents',  # YouTube-specific selector
                 'block_ads': 'true',
                 'block_resources': 'false'

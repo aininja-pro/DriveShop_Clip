@@ -502,6 +502,7 @@ def _create_fallback_metadata_with_title(video_id, title, url):
 def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: str) -> Optional[List[Dict[str, Any]]]:
     """
     Scrape YouTube channel page using ScrapingBee to get raw HTML and parse manually.
+    Falls back to YouTube API if ScrapingBee fails.
     
     Args:
         channel_url: YouTube channel URL (e.g., https://www.youtube.com/@TheCarCareNutReviews/videos)
@@ -526,8 +527,8 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
         )
         
         if not test_content:
-            logger.warning("⚠️ ScrapingBee API test failed - cannot connect to ScrapingBee")
-            return None
+            logger.warning("⚠️ ScrapingBee API test failed - falling back to YouTube API")
+            return _fallback_to_youtube_api(channel_url, make, model)
         else:
             logger.info("✅ ScrapingBee API test successful - proceeding with YouTube scraping")
         
@@ -549,9 +550,9 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                 premium_proxy=True  # Essential for YouTube
             )
             
-            if not html_content:
-                logger.error("❌ ScrapingBee failed to get YouTube channel HTML")
-                return None
+            if not html_content or len(html_content) < 1000:
+                logger.warning(f"❌ ScrapingBee returned insufficient content ({len(html_content) if html_content else 0} chars) - falling back to YouTube API")
+                return _fallback_to_youtube_api(channel_url, make, model)
                 
             logger.info(f"✅ ScrapingBee successfully scraped YouTube channel! ({len(html_content)} chars)")
             
@@ -597,7 +598,7 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                                     'video_id': video_id,
                                     'title': title,
                                     'url': f"https://www.youtube.com/watch?v={video_id}",
-                                    'method': 'beautifulsoup_id_selector'
+                                    'method': 'scrapingbee'
                                 }
                                 
                                 videos_found.append(video_info)
@@ -607,89 +608,99 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                         logger.warning(f"   ❌ Error processing video {i+1}: {e}")
                         continue
                 
-                logger.info(f"🎬 BeautifulSoup method: Found {len(videos_found)} valid videos")
+                logger.info(f"🎬 ScrapingBee method: Found {len(videos_found)} valid videos")
                 
-                # If BeautifulSoup method worked, use it
+                # If ScrapingBee found videos, use them
                 if videos_found:
-                    logger.info("✅ BeautifulSoup extraction successful!")
+                    logger.info("✅ ScrapingBee extraction successful!")
+                    
+                    # Filter for relevant videos
+                    relevant_videos = []
+                    make_lower = make.lower()
+                    model_lower = model.lower()
+                    
+                    # Create model variations
+                    model_variations = [
+                        model_lower,
+                        model_lower.replace('3', ' 3'),  # mazda3 -> mazda 3
+                        model_lower.replace('mazda3', 'mazda 3'),
+                    ]
+                    
+                    logger.info(f"Filtering {len(videos_found)} videos for make='{make}' and model variations: {model_variations}")
+                    
+                    # 🚀 SHOW MORE DEBUG INFO: Display first 50 videos instead of just 25
+                    logger.info("🔍 DEBUG: All video titles extracted by ScrapingBee:")
+                    for i, video in enumerate(videos_found[:50]):  # Show first 50 for debugging (to catch video #33)
+                        logger.info(f"  {i+1}. '{video['title']}'")
+                    
+                    for video in videos_found:
+                        title_lower = video['title'].lower()
+                        
+                        # DEBUG: Show what we're checking
+                        logger.info(f"🔍 Checking video: '{video['title']}'")
+                        logger.info(f"   Title (lowercase): '{title_lower}'")
+                        logger.info(f"   Looking for make: '{make_lower}' in title")
+                        
+                        # Check if title contains make and any model variation
+                        if make_lower in title_lower:
+                            logger.info(f"   ✅ Found make '{make_lower}' in title!")
+                            for model_var in model_variations:
+                                logger.info(f"   🔍 Checking for model variation: '{model_var}'")
+                                if model_var in title_lower:
+                                    logger.info(f"🎯 ScrapingBee found relevant video: {video['title']}")
+                                    relevant_videos.append(video)
+                                    break
+                                else:
+                                    logger.info(f"   ❌ Model variation '{model_var}' not found")
+                        else:
+                            logger.info(f"   ❌ Make '{make_lower}' not found in title")
+                    
+                    logger.info(f"🎬 ScrapingBee found {len(relevant_videos)} relevant videos for {make} {model}")
+                    
+                    if relevant_videos:
+                        return relevant_videos[:10]  # Return top 10 most relevant
+                    else:
+                        logger.warning("ScrapingBee found videos but none were relevant - falling back to YouTube API")
+                        return _fallback_to_youtube_api(channel_url, make, model)
+                        
+                else:
+                    logger.warning("ScrapingBee extracted no videos - falling back to YouTube API")
+                    return _fallback_to_youtube_api(channel_url, make, model)
                     
             except Exception as e:
-                logger.error(f"BeautifulSoup parsing failed: {e}")
-                videos_found = []
-            
-            # Fallback: Try alternative selectors if main method failed
-            if not videos_found:
-                logger.info("🔄 Trying alternative CSS selectors...")
-                try:
-                    # Alternative approach: Look for yt-formatted-string elements
-                    title_elements = soup.find_all('yt-formatted-string')
-                    
-                    # 🚀 REMOVED 20-ELEMENT LIMIT: Process ALL elements found
-                    for elem in title_elements:
-                        title = elem.get_text(strip=True)
-                        if title and len(title) > 15 and ('review' in title.lower() or 'buy' in title.lower()):
-                            logger.info(f"🔍 Found potential title: {title}")
-                            
-                except Exception as e:
-                    logger.warning(f"Alternative selector method failed: {e}")
-            
-            # If still no videos, fall back to original regex (but improve it)
-            if not videos_found:
-                logger.warning("🔄 Falling back to improved regex extraction...")
-                # ... (keep original regex as fallback)
-            
-            # Filter for relevant videos
-            relevant_videos = []
-            if videos_found:
-                make_lower = make.lower()
-                model_lower = model.lower()
-                
-                # Create model variations
-                model_variations = [
-                    model_lower,
-                    model_lower.replace('3', ' 3'),  # mazda3 -> mazda 3
-                    model_lower.replace('mazda3', 'mazda 3'),
-                ]
-                
-                logger.info(f"Filtering {len(videos_found)} videos for make='{make}' and model variations: {model_variations}")
-                
-                # 🚀 SHOW MORE DEBUG INFO: Display first 25 videos instead of just 10
-                logger.info("🔍 DEBUG: All video titles extracted by ScrapingBee:")
-                for i, video in enumerate(videos_found[:25]):  # Show first 25 for debugging
-                    logger.info(f"  {i+1}. '{video['title']}'")
-                
-                for video in videos_found:
-                    title_lower = video['title'].lower()
-                    
-                    # DEBUG: Show what we're checking
-                    logger.info(f"🔍 Checking video: '{video['title']}'")
-                    logger.info(f"   Title (lowercase): '{title_lower}'")
-                    logger.info(f"   Looking for make: '{make_lower}' in title")
-                    
-                    # Check if title contains make and any model variation
-                    if make_lower in title_lower:
-                        logger.info(f"   ✅ Found make '{make_lower}' in title!")
-                        for model_var in model_variations:
-                            logger.info(f"   🔍 Checking for model variation: '{model_var}'")
-                            if model_var in title_lower:
-                                logger.info(f"🎯 ScrapingBee found relevant video: {video['title']}")
-                                relevant_videos.append(video)
-                                break
-                            else:
-                                logger.info(f"   ❌ Model variation '{model_var}' not found")
-                    else:
-                        logger.info(f"   ❌ Make '{make_lower}' not found in title")
-                
-                logger.info(f"🎬 ScrapingBee found {len(relevant_videos)} relevant videos for {make} {model}")
-                return relevant_videos[:10]  # Return top 10 most relevant
-            else:
-                logger.warning("ScrapingBee extracted no videos from YouTube channel HTML")
-                return None
+                logger.error(f"BeautifulSoup parsing failed: {e} - falling back to YouTube API")
+                return _fallback_to_youtube_api(channel_url, make, model)
                 
         except Exception as e:
-            logger.error(f"Error processing ScrapingBee YouTube response: {e}")
-            return None
+            logger.error(f"Error processing ScrapingBee YouTube response: {e} - falling back to YouTube API")
+            return _fallback_to_youtube_api(channel_url, make, model)
         
     except Exception as e:
-        logger.error(f"Error scraping YouTube channel with ScrapingBee: {e}")
+        logger.error(f"Error scraping YouTube channel with ScrapingBee: {e} - falling back to YouTube API")
+        return _fallback_to_youtube_api(channel_url, make, model)
+
+def _fallback_to_youtube_api(channel_url: str, make: str, model: str) -> Optional[List[Dict[str, Any]]]:
+    """
+    Fallback to YouTube API when ScrapingBee fails.
+    Provides unlimited video access to find videos at position 33+.
+    """
+    try:
+        from src.utils.youtube_api import YouTubeAPIClient
+        
+        logger.info("🔄 Falling back to YouTube Data API v3...")
+        
+        api_client = YouTubeAPIClient()
+        
+        # Use YouTube API to search channel
+        relevant_videos = api_client.search_channel_for_videos(channel_url, make, model)
+        
+        if relevant_videos:
+            logger.info(f"✅ YouTube API found {len(relevant_videos)} relevant videos for {make} {model}")
+            return relevant_videos
+        else:
+            logger.warning(f"❌ YouTube API found no relevant videos for {make} {model}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"YouTube API fallback failed: {e}")
         return None 
