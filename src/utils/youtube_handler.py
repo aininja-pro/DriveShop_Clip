@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 from bs4 import BeautifulSoup
 
 # Import local modules
@@ -499,7 +500,7 @@ def _create_fallback_metadata_with_title(video_id, title, url):
         'url': url
     }
 
-def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: str) -> Optional[List[Dict[str, Any]]]:
+def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90) -> Optional[List[Dict[str, Any]]]:
     """
     Scrape YouTube channel page using ScrapingBee to get raw HTML and parse manually.
     Falls back to YouTube API if ScrapingBee fails.
@@ -528,7 +529,7 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
         
         if not test_content:
             logger.warning("⚠️ ScrapingBee API test failed - falling back to YouTube API")
-            return _fallback_to_youtube_api(channel_url, make, model)
+            return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
         else:
             logger.info("✅ ScrapingBee API test successful - proceeding with YouTube scraping")
         
@@ -552,7 +553,7 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
             
             if not html_content or len(html_content) < 1000:
                 logger.warning(f"❌ ScrapingBee returned insufficient content ({len(html_content) if html_content else 0} chars) - falling back to YouTube API")
-                return _fallback_to_youtube_api(channel_url, make, model)
+                return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                 
             logger.info(f"✅ ScrapingBee successfully scraped YouTube channel! ({len(html_content)} chars)")
             
@@ -619,12 +620,9 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                     make_lower = make.lower()
                     model_lower = model.lower()
                     
-                    # Create model variations
-                    model_variations = [
-                        model_lower,
-                        model_lower.replace('3', ' 3'),  # mazda3 -> mazda 3
-                        model_lower.replace('mazda3', 'mazda 3'),
-                    ]
+                    # Create model variations using the improved function
+                    from src.utils.model_variations import generate_model_variations
+                    model_variations = generate_model_variations(make, model)
                     
                     logger.info(f"Filtering {len(videos_found)} videos for make='{make}' and model variations: {model_variations}")
                     
@@ -661,25 +659,25 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                         return relevant_videos[:10]  # Return top 10 most relevant
                     else:
                         logger.warning("ScrapingBee found videos but none were relevant - falling back to YouTube API")
-                        return _fallback_to_youtube_api(channel_url, make, model)
+                        return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                         
                 else:
                     logger.warning("ScrapingBee extracted no videos - falling back to YouTube API")
-                    return _fallback_to_youtube_api(channel_url, make, model)
+                    return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                     
             except Exception as e:
                 logger.error(f"BeautifulSoup parsing failed: {e} - falling back to YouTube API")
-                return _fallback_to_youtube_api(channel_url, make, model)
+                return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                 
         except Exception as e:
             logger.error(f"Error processing ScrapingBee YouTube response: {e} - falling back to YouTube API")
-            return _fallback_to_youtube_api(channel_url, make, model)
+            return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
         
     except Exception as e:
         logger.error(f"Error scraping YouTube channel with ScrapingBee: {e} - falling back to YouTube API")
         return _fallback_to_youtube_api(channel_url, make, model)
 
-def _fallback_to_youtube_api(channel_url: str, make: str, model: str) -> Optional[List[Dict[str, Any]]]:
+def _fallback_to_youtube_api(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90) -> Optional[List[Dict[str, Any]]]:
     """
     Fallback to YouTube API when ScrapingBee fails.
     Provides unlimited video access to find videos at position 33+.
@@ -691,8 +689,8 @@ def _fallback_to_youtube_api(channel_url: str, make: str, model: str) -> Optiona
         
         api_client = YouTubeAPIClient()
         
-        # Use YouTube API to search channel
-        relevant_videos = api_client.search_channel_for_videos(channel_url, make, model)
+        # Use YouTube API to search channel with date filtering
+        relevant_videos = api_client.search_channel_for_videos(channel_url, make, model, start_date, days_forward)
         
         if relevant_videos:
             logger.info(f"✅ YouTube API found {len(relevant_videos)} relevant videos for {make} {model}")

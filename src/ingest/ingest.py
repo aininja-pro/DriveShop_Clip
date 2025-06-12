@@ -578,8 +578,9 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         logger.info(f"🔄 Falling back to ScrapingBee channel search for {make} {model}")
         
         try:
-            # Use ScrapingBee to search the full channel content
-            channel_videos = scrape_channel_videos_with_scrapingbee(url, make, model)
+            # Use ScrapingBee to search the full channel content with date filtering
+            start_date = loan.get('start_date')
+            channel_videos = scrape_channel_videos_with_scrapingbee(url, make, model, start_date, 90)
             
             if channel_videos:
                 logger.info(f"✅ ScrapingBee found {len(channel_videos)} relevant videos in channel")
