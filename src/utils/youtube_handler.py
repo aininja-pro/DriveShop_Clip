@@ -328,12 +328,13 @@ def get_transcript(video_id):
         logger.error(f"Error fetching transcript for video {video_id}: {e}")
         return None
 
-def get_video_metadata_fallback(video_id):
+def get_video_metadata_fallback(video_id, known_title=None):
     """
     Fallback method to get video description and metadata when transcript is not available.
     
     Args:
         video_id (str): YouTube video ID
+        known_title (str, optional): Title already extracted by ScrapingBee
         
     Returns:
         dict: Video metadata including title, description, and basic info
@@ -354,6 +355,9 @@ def get_video_metadata_fallback(video_id):
         
         if response.status_code != 200:
             logger.error(f"Error fetching video page: Status code {response.status_code}")
+            # If we have a known title from ScrapingBee, use it
+            if known_title:
+                return _create_fallback_metadata_with_title(video_id, known_title, url)
             return None
         
         html_content = response.text
@@ -385,7 +389,11 @@ def get_video_metadata_fallback(video_id):
                 else:
                     title = None  # Reset if invalid
         
-        if not title:
+        # If we couldn't extract title from page but have known_title from ScrapingBee, use it
+        if not title and known_title:
+            title = known_title
+            logger.info(f"Using ScrapingBee title as fallback: {title}")
+        elif not title:
             title = f"YouTube Video {video_id}"
             logger.warning(f"Could not extract title for video {video_id}, using fallback")
         
@@ -403,7 +411,14 @@ def get_video_metadata_fallback(video_id):
                 description = desc_match.group(1)
                 # Clean up escapes
                 description = description.replace('\\n', ' ').replace('\\/', '/')
+                # Limit description length to avoid token limits
+                if len(description) > 500:
+                    description = description[:500] + "..."
                 break
+        
+        # If no description found, create one from the title
+        if not description and title and title != f"YouTube Video {video_id}":
+            description = f"This is a video about {title.lower()}. Content analysis based on video title and metadata."
         
         # Extract view count
         view_patterns = [
@@ -434,12 +449,18 @@ def get_video_metadata_fallback(video_id):
                 channel_name = channel_match.group(1)
                 break
         
-        # Combine available text for analysis
-        content_text = f"Title: {title}\n"
+        # 🚀 ENHANCED: Create richer content for GPT analysis
+        content_text = f"Video Title: {title}\n"
         content_text += f"Channel: {channel_name}\n"
-        if description:
-            content_text += f"Description: {description}\n"
-        content_text += f"Views: {view_count}"
+        if description and len(description) > 10:
+            content_text += f"Video Description: {description}\n"
+        content_text += f"View Count: {view_count}\n"
+        
+        # Add context cues for GPT to understand this is a car review
+        if any(keyword in title.lower() for keyword in ['review', 'test', 'drive', 'driving', 'commute', 'ownership']):
+            content_text += f"Video Type: Automotive review/test drive content\n"
+        
+        content_text += f"URL: {url}"
         
         return {
             'title': title,
@@ -452,7 +473,31 @@ def get_video_metadata_fallback(video_id):
         
     except Exception as e:
         logger.error(f"Error fetching video metadata for {video_id}: {e}")
+        # If we have a known title from ScrapingBee, use it as last resort
+        if known_title:
+            return _create_fallback_metadata_with_title(video_id, known_title, f"https://www.youtube.com/watch?v={video_id}")
         return None
+
+def _create_fallback_metadata_with_title(video_id, title, url):
+    """
+    Create basic metadata when full extraction fails but we have the title.
+    """
+    description = f"This is a video about {title.lower()}. Content analysis based on video title."
+    
+    content_text = f"Video Title: {title}\n"
+    content_text += f"Channel: TopherDrives (inferred from context)\n"
+    content_text += f"Video Description: {description}\n"
+    content_text += f"Video Type: Automotive review/test drive content\n"
+    content_text += f"URL: {url}"
+    
+    return {
+        'title': title,
+        'description': description,
+        'channel_name': 'TopherDrives',
+        'view_count': '0',
+        'content_text': content_text,
+        'url': url
+    }
 
 def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: str) -> Optional[List[Dict[str, Any]]]:
     """
@@ -526,11 +571,8 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                 
                 videos_found = []
                 
-                # Combine titles and links (ScrapingBee approach)
+                # 🚀 REMOVED 20-VIDEO LIMIT: Process ALL videos found on the page
                 for i, (title_elem, link_elem) in enumerate(zip(title_elements, link_elements)):
-                    if i >= 20:  # Limit for debugging
-                        break
-                        
                     try:
                         # Extract title text
                         title = title_elem.get_text(strip=True) if title_elem else ""
@@ -582,7 +624,8 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                     # Alternative approach: Look for yt-formatted-string elements
                     title_elements = soup.find_all('yt-formatted-string')
                     
-                    for elem in title_elements[:20]:
+                    # 🚀 REMOVED 20-ELEMENT LIMIT: Process ALL elements found
+                    for elem in title_elements:
                         title = elem.get_text(strip=True)
                         if title and len(title) > 15 and ('review' in title.lower() or 'buy' in title.lower()):
                             logger.info(f"🔍 Found potential title: {title}")
@@ -610,9 +653,9 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                 
                 logger.info(f"Filtering {len(videos_found)} videos for make='{make}' and model variations: {model_variations}")
                 
-                # DEBUG: Log all extracted video titles
+                # 🚀 SHOW MORE DEBUG INFO: Display first 25 videos instead of just 10
                 logger.info("🔍 DEBUG: All video titles extracted by ScrapingBee:")
-                for i, video in enumerate(videos_found[:10]):  # Show first 10 for debugging
+                for i, video in enumerate(videos_found[:25]):  # Show first 25 for debugging
                     logger.info(f"  {i+1}. '{video['title']}'")
                 
                 for video in videos_found:

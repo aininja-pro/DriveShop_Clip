@@ -590,7 +590,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                     if video_id:
                         # Try metadata fallback first since transcript fetching is consistently failing
                         logger.info(f"Trying metadata fallback first for ScrapingBee video: {video_info['title']}")
-                        metadata = get_video_metadata_fallback(video_id)
+                        metadata = get_video_metadata_fallback(video_id, known_title=video_info['title'])
                         if metadata and metadata.get('content_text'):
                             logger.info(f"✅ ScrapingBee + metadata success: {video_info['title']}")
                             return {
