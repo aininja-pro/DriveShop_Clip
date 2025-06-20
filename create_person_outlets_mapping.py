@@ -25,20 +25,18 @@ def fetch_driveshop_data():
     print(f"✅ Loaded {len(df)} records")
     return df
 
-def create_person_outlets_mapping(df: pd.DataFrame) -> Dict[str, List[Dict]]:
+def create_person_outlets_mapping(df: pd.DataFrame):
     """
-    Transform the data into Person_ID to outlets mapping
-    
-    Returns:
-        Dict where key is Person_ID and value is list of outlet dictionaries
+    Transform the data into Person_ID to outlets mapping.
+    The new structure will hold the reporter's name alongside their outlets.
     """
     print("🔧 Creating Person_ID to outlets mapping...")
     
-    # Group by Person_ID
     person_outlets = {}
     
     for _, row in df.iterrows():
         person_id = str(row['Person_ID'])
+        reporter_name = str(row['Reporter_Name'])
         outlet_info = {
             'outlet_name': row['Outlet_Name'],
             'outlet_url': row['Outlet_URL'],
@@ -47,15 +45,19 @@ def create_person_outlets_mapping(df: pd.DataFrame) -> Dict[str, List[Dict]]:
         }
         
         if person_id not in person_outlets:
-            person_outlets[person_id] = []
+            # Initialize the entry with the reporter's name and an empty list for outlets
+            person_outlets[person_id] = {
+                'reporter_name': reporter_name,
+                'outlets': []
+            }
         
-        person_outlets[person_id].append(outlet_info)
+        person_outlets[person_id]['outlets'].append(outlet_info)
     
     print(f"✅ Created mapping for {len(person_outlets)} unique Person_IDs")
     return person_outlets
 
-def save_mapping_files(person_outlets: Dict[str, List[Dict]]):
-    """Save the mapping in multiple formats"""
+def save_mapping_files(person_outlets: dict):
+    """Save the mapping in multiple formats, now including Reporter_Name."""
     
     # Create data directory if it doesn't exist
     import os
@@ -67,12 +69,14 @@ def save_mapping_files(person_outlets: Dict[str, List[Dict]]):
         json.dump(person_outlets, f, indent=2)
     print(f"💾 Saved JSON mapping to {json_file}")
     
-    # Save as CSV (for easy editing/viewing)
+    # Save as CSV (for easy editing/viewing), now with Reporter_Name
     csv_rows = []
-    for person_id, outlets in person_outlets.items():
-        for outlet in outlets:
+    for person_id, data in person_outlets.items():
+        reporter_name = data.get('reporter_name', 'N/A')
+        for outlet in data.get('outlets', []):
             csv_rows.append({
                 'Person_ID': person_id,
+                'Reporter_Name': reporter_name,
                 'Outlet_Name': outlet['outlet_name'],
                 'Outlet_URL': outlet['outlet_url'],
                 'Outlet_ID': outlet['outlet_id'],
@@ -91,8 +95,10 @@ def save_mapping_files(person_outlets: Dict[str, List[Dict]]):
     
     # Show some examples
     print(f"\n📋 Example mappings:")
-    for i, (person_id, outlets) in enumerate(list(person_outlets.items())[:3]):
-        print(f"   Person_ID {person_id}: {len(outlets)} outlets")
+    for i, (person_id, data) in enumerate(list(person_outlets.items())[:3]):
+        reporter_name = data.get('reporter_name', 'N/A')
+        outlets = data.get('outlets', [])
+        print(f"   Person_ID {person_id} ({reporter_name}): {len(outlets)} outlets")
         for outlet in outlets[:2]:  # Show first 2 outlets
             print(f"     - {outlet['outlet_name']} ({outlet['outlet_url']})")
         if len(outlets) > 2:
