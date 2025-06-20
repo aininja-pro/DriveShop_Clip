@@ -54,6 +54,32 @@ except ImportError:
         st.error("Concurrent ingest module not implemented yet")
         return False
 
+def load_person_outlets_mapping():
+    """Load Person_ID to Media Outlets mapping from JSON file"""
+    try:
+        mapping_file = os.path.join(project_root, "data", "person_outlets_mapping.json")
+        if os.path.exists(mapping_file):
+            with open(mapping_file, 'r') as f:
+                mapping = json.load(f)
+            print(f"✅ Loaded Person_ID mapping with {len(mapping)} unique Person_IDs")
+            return mapping
+        else:
+            print("⚠️ Person_ID mapping file not found")
+            return {}
+    except Exception as e:
+        print(f"❌ Error loading Person_ID mapping: {e}")
+        return {}
+
+def get_outlet_options_for_person(person_id, mapping):
+    """Get list of outlet names for a given Person_ID"""
+    if not person_id or not mapping:
+        return []
+    
+    person_id_str = str(person_id)
+    if person_id_str in mapping:
+        return [outlet['outlet_name'] for outlet in mapping[person_id_str]]
+    return []
+
 # Load environment variables
 def load_env():
     """Load environment variables from .env file"""
@@ -663,7 +689,232 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_tab, rejected_tab, analysis_tab = st.tabs(["📋 Bulk Review", "⚠️ Rejected/Issues", "🔍 Detailed Analysis"])
+creatoriq_tab, bulk_tab, rejected_tab, analysis_tab = st.tabs(["🎬 CreatorIQ", "📋 Bulk Review", "⚠️ Rejected/Issues", "🔍 Detailed Analysis"])
+
+# ========== CREATORIQ TAB ==========
+with creatoriq_tab:
+    # Import CreatorIQ modules
+    try:
+        from src.creatoriq import playwright_scraper, parser, exporter
+        
+        # Compact header styling
+        st.markdown("### 🎬 CreatorIQ Scraper")
+        st.markdown("Extract social media post URLs from CreatorIQ campaign reports")
+        
+        # Input section with tight layout
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            url = st.text_input(
+                "CreatorIQ Report URL:",
+                placeholder="https://report.driveshop.com/report/audi_media_spotl-dcMIG3Mp5APt/posts",
+                help="Paste the CreatorIQ campaign report URL here"
+            )
+        
+        with col2:
+            scrolls = st.slider("Scroll cycles:", 5, 50, 20, help="Number of scroll cycles to load all posts")
+        
+        # Action buttons
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            scrape_button = st.button("🚀 Scrape", use_container_width=True)
+        
+        with col2:
+            if st.button("📋 Clear", use_container_width=True):
+                if 'creatoriq_urls' in st.session_state:
+                    del st.session_state.creatoriq_urls
+                if 'creatoriq_export_path' in st.session_state:
+                    del st.session_state.creatoriq_export_path
+                st.rerun()
+        
+        # Scraping logic
+        if scrape_button:
+            if url:
+                with st.spinner("🔄 Scraping CreatorIQ... this may take 1-3 minutes."):
+                    try:
+                        # Get HTML content and API responses with network interception
+                        html, api_responses = playwright_scraper.get_creatoriq_data(url, scrolls=scrolls)
+                        
+                        # Extract URLs using both HTML and captured API responses
+                        urls = parser.extract_social_urls(html, api_responses)
+                        
+                        # Store in session state
+                        st.session_state.creatoriq_urls = urls
+                        
+                        # Create export directory
+                        os.makedirs("data/creatoriq_exports", exist_ok=True)
+                        export_path = f"data/creatoriq_exports/creatoriq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                        
+                        # Export to CSV
+                        exporter.export_to_csv(urls, export_path)
+                        st.session_state.creatoriq_export_path = export_path
+                        
+                        st.success(f"✅ Extraction complete: {len(urls)} URLs found")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error during scraping: {str(e)}")
+            else:
+                st.warning("⚠️ Please enter a valid CreatorIQ report URL")
+        
+        # Results display
+        if 'creatoriq_urls' in st.session_state and st.session_state.creatoriq_urls:
+            urls = st.session_state.creatoriq_urls
+            
+            # Metrics row
+            col1, col2, col3, col4 = st.columns(4)
+            
+            # Count URLs by platform
+            platform_counts = {}
+            for url in urls:
+                if 'instagram.com' in url:
+                    platform_counts['Instagram'] = platform_counts.get('Instagram', 0) + 1
+                elif 'tiktok.com' in url:
+                    platform_counts['TikTok'] = platform_counts.get('TikTok', 0) + 1
+                elif 'youtube.com' in url:
+                    platform_counts['YouTube'] = platform_counts.get('YouTube', 0) + 1
+                elif 'twitter.com' in url:
+                    platform_counts['Twitter'] = platform_counts.get('Twitter', 0) + 1
+                elif 'facebook.com' in url:
+                    platform_counts['Facebook'] = platform_counts.get('Facebook', 0) + 1
+            
+            with col1:
+                st.metric("Total URLs", len(urls))
+            with col2:
+                st.metric("Instagram", platform_counts.get('Instagram', 0))
+            with col3:
+                st.metric("TikTok", platform_counts.get('TikTok', 0))
+            with col4:
+                st.metric("YouTube", platform_counts.get('YouTube', 0))
+            
+            # Create DataFrame for AgGrid display
+            data = []
+            for i, url in enumerate(urls, 1):
+                platform = exporter.get_platform(url)
+                data.append({
+                    "#": i,
+                    "Platform": platform,
+                    "Post URL": url,
+                    "Creator": "",  # Will be extracted later
+                    "Status": "✅ Found"
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Create proper cellRenderer for clickable URLs (same as Bulk Review)
+            cellRenderer_url = JsCode("""
+            class UrlCellRenderer {
+              init(params) {
+                this.eGui = document.createElement('a');
+                this.eGui.innerText = '🔗 View';
+                this.eGui.href = params.value;
+                this.eGui.target = '_blank';
+                this.eGui.style.color = '#1f77b4';
+                this.eGui.style.textDecoration = 'underline';
+                this.eGui.style.cursor = 'pointer';
+              }
+
+              getGui() {
+                return this.eGui;
+              }
+
+              refresh(params) {
+                return false;
+              }
+            }
+            """)
+            
+            # Configure AgGrid with EXACT same settings as Bulk Review
+            gb = GridOptionsBuilder.from_dataframe(df)
+            
+            # *** ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
+            gb.configure_side_bar()  # Enable filtering sidebar
+            gb.configure_default_column(
+                filter="agSetColumnFilter",  # CHECKBOX FILTERS with search
+                sortable=True,  # Enable sorting
+                resizable=True,  # Enable column resizing
+                editable=False, 
+                groupable=True, 
+                value=True, 
+                enableRowGroup=True, 
+                enablePivot=True, 
+                enableValue=True,
+                filterParams={
+                    "buttons": ["reset", "apply"],
+                    "closeOnApply": True,
+                    "newRowsAction": "keep"
+                }
+            )
+            
+            # Configure columns with proper widths and features
+            gb.configure_column("#", width=60, pinned="left")
+            gb.configure_column("Platform", width=120, pinned="left")
+            gb.configure_column("Post URL", 
+                cellRenderer=cellRenderer_url,
+                width=100,
+                sortable=False,
+                filter=False
+            )
+            gb.configure_column("Creator", width=150)
+            gb.configure_column("Status", width=100)
+            
+            # Configure selection
+            gb.configure_selection(selection_mode="multiple", use_checkbox=False)
+            
+            gridOptions = gb.build()
+            
+            # Display table with EXACT same AgGrid call as Bulk Review
+            st.markdown("#### 📊 Extracted URLs")
+            selected_rows = AgGrid(
+                df,
+                gridOptions=gridOptions,
+                allow_unsafe_jscode=True,
+                update_mode=GridUpdateMode.SELECTION_CHANGED,
+                height=650,  # Same height as Bulk Review
+                fit_columns_on_grid_load=True,
+                theme="alpine",
+                enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
+            )
+            
+            # Download section
+            if 'creatoriq_export_path' in st.session_state:
+                export_path = st.session_state.creatoriq_export_path
+                
+                if os.path.exists(export_path):
+                    with open(export_path, 'rb') as f:
+                        csv_data = f.read()
+                    
+                    st.download_button(
+                        label="📥 Download CSV",
+                        data=csv_data,
+                        file_name=f"creatoriq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+        
+        # Help section
+        with st.expander("ℹ️ How to use CreatorIQ Scraper"):
+            st.markdown("""
+            **Steps:**
+            1. **Get URL**: Copy the CreatorIQ campaign report URL (must end with `/posts`)
+            2. **Adjust Scrolls**: Set scroll cycles (20 is usually enough for 500+ posts)
+            3. **Scrape**: Click 'Scrape' and wait 1-3 minutes for completion
+            4. **Review**: Check the extracted URLs in the table below
+            5. **Download**: Export the results as CSV for further analysis
+            
+            **Supported Platforms:**
+            - Instagram (profiles and posts)
+            - TikTok (videos)
+            - YouTube (videos)
+            - Twitter (posts)
+            - Facebook (posts)
+            
+            **Note**: The scraper extracts post URLs only. Creator names and engagement metrics will be added in future versions.
+            """)
+    
+    except ImportError as e:
+        st.error(f"❌ CreatorIQ module not available: {str(e)}")
+        st.info("Please ensure the CreatorIQ module is properly installed.")
 
 # ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_tab:
@@ -708,6 +959,9 @@ with bulk_tab:
                 clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
                 clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
                 clean_df['Publication'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else 'N/A'
+                
+                # Add Person_ID column for dropdown lookup (map from 'To' field or use Contact)
+                clean_df['Person_ID'] = display_df['To'] if 'To' in display_df.columns else display_df['Contact'] if 'Contact' in display_df.columns else ''
                 
                 # Format relevance score as "8/10" format
                 if 'Relevance Score' in display_df.columns:
@@ -1042,6 +1296,99 @@ with bulk_tab:
                 gb.configure_column("Publication", width=180)
                 gb.configure_column("Relevance", width=80)
                 gb.configure_column("Sentiment", width=100)
+                
+                # Load Person_ID to Media Outlets mapping for dropdown
+                person_outlets_mapping = load_person_outlets_mapping()
+                
+                # Add Media Outlet dropdown column if mapping is available
+                if person_outlets_mapping:
+                    # Add Media Outlet column to the dataframe
+                    clean_df['Media Outlet'] = ''
+                    
+                    # Configure the Media Outlet dropdown column
+                    gb.configure_column(
+                        "Media Outlet",
+                        cellEditor="agSelectCellEditor",
+                        cellEditorParams={
+                            "values": []  # Will be populated dynamically per row
+                        },
+                        width=180,
+                        editable=True,
+                        sortable=True,
+                        filter=True
+                    )
+                    
+                    # Create custom cell renderer for dynamic dropdown options
+                    cellRenderer_outlet_dropdown = JsCode("""
+                    class OutletDropdownRenderer {
+                      init(params) {
+                        this.eGui = document.createElement('select');
+                        this.eGui.style.width = '100%';
+                        this.eGui.style.height = '100%';
+                        this.eGui.style.border = 'none';
+                        this.eGui.style.background = 'transparent';
+                        this.eGui.style.fontSize = '12px';
+                        
+                        // Get Person_ID from the row data
+                        const personId = params.data['Person_ID'] || params.data['Contact'];
+                        const currentValue = params.value || '';
+                        
+                        // Add default option
+                        const defaultOption = document.createElement('option');
+                        defaultOption.value = '';
+                        defaultOption.text = 'Select outlet...';
+                        defaultOption.selected = currentValue === '';
+                        this.eGui.appendChild(defaultOption);
+                        
+                        // Add outlet options based on Person_ID
+                        // This will be populated by the backend
+                        const outletOptions = params.data['Outlet_Options'] || [];
+                        outletOptions.forEach(outlet => {
+                          const option = document.createElement('option');
+                          option.value = outlet;
+                          option.text = outlet;
+                          option.selected = currentValue === outlet;
+                          this.eGui.appendChild(option);
+                        });
+                        
+                        // Set current value
+                        this.eGui.value = currentValue;
+                        
+                        // Add change event listener
+                        this.eGui.addEventListener('change', () => {
+                          params.setValue(this.eGui.value);
+                        });
+                      }
+
+                      getGui() {
+                        return this.eGui;
+                      }
+
+                      refresh(params) {
+                        return false;
+                      }
+                    }
+                    """)
+                    
+                    # Configure the dropdown with custom renderer
+                    gb.configure_column(
+                        "Media Outlet",
+                        cellRenderer=cellRenderer_outlet_dropdown,
+                        width=180,
+                        editable=True,
+                        sortable=True,
+                        filter=True
+                    )
+                    
+                    # Add outlet options to each row based on Person_ID
+                    def add_outlet_options(row):
+                        person_id = row.get('Person_ID', row.get('Contact', ''))
+                        outlet_options = get_outlet_options_for_person(person_id, person_outlets_mapping)
+                        row['Outlet_Options'] = outlet_options
+                        return row
+                    
+                    # Apply outlet options to each row
+                    clean_df = clean_df.apply(add_outlet_options, axis=1)
                 
                 # Configure Approve and Reject columns with checkbox renderers
                 gb.configure_column(
