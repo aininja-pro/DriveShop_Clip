@@ -77,8 +77,33 @@ def get_outlet_options_for_person(person_id, mapping):
     
     person_id_str = str(person_id)
     if person_id_str in mapping:
-        return [outlet['outlet_name'] for outlet in mapping[person_id_str]]
+        # FIX: Correctly access the nested 'outlets' list
+        person_data = mapping.get(person_id_str, {})
+        outlets_list = person_data.get('outlets', [])
+        return [outlet['outlet_name'] for outlet in outlets_list]
     return []
+
+@st.cache_data
+def create_reporter_name_to_id_mapping():
+    """Create a mapping from Reporter Name to Person_ID for lookups."""
+    try:
+        mapping_file = os.path.join(project_root, "data", "person_outlets_mapping.csv")
+        if not os.path.exists(mapping_file):
+            return {}
+        
+        df = pd.read_csv(mapping_file)
+        # Ensure correct types
+        df['Reporter_Name'] = df['Reporter_Name'].astype(str)
+        df['Person_ID'] = df['Person_ID'].astype(str)
+        
+        # Create a dictionary from the two columns, dropping duplicates
+        # In case a name is associated with multiple IDs, this takes the first one.
+        name_to_id_map = df.drop_duplicates('Reporter_Name').set_index('Reporter_Name')['Person_ID'].to_dict()
+        print(f"✅ Created Reporter Name to Person_ID mapping for {len(name_to_id_map)} reporters.")
+        return name_to_id_map
+    except Exception as e:
+        print(f"❌ Error creating reporter name to ID mapping: {e}")
+        return {}
 
 # Load environment variables
 def load_env():
@@ -960,8 +985,12 @@ with bulk_tab:
                 clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
                 clean_df['Publication'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else 'N/A'
                 
-                # Add Person_ID column for dropdown lookup (map from 'To' field or use Contact)
-                clean_df['Person_ID'] = display_df['To'] if 'To' in display_df.columns else display_df['Contact'] if 'Contact' in display_df.columns else ''
+                # --- FIX: Use a name-to-ID mapping to get the correct numeric Person_ID ---
+                reporter_name_to_id_map = create_reporter_name_to_id_mapping()
+                
+                # Use the 'Contact' column to look up the numeric Person_ID
+                clean_df['Person_ID'] = clean_df['Contact'].apply(lambda name: reporter_name_to_id_map.get(name, ''))
+                
                 
                 # Format relevance score as "8/10" format
                 if 'Relevance Score' in display_df.columns:
@@ -1382,9 +1411,10 @@ with bulk_tab:
                     
                     # Add outlet options to each row based on Person_ID
                     def add_outlet_options(row):
-                        person_id = row.get('Person_ID', row.get('Contact', ''))
+                        person_id = row.get('Person_ID')
                         outlet_options = get_outlet_options_for_person(person_id, person_outlets_mapping)
-                        row['Outlet_Options'] = outlet_options
+                        # --- FIX: Ensure options are a list of strings ---
+                        row['Outlet_Options'] = [str(opt) for opt in outlet_options] if outlet_options else []
                         return row
                     
                     # Apply outlet options to each row
