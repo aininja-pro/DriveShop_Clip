@@ -1,0 +1,18 @@
+{
+  "type": "IntegrationSettingsSlimCollection",
+  "count": 1,
+  "total": 1,
+  "page": 1,
+  "IntegrationSettingsSlimCollection": [
+    {
+      "CampaignId": 695483,
+      "Integration": null,
+      "ShortLinkWrapper": null,
+      "TrackingLevel": "publisher",
+      "TrackingLinkCreationType": "mass-generate",
+      "PromotionType": "product",
+      "PromotionWithType": "link",
+      "PromotionCount": 0
+    }
+  ]
+}

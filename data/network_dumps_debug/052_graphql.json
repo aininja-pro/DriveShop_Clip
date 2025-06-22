@@ -1,0 +1,79 @@
+{
+  "data": {
+    "getAggregatedPosts": {
+      "networks": [
+        {
+          "network": "FACEBOOK",
+          "__typename": "NetworkGroup"
+        },
+        {
+          "network": "INSTAGRAM",
+          "__typename": "NetworkGroup"
+        },
+        {
+          "network": "PINTEREST",
+          "__typename": "NetworkGroup"
+        },
+        {
+          "network": "TIKTOK",
+          "__typename": "NetworkGroup"
+        },
+        {
+          "network": "TWITTER",
+          "__typename": "NetworkGroup"
+        },
+        {
+          "network": "YOUTUBE",
+          "__typename": "NetworkGroup"
+        }
+      ],
+      "contentTypes": [
+        {
+          "contentType": "CAROUSEL",
+          "__typename": "ContentTypeGroup"
+        },
+        {
+          "contentType": "IMAGE",
+          "__typename": "ContentTypeGroup"
+        },
+        {
+          "contentType": "REEL",
+          "__typename": "ContentTypeGroup"
+        },
+        {
+          "contentType": "SHORT",
+          "__typename": "ContentTypeGroup"
+        },
+        {
+          "contentType": "STORY",
+          "__typename": "ContentTypeGroup"
+        },
+        {
+          "contentType": "TEXT",
+          "__typename": "ContentTypeGroup"
+        },
+        {
+          "contentType": "VIDEO",
+          "__typename": "ContentTypeGroup"
+        }
+      ],
+      "summaryTotals": {
+        "count": {
+          "posts": 646,
+          "creators": 19,
+          "__typename": "Count"
+        },
+        "__typename": "SummaryTotals"
+      },
+      "campaigns": [
+        {
+          "id": "695483",
+          "isPaidMediaOn": true,
+          "isLinkTrackingOn": true,
+          "__typename": "CampaignGroup"
+        }
+      ],
+      "__typename": "PostsAggregate"
+    }
+  }
+}

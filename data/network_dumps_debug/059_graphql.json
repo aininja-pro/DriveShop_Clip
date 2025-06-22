@@ -1,0 +1,415 @@
+{
+  "data": {
+    "getAggregatedPosts": {
+      "creators": [
+        {
+          "id": "793749",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Sarah Greenwood",
+          "description": "Name: Sarah Greenwood\nBrand: Sarah-N-Tuned\nLocation: Tuscan, AZ\nSegment: Automotive\n\nBio: Sarah is a car builder and former aerospace mechanic for the USAF. Her YouTube channel focuses on project builds and she wants to include more car reviews. Sarah previously wrote for cars on TFLCars.com and has built a loyal following over the years. \n\nDriveShop Programs: \n2018 SEMA Young Guns\n\nSpotlight Programs: \n2023 Audi",
+          "tier": "MEGA",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/ef371a85cca2175304571b2f103404fe_1539116683.jpg?time=1539116683",
+          "primarySocialUsername": "@sarahntuned",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 3,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "865432",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "The Smoking Tire",
+          "description": "Name: Matt Farah\nLocation: Los Angeles, CA\nSegment: Automotive Reviews\n\nBio: Matt Farah is a lifelong car enthusiast who began his automotive career at dealerships, rental agencies, and detail shops before discovering the power of YouTube in 2006.   He moved to CA and started The Smoking Tire in 2009 with the goal of filling an irreverent, yet professional niche in automotive media, an effort that continues today with over 1 million subscribers on the channel   He was a host and creator of the show \u2018TUNED\u2019 on the /DRIVE YouTube network from 2011 to 2014, and appeared on /DRIVE on NBC Sports, \u2018The Car Show\u2019 on the Speed Channel, and \u2018Attack of the Show\u2019 on the G4 Network.   His podcast, The Smoking Tire Podcast, started in 2011, is #1 in the category every week of the year, with 3-6 episodes in the top ten for the Automotive category on iTunes. Going into its second decade with a catalog 750+ episodes deep, The Smoking Tire podcast is the definitive guest stop for who\u2019s who in the auto industry.   Farah has an extensive writing resume, having contributed reviews and editorials to HAGERTY Magazine, Popular Mechanics, and online publications including TheDrive and Jalopnik. He is currently the Editor-at-Large for Road & Track Magazine  Having just turned 40, Farah is redefining how car collectors keep, maintain, and use their cars in the densely populated beach cities around LA with his venture Westside Collector Car Storage, a game-changer in luxury, concierge parking that sold out soon after opening, and is expanding to a second location to open winter 2022.  No stranger to the trials and tribulations of old cars himself, Farah\u2019s stable currently includes a Ferrari 328 GTS, a collector-grade 2005 BMW M3, an imported JDM Van, several motorcycles, and his dream car: the 1988 Lamborghini Countach. not testing new sports cars, he daily drives a Ford Mach E.",
+          "tier": "MEGA",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/29b952bd01ac067952d038d5f498f0a1_3782517.png?time=1716408122",
+          "primarySocialUsername": "@thesmokingtire",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 11,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "865462",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Redline Reviews",
+          "description": "Name: Sofyan Bey\nMedia Outlet: Redline Reviews\nLocation: Washington D.C\nSegment: Automotive Outlet",
+          "tier": "MEGA",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/53e1fe279c899f098c8c225d3f9b112e_2892015.jpeg?time=1679327186",
+          "primarySocialUsername": "@theredline",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 66,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "1140312",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Matt Maran",
+          "description": "Name: Matt Maran\nBrand: Matt Maran Motoring\nLocation:\nSegment: Automotive reviews\n\nBio: YouTuber and car enthusiast. Subscribe to see car reviews, automotive weekly news updates, videos of my personal car, and other car videos!",
+          "tier": "MACRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/6e02cb2f92032b04c1501300fc70a38f_1552077846.jpg?time=1552077846",
+          "primarySocialUsername": "@mattmaranmotoring",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 28,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "3327882",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Abdullah Bundogji",
+          "description": "Name: Abdullah Bundogji (Pushing Pistons)\nLocation: Unknown\nSegment: Automotive/Car Reviews\n\nBio: Abdullah likes to post car reviews and explain car concepts to his followers.",
+          "tier": "MEGA",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/pushingpistons.jpg",
+          "primarySocialUsername": "pushingpistons",
+          "primaryNetwork": "TIKTOK",
+          "count": {
+            "posts": 50,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "3650000",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Omar Rana",
+          "description": "Name: Omar Rana\nMedia Outlet: Omar Drives \nLocation: Unknown\nSegment: Automotive Reviews\n\nBio: I review cars and answer all your questions",
+          "tier": "MACRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/873a639d083d0df4d9195e2aeb66fafd_5424202.jpeg?time=1717190091",
+          "primarySocialUsername": "omardrives",
+          "primaryNetwork": "INSTAGRAM",
+          "count": {
+            "posts": 72,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "3650147",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Miles Branman | Miles Per Hr",
+          "description": "Name: Miles Branman\nSegment: Automotive journalist/reviewer\nBio: Car reviews from the POV perspective\n\nSpotlight: \n2023 Audi\n2023 Mazda",
+          "tier": "MEGA",
+          "profilePictureURL": "https://s3-us-west-1.amazonaws.com/social-pictures-storage/LogoPublisher/3299424_Logo.jpg",
+          "primarySocialUsername": "@milesperhr",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 121,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "3650172",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "A Girl\\'s Guide To Cars",
+          "description": "Media Outlet: A Girl's Guide to Cars\n\nBio: A Girl's Guide to Cars is a dedicated advocate for empowering girls in the automotive world, aiming to offer a comprehensive guide that cultivates confidence and knowledge for a joyful and informed journey into car ownership. Committed to breaking stereotypes, this outlet actively works towards creating a supportive community within the Girls Guide to Cars.",
+          "tier": "MICRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/00fc852dd0f59eaeb8845e335d3542a4_6376974.jpeg?time=1741371469",
+          "primarySocialUsername": "agirlsguide2cars",
+          "primaryNetwork": "INSTAGRAM",
+          "count": {
+            "posts": 19,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "3658641",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Savage Geese",
+          "description": "Media Outlet: Savage Geese\nLocation: \nSegment: Automotive Reviews\n\nBio: Videos covering technology, the automotive sector and life.\nWe do our best as a private group to post real world videos free of sponsorships, endorsements and stick with entertaining content.\nWe are privately funded.\n\nSpotlight: \n2023 Audi, Mazda",
+          "tier": "MACRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/9fc8e90662b2043fd755a17acd9e86ce_1891242.jpeg?time=1716920996",
+          "primarySocialUsername": "@savagegeese",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 6,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "8147668",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Forrest Jones",
+          "description": "Name: Forrest Jones\nLocation: Dallas, TX (recently relocated from Los Angeles, CA - July 2024)\nSegment: Automotive Reviews\n\nBio: Forrest Jones is responsible for Forrest Jones Auto Reviews, providing  the most in-depth car review possible while also sharing his passion for cars and the entire automotive industry. Coverage includes affordable cars, supercars, exotic cars, hyper car and everything in-between.",
+          "tier": "MEGA",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+          "primarySocialUsername": "forrestsautoreviews",
+          "primaryNetwork": "TIKTOK",
+          "count": {
+            "posts": 40,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "8404499",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Drake Moschkau",
+          "description": "Name: Drake Moshchkau\nLocation: Los Angeles, CA\nSegment: Automotive TikTok Creator\n\nBio: Drake is an automotive reviewer from Los Angeles. His primary platform is TikTok, which has over 360k followers and 16M likes. He frequently shares videos on automotive updates, car reviews, and features with his audience with consistent metrics.\n\nDriveShop Programs:\nSEMA SMC, SEMA Garage Measuring Session\n\nSpotlight Programs: \nMazda 2023",
+          "tier": "MACRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/3307104b37e2206a2a7ce8fbca9e66ed_1649352593.jpeg",
+          "primarySocialUsername": "@drakemoschkau",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 68,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "10365653",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Christina Branman",
+          "description": "Name: Christina Branman\nMedia Outlet: Mobile Mama Reviews \nLocation: \nSegment:\n\nBio:",
+          "tier": "MEGA",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/8b83cbdfe28388e8b14e92d0c7441486_1655133237.jpeg",
+          "primarySocialUsername": "mobile_mama_reviews",
+          "primaryNetwork": "INSTAGRAM",
+          "count": {
+            "posts": 35,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "12301430",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Jaime  Gabaldoni",
+          "description": "Name: Jaime Gabaldoni\nLocation: Miami\nSegment: Automotive\n\nSpotlight:\n2023 Audi",
+          "tier": "MEGA",
+          "profilePictureURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/account/6782606469188748294.jpg",
+          "primarySocialUsername": "jaime_gabaldoni",
+          "primaryNetwork": "TIKTOK",
+          "count": {
+            "posts": 51,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "12301441",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Out Motorsports",
+          "description": "Name: OutMotorsports (Jake Thiewes)\nLocation: Washington D.C.\nSegment: Automotive Media\n\nBio: OutMotorsports is a LGBTQ+ run automotive media outlet. Their goal is connecting LGBT, queer, gay car enthusiasts & motorsports competitors alike. \n\nSpotlight: \n2023 Audi, Mazda",
+          "tier": "MICRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/56c07553d1ed1d24f1a5af6845a3dbd8_2159767.jpeg?time=1715886488",
+          "primarySocialUsername": "outmotorsports",
+          "primaryNetwork": "INSTAGRAM",
+          "count": {
+            "posts": 31,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "13107560",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Javier Mota",
+          "description": "Name: Javier Mota\nBrand: Freelance\nLocation: Miami, FL\nSegment: Automotive Reviews\n\nBio: Videos about cars, the auto industry and the amazing places we go to drive them.",
+          "tier": "MICRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/3c54d3a31495f0d6fd04522b2094023a_5110344.jpeg?time=1705102251",
+          "primarySocialUsername": "javiermota",
+          "primaryNetwork": "TWITTER",
+          "count": {
+            "posts": 14,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "13109624",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Kirk Kreifels",
+          "description": "Name: Kirk Kreifels\nBrand: Kirk Kreifels\nLocation: Florida\nSegment: Automotive Freelancer\n\nBio: Kirk is an automotive freelancer specializing in bringing the latest in automotive news and reviews.\n\nDriveShop Spotlight: \n2023 Audi SLP\n2023 Hyundai SLP\n2023 Mazda Press Fleet Spotlight",
+          "tier": "MACRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/f26b7a51fc97cbb6f0e243b2aa629fce_4709298.jpeg?time=1733162628",
+          "primarySocialUsername": "kirk_kreifels",
+          "primaryNetwork": "INSTAGRAM",
+          "count": {
+            "posts": 12,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "13933190",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "The Topher",
+          "description": "Name: Christopher Brower\nMedia Outlet: The Topher\nLocation: Detroit\nSegment: Automotive Reviews\n\nI've been a car & driving enthusiast for as long as I can remember. My career began as a photographer until I re-launched the Winding Road Magazine YouTube channel, pioneering the POV car video & review genre. TheTopher is my personal channel where I review press cars, my personal vehicles, and everything else I manage to get my hands on.",
+          "tier": "MACRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/3d51732ac522e9068708e95161df8367_9047327.jpeg?time=1681325177",
+          "primarySocialUsername": "@thetopher",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 10,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "17590601",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Evan  Ross",
+          "description": "Name: Evan Ross\nLocation: Unknown\nSegment: Automotive Reviews \n\nBio: Evan Ross is a social media success coach and manager with a passion for the automotive niche, including car reviews. Trusted by over 35 dealerships, he's helped 160+ people increase their revenue using social media strategies. Join his team to enhance your social media presence and boost business success.",
+          "tier": "MACRO",
+          "profilePictureURL": "https://static-resources.creatoriq.com/social-pictures/instagram/thumbnail/evanrossmedia.jpg",
+          "primarySocialUsername": "evanrossmedia",
+          "primaryNetwork": "INSTAGRAM",
+          "count": {
+            "posts": 5,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        },
+        {
+          "id": "20729517",
+          "statusInCampaign": [
+            {
+              "status": "Accepted",
+              "campaignId": "695483",
+              "__typename": "StatusInCampaign"
+            }
+          ],
+          "fullName": "Queontae Boggs",
+          "description": "Name: Queontae Boggs\nMedia Outlet: Que the Chaotic\nLocation: Detroit\nSegment:\n\nBio:",
+          "tier": "MICRO",
+          "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/1434aac76727bdeb83b2e627d510fcf2_8900681.jpeg?time=1720795978",
+          "primarySocialUsername": "@quethechaotic",
+          "primaryNetwork": "YOUTUBE",
+          "count": {
+            "posts": 4,
+            "__typename": "Count"
+          },
+          "__typename": "CreatorGroup"
+        }
+      ],
+      "summaryTotals": {
+        "count": {
+          "creators": 19,
+          "__typename": "Count"
+        },
+        "__typename": "SummaryTotals"
+      },
+      "__typename": "PostsAggregate"
+    }
+  }
+}

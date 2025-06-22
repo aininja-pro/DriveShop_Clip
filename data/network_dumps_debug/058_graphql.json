@@ -1,0 +1,13 @@
+{
+  "data": {
+    "getAggregatedPosts": {
+      "campaigns": [
+        {
+          "lastUpdatedAt": "2025-06-14T20:12:27.000Z",
+          "__typename": "CampaignGroup"
+        }
+      ],
+      "__typename": "PostsAggregate"
+    }
+  }
+}

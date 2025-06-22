@@ -1263,6 +1263,75 @@ def run_ingest_concurrent(
         # send_slack_message(f"❌ Ingestion failed: {e}")
         return False
 
+def run_ingest_concurrent_with_filters(
+    url: str,
+    filters: dict
+) -> bool:
+    """
+    Run the ingestion process with filters applied.
+    
+    Args:
+        url: URL to the loans CSV file
+        filters: Dictionary containing filter criteria:
+            - office: Filter by office name
+            - make: Filter by vehicle make
+            - person_id: Filter by Person_ID
+            - outlet: Filter by media outlet name
+            - limit: Maximum number of records to process
+            
+    Returns:
+        True if successful, False otherwise
+    """
+    start_time = time.time()
+    logger.info("🚀 Starting filtered ingestion process...")
+    clear_rejected_records()
+
+    df = load_loans_data_from_url(url)
+    if df is None:
+        logger.error("❌ Failed to load or process data from URL for filtered ingest.")
+        return False
+
+    all_loans = df.to_dict('records')
+    logger.info(f"Loaded {len(all_loans)} total loans from URL.")
+
+    # Apply filters
+    filtered_loans = all_loans
+    
+    if filters.get("office") and filters["office"] != 'All Offices':
+        logger.info(f"Filtering by Office: {filters['office']}")
+        filtered_loans = [loan for loan in filtered_loans if loan.get('Office') == filters['office']]
+    
+    if filters.get("make") and filters["make"] != 'All Makes':
+        logger.info(f"Filtering by Make: {filters['make']}")
+        filtered_loans = [loan for loan in filtered_loans if loan.get('Make') == filters['make']]
+        
+    if filters.get("person_id"):
+        logger.info(f"Filtering by Person_ID: {filters['person_id']}")
+        # Ensure we compare strings to strings to avoid type issues
+        filtered_loans = [loan for loan in filtered_loans if str(loan.get('Person_ID', '')).split('.')[0] == str(filters['person_id'])]
+        
+    # We are not filtering by outlet name on the backend for now.
+
+    record_limit = filters.get("limit", 0)
+    if record_limit > 0:
+        logger.info(f"Limiting processing to {record_limit} records.")
+        loans_to_process = filtered_loans[:record_limit]
+    else:
+        loans_to_process = filtered_loans
+
+    total_to_process = len(loans_to_process)
+    logger.info(f"Processing {total_to_process} loans after filtering.")
+    
+    if not loans_to_process:
+        logger.warning("No loans to process after filtering.")
+        return True
+
+    process_loans_concurrently(loans_to_process, total_to_process)
+    
+    end_time = time.time()
+    logger.info(f"✅ Filtered ingestion process finished in {end_time - start_time:.2f} seconds.")
+    return True
+
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run clip tracking ingestion pipeline")

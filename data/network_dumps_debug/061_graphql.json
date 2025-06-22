@@ -1,0 +1,2106 @@
+{
+  "data": {
+    "getPosts": {
+      "pageInfo": {
+        "endCursor": "W3sibmFtZSI6ImNvbWJpbmVkRW5nYWdlbWVudHMiLCJkaXJlY3Rpb24iOiJERVNDIiwib2Zmc2V0IjoyNH1d",
+        "hasNextPage": true,
+        "__typename": "PageInfo"
+      },
+      "edges": [
+        {
+          "node": {
+            "id": "21736797",
+            "publishedAt": "2023-03-30T14:59:23.000Z",
+            "duration": null,
+            "text": "Should Audi build this for real?? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #luxurycars #offroad #ev #concept #carsoftiktok #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7216353970749525290.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7216353970749525290",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 8630117.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 8630117.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 1426313.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "27017638",
+            "publishedAt": "2024-03-09T17:22:00.000Z",
+            "duration": null,
+            "text": "Worth $65K as tested? \\ud83e\\udd14 #audi #rs3 #luxurycars #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7344415143830326559.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7344415143830326559",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 5668454.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 5668454.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 572291.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "21676425",
+            "publishedAt": "2023-03-28T17:04:30.000Z",
+            "duration": null,
+            "text": "Its also $150k for 240 miles of range. \\ud83e\\udee0 #audi #etron #luxurycars #ev #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7215644081496657195.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7215644081496657195",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 3634377.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 3634377.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 570067.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "23728924",
+            "publishedAt": "2023-09-07T16:44:18.000Z",
+            "duration": null,
+            "text": "Maybe one day I\u2019ll own a first-gen manual V10 \\ud83e\\udd72. What was your favorite R8 model? \\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #r8 #v8 #v10 #carsoftiktok #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7276125675633806622.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7276125675633806622",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 3582992.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 3582992.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 500766.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "25390760",
+            "publishedAt": "2023-12-09T16:28:37.000Z",
+            "duration": null,
+            "text": "Ken Block will forever be missed, thankful for this opportunity. \\ud83e\\udd72 #audi #hoonitron #racecar #drift #kenblock #carsoftiktok #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7310632641458375979.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7310632641458375979",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 4001174.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 4001174.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 478258.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "22229503",
+            "publishedAt": "2023-05-14T19:24:48.000Z",
+            "duration": null,
+            "text": "$92K as tested! Worth it over a BMW M3? \\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #bmw #rs5 #m3 #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7233121254054595886.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7233121254054595886",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 3541187.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 3541187.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 450897.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "21487204",
+            "publishedAt": "2023-03-15T16:40:29.000Z",
+            "duration": null,
+            "text": "$179K and EXTREMELY LIMITED! Worth it for a car that could go up in value? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #etron #ev #luxurycars #rs #carsoftiktok #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7210813800172342574.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7210813800172342574",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 2171191.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 2171191.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 373907.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "21572546",
+            "publishedAt": "2023-03-23T14:19:47.000Z",
+            "duration": null,
+            "text": "Would you get the Lambo or just save the \\ud83d\\udcb0 and get this? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #urus #rsq8 #lamborghini #suv #luxurycars #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7213746209356418350.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7213746209356418350",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 3115054.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 3115054.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 328236.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "26382863",
+            "publishedAt": "2024-01-20T17:22:18.000Z",
+            "duration": null,
+            "text": "Audi can predict when a traffic light turns green! How cool is that!?\n\n#audi #audilove #audilover #audigramm #audigang #audination #carswithoutlimits #carsofinstagram #carsandcoffee #carlover",
+            "title": null,
+            "network": "INSTAGRAM",
+            "thumbnailURL": "https://scontent-sjc3-1.cdninstagram.com/v/t51.29350-15/420115968_1306644103363116_9007035595951662266_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=102&ccb=1-7&_nc_sid=18de74&_nc_ohc=KMV_UcEHOaMQ7kNvgEiDCK-&_nc_oc=AdhZR3dX1cU2UJTTLWN5QZaKjte3EtQFr-8friECsosqg5T-Ti0EKR9g8ChWNiNXHqo&_nc_zt=23&_nc_ht=scontent-sjc3-1.cdninstagram.com&edm=AL-3X8kEAAAA&_nc_gid=Ap1Tu86-IFYobuWNjA24Jxd&oh=00_AYB_Hqk_hibXbLPiZwMORZVxXk0IDJ7ZanbpC25zhMD40Q&oe=67CBAABC",
+            "contentMediaUrl": "https://static-resources.creatoriq.com/social-pictures/instagram/thumbnail/C2VIvmCpnCd.jpg",
+            "contentUrl": "https://www.instagram.com/reel/C2VIvmCpnCd",
+            "contentType": "REEL",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "4958566",
+              "socialUsername": "omardrives",
+              "socialNetworkId": "231184579",
+              "accountUrl": "https://www.instagram.com/omardrives",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "3650000",
+              "fullName": "Omar Rana",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/873a639d083d0df4d9195e2aeb66fafd_5424202.jpeg?time=1717190091",
+              "primarySocialUsername": "omardrives",
+              "primaryNetwork": "INSTAGRAM",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "impressions": {
+                "value": 53922.0,
+                "type": "ESTIMATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "estimatedImpressions": {
+                "value": 53922.0,
+                "type": "ESTIMATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "networkImpressions": null,
+              "videoViews": null,
+              "engagements": {
+                "value": 322236.0,
+                "type": "AUTHENTICATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "IGReelVideoMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "MetaPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 53922.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": 53922.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 322236.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "IGReelVideoCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "22739634",
+            "publishedAt": "2023-06-28T15:45:00.000Z",
+            "duration": null,
+            "text": "This thing is super cool! But is it $160K cool? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #rs #rs7 #luxurycars #foryoupage #foryou #fyp",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7249763422244490539.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7249763422244490539",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 2616879.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 2616879.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 312660.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "30773247",
+            "publishedAt": "2024-10-01T15:51:05.000Z",
+            "duration": 77,
+            "text": "This thing is pretty sweet! Starts at $90,800 but is $110k as tested! Worth it? #audi #luxurycars #sq7 #suv #cartok #foryoupage #foryou",
+            "title": "",
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7420835220024216862.jpg",
+            "contentMediaUrl": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7420835220024216862.jpg",
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7420835220024216862",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 2644191.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 2644191.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 300180.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "13189123",
+            "publishedAt": "2022-10-16T13:32:57.000Z",
+            "duration": null,
+            "text": "Starts at $48,800 and is $60,000 as tested! Worth the money over a Tesla Model Y? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #tesla #etron #ev #suv #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7155102614005271850.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7155102614005271850",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 2210049.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 2210049.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 279546.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "22055852",
+            "publishedAt": "2023-04-26T14:07:00.000Z",
+            "duration": null,
+            "text": "Are you dreaming about the Audi RS Q8, Mama? I know I am! #audi #rsq8 #fyp\u30b7 #foryou #fy #fyp #cartok #mom #foryoupage #momsoftiktok #luxurycars #suv",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7226359823439318314.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@mobile_mama/video/7226359823439318314",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "13610108",
+              "socialUsername": "mobile_mama",
+              "socialNetworkId": "6969381181850829829",
+              "accountUrl": "https://www.tiktok.com/mobile_mama",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "10365653",
+              "fullName": "Christina Branman",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/8b83cbdfe28388e8b14e92d0c7441486_1655133237.jpeg",
+              "primarySocialUsername": "mobile_mama_reviews",
+              "primaryNetwork": "INSTAGRAM",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 3400000.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 3400000.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 247129.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "22739635",
+            "publishedAt": "2023-06-27T15:17:41.000Z",
+            "duration": null,
+            "text": "This thing is the ultimate family car! Is it worth $150k though?? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #rs #rs6 #sleeper #cars #foryoupage #foryou #fyp",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7249385336634084651.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7249385336634084651",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1692988.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1692988.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 229619.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "22855160",
+            "publishedAt": "2023-07-07T21:16:52.000Z",
+            "duration": null,
+            "text": "Sometimes its nice to switch up the vibe. Is this Q8 E-Trin worth $84K? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #etron #q8 #ev #suv #foryoupage #foryou #fyp",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7253188730180111658.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7253188730180111658",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1965085.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1965085.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 228346.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "21316321",
+            "publishedAt": "2023-03-01T15:51:56.000Z",
+            "duration": null,
+            "text": "$83K as tested! Worth it?? \\ud83e\\udd14\\ud83e\\udd37\\ud83c\\udffd\u200d\u2642\ufe0f #audi #offroad #quattro #a6 #luxurycars #carsoftiktok #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7205606090019540267.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7205606090019540267",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1934292.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1934292.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 222573.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "23918760",
+            "publishedAt": "2023-08-27T14:42:45.000Z",
+            "duration": null,
+            "text": "Replying to @F1_Jw send this video to your parents because the Audi RS6 is just a starion wagon \\ud83e\\udee1",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7272012476747681067.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@pushingpistons/video/7272012476747681067",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5086916",
+              "socialUsername": "pushingpistons",
+              "socialNetworkId": "6731452727752180741",
+              "accountUrl": "https://www.tiktok.com/pushingpistons",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "3327882",
+              "fullName": "Abdullah Bundogji",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/pushingpistons.jpg",
+              "primarySocialUsername": "pushingpistons",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1700000.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1700000.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 221329.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "27273978",
+            "publishedAt": "2024-03-24T16:00:26.000Z",
+            "duration": null,
+            "text": "Beast of a machine! Is it worth $150k though? \\ud83e\\udee8 #audi #rs6 #luxurycars #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7349960266517351710.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7349960266517351710",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1657392.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1657392.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 202401.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "24545016",
+            "publishedAt": "2023-09-07T18:00:12.000Z",
+            "duration": 60,
+            "text": "",
+            "title": "BREAKING NEWS! Audi\u2019s no longer making the R8.\\ud83d\\ude29\\ud83d\\ude2d",
+            "network": "YOUTUBE",
+            "thumbnailURL": "https://i.ytimg.com/vi/V8zytfXVHm4/maxresdefault.jpg",
+            "contentMediaUrl": "https://static-resources.creatoriq.com/social-pictures/youtube/video/V8zytfXVHm4.jpg",
+            "contentUrl": "https://www.youtube.com/watch?v=V8zytfXVHm4",
+            "contentType": "SHORT",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "-638370",
+              "socialUsername": "@forrestsautoreviewsofficial",
+              "socialNetworkId": "UCJla13cU_l6Itg8yEtOiAqQ",
+              "accountUrl": "https://www.youtube.com/@forrestsautoreviewsofficial",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "__typename": "YouTubeMetrics"
+            },
+            "paidMetrics": null,
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 0.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": 2478502.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 197835.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "YouTubeCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "25323949",
+            "publishedAt": "2022-12-06T01:12:55.000Z",
+            "duration": 11,
+            "text": "The #audi Skysphere Concept car going into sport mode is so cool!",
+            "title": null,
+            "network": "FACEBOOK",
+            "thumbnailURL": "https://scontent-sjc3-1.xx.fbcdn.net/v/t15.5256-10/317691203_1363201394216849_3237991940166828361_n.jpg?stp=dst-jpg_p160x160&_nc_cat=109&ccb=1-7&_nc_sid=869369&_nc_ohc=OIallhRcoawAX9yM7Wo&_nc_ht=scontent-sjc3-1.xx&edm=ADk9D8YEAAAA&oh=00_AfArlpcXATtTqt9Sk0tw9J-agcJq2G-cj-JoPAqoGrLJlA&oe=65C9A059",
+            "contentMediaUrl": "https://social-pictures-storage.s3.us-west-1.amazonaws.com/Facebook/438178515197916-8ff074d5a1b78dbae1fe8cde10122307.jpeg",
+            "contentUrl": "https://www.facebook.com/reel/438178515197916/",
+            "contentType": "REEL",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5107793",
+              "socialUsername": "pushingpistons",
+              "socialNetworkId": "108254737242226",
+              "accountUrl": "https://facebook.com/pushingpistons",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "3327882",
+              "fullName": "Abdullah Bundogji",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/pushingpistons.jpg",
+              "primarySocialUsername": "pushingpistons",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "impressions": {
+                "value": 5645771.0,
+                "type": "COLLECTED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "estimatedImpressions": {
+                "value": 1055.0,
+                "type": "COLLECTED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "networkImpressions": {
+                "value": 5645771.0,
+                "type": "COLLECTED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "videoViews": {
+                "value": 2966750.0,
+                "type": "AUTHENTICATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "engagements": {
+                "value": 193376.0,
+                "type": "AUTHENTICATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "FacebookMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "MetaPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 5645771.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": 1055.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 5645771.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": 2966750.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 193376.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "FacebookCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "25651623",
+            "publishedAt": "2023-12-30T17:23:52.000Z",
+            "duration": null,
+            "text": "Which one will you miss the most? These cars are being discontinued in 2024!\n\n#dodge #chevy #ford #audi #kia #porsche #toyota #mazda #carsofinstagram #carsandcoffee #carlifestyle #carswithoutlimits #newcar",
+            "title": null,
+            "network": "INSTAGRAM",
+            "thumbnailURL": "https://scontent-sjc3-1.cdninstagram.com/v/t51.29350-15/413871592_410522244912181_1250619663522871609_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=103&ccb=1-7&_nc_sid=18de74&_nc_ohc=sx7XqwPH0tcQ7kNvgHgQzzC&_nc_oc=AdijhXVCwLrX00Dtsiv7Q1PFV60LxKlI9fafdyGPrT1JiIQPBzePTPeBsARN7AsG-aM&_nc_zt=23&_nc_ht=scontent-sjc3-1.cdninstagram.com&edm=AL-3X8kEAAAA&_nc_gid=A2pzX0KXUJQn2pM6DSZT1gg&oh=00_AYDoLxT-yF12UvETUm90iwrZKwREhmukf-y-LBl9YOrHcw&oe=67CBAB8F",
+            "contentMediaUrl": "https://static-resources.creatoriq.com/social-pictures/instagram/thumbnail/C1fEFFmJA-d.jpg",
+            "contentUrl": "https://www.instagram.com/reel/C1fEFFmJA-d",
+            "contentType": "REEL",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "4958566",
+              "socialUsername": "omardrives",
+              "socialNetworkId": "231184579",
+              "accountUrl": "https://www.instagram.com/omardrives",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "3650000",
+              "fullName": "Omar Rana",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/873a639d083d0df4d9195e2aeb66fafd_5424202.jpeg?time=1717190091",
+              "primarySocialUsername": "omardrives",
+              "primaryNetwork": "INSTAGRAM",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "impressions": {
+                "value": 50195.0,
+                "type": "ESTIMATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "estimatedImpressions": {
+                "value": 50195.0,
+                "type": "ESTIMATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "networkImpressions": null,
+              "videoViews": null,
+              "engagements": {
+                "value": 181716.0,
+                "type": "AUTHENTICATED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "IGReelVideoMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "MetaPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 50195.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": 50195.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 181716.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "IGReelVideoCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "35305384",
+            "publishedAt": "2025-05-11T20:12:41.000Z",
+            "duration": 65,
+            "text": "This or a Lamborghini Urus? \ud83e\udd14 \u2022 \u2022 \u2022 \u2022 \u2022 \u2022 #audi #rsq8 #urus #luxurycars #carsoftiktok #cartok #foryoupage #foryou ",
+            "title": "",
+            "network": "TIKTOK",
+            "thumbnailURL": "https://p16-sign.tiktokcdn-us.com/tos-useast5-p-0068-tx/oYeQNcjAI8GQGhrIcBLlvEALHfAlIAEegoAknA~tplv-tiktokx-dmt-logom:tos-useast5-i-0068-tx/o4hEI4BCtACgLEjiZBOaMkAAALEABEi8vAEZF.image?dr=9634&x-expires=1750204800&x-signature=uyBgiSCINEGpJU77jOuwtHMlEcA%3D&t=4d5b0474&ps=13740610&shp=81f88b70&shcp=43f4a2f9&idc=useast5",
+            "contentMediaUrl": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7503283533637717294.jpg",
+            "contentUrl": "https://tiktok.com/@forrestsautoreviews/video/7503283533637717294/",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "MetaPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1330005.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1330005.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 157083.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "13102667",
+            "publishedAt": "2022-10-09T13:47:44.000Z",
+            "duration": null,
+            "text": "$52K as is! Worth it or no?? \\ud83e\\udd14 #audi #s4 #luxurycars #cartok #carsoftiktok #foryoupage #foryou",
+            "title": null,
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7152508862711483690.jpg",
+            "contentMediaUrl": null,
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7152508862711483690",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1585632.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1585632.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 152579.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        },
+        {
+          "node": {
+            "id": "30773246",
+            "publishedAt": "2024-10-02T15:58:28.000Z",
+            "duration": 67,
+            "text": "Replying to @Jr_Bravo Durango Hellcat is dope but this is a better deal than you think. \\ud83d\\udc40 #durangohellcat #audi #sq7 #luxurycars #suv #cartok #foryoupage #foryou",
+            "title": "",
+            "network": "TIKTOK",
+            "thumbnailURL": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7421208195596619039.jpg",
+            "contentMediaUrl": "https://static-resources.creatoriq.com/social-pictures/Tiktok/post/image/7421208195596619039.jpg",
+            "contentUrl": "https://www.tiktok.com/@forrestsautoreviews/video/7421208195596619039",
+            "contentType": "VIDEO",
+            "isSponsored": false,
+            "isBoosted": false,
+            "isPaidPartnership": false,
+            "games": [],
+            "account": {
+              "id": "5378283",
+              "socialUsername": "forrestsautoreviews",
+              "socialNetworkId": "6597205700467507206",
+              "accountUrl": "https://www.tiktok.com/forrestsautoreviews",
+              "__typename": "Account"
+            },
+            "creator": {
+              "id": "8147668",
+              "fullName": "Forrest Jones",
+              "profilePictureURL": "https://social-pictures-storage.s3.amazonaws.com/instagram/thumbnail/forrest.auto.reviews.official.jpg",
+              "primarySocialUsername": "forrestsautoreviews",
+              "primaryNetwork": "TIKTOK",
+              "__typename": "Creator"
+            },
+            "organicMetrics": {
+              "videoViews": null,
+              "__typename": "TiktokMetrics"
+            },
+            "paidMetrics": {
+              "paidImpressions": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidVideoViews": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "paidEngagements": {
+                "value": null,
+                "type": "PAID",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokPaidMetrics"
+            },
+            "combinedMetrics": {
+              "combinedImpressions": {
+                "value": 1619448.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEstimatedImpressions": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedNetworkImpressions": {
+                "value": 1619448.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedVideoViews": {
+                "value": null,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "combinedEngagements": {
+                "value": 152087.0,
+                "type": "COMBINED",
+                "__typename": "MetricTypeWithValue"
+              },
+              "__typename": "TiktokCombinedMetrics"
+            },
+            "usageRights": null,
+            "__typename": "Post"
+          },
+          "__typename": "PostEdge"
+        }
+      ],
+      "__typename": "PostsCollection"
+    }
+  }
+}

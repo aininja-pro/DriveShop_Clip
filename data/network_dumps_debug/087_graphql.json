@@ -1,0 +1,45 @@
+{
+  "data": {
+    "getAggregatedPosts": {
+      "summaryTotals": {
+        "count": {
+          "posts": 646,
+          "creators": 19,
+          "__typename": "Count"
+        },
+        "sum": {
+          "impressions": 27184547.0,
+          "paidImpressions": null,
+          "combinedImpressions": 108806632.0,
+          "estimatedImpressions": 14902102.0,
+          "combinedEstimatedImpressions": 14915237.0,
+          "networkImpressions": 16289729.0,
+          "combinedNetworkImpressions": 97910398.0,
+          "videoViews": 3630375.0,
+          "paidVideoViews": null,
+          "combinedVideoViews": 14220765.0,
+          "engagements": 2432667.0,
+          "paidEngagements": null,
+          "combinedEngagements": 12128581.0,
+          "engagementRate": 0.1012,
+          "paidEngagementRate": null,
+          "combinedEngagementRate": 0.1043,
+          "reach": 24237506.0,
+          "paidReach": null,
+          "combinedReach": 45466689.0,
+          "estimatedReach": 12523436.0,
+          "combinedEstimatedReach": 33752619.0,
+          "networkReach": 14694576.0,
+          "combinedNetworkReach": 14694576.0,
+          "socialMediaValue": 2634636.936,
+          "combinedSocialMediaValue": 13619336.9042,
+          "followers": 23706730.0,
+          "combinedFollowers": 23706730.0,
+          "__typename": "Sum"
+        },
+        "__typename": "SummaryTotals"
+      },
+      "__typename": "PostsAggregate"
+    }
+  }
+}

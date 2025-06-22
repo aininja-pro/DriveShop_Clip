@@ -1,0 +1,160 @@
+{
+  "data": {
+    "getPublishedReport": {
+      "id": "691BDBE5-BCF0-42C4-886D-0A46BDD62196",
+      "path": "audi_media_spotl",
+      "campaigns": [
+        {
+          "brandName": "Audi",
+          "campaignId": 695483,
+          "campaignName": "Audi Media Spotlight Program",
+          "endDate": "2025-12-31T00:00:00.000Z",
+          "logoUrl": "https://social-pictures-storage.s3.amazonaws.com/bd2a90ed03af494399c641970bfa30e5_3721503.png?time=1668550670",
+          "startDate": "2022-10-01T00:00:00.000Z",
+          "__typename": "PublishedReportCampaign"
+        }
+      ],
+      "campaignIds": "695483",
+      "createdAt": "2024-06-20T23:54:07.793Z",
+      "expiredAt": null,
+      "status": "PUBLISHED",
+      "reportToken": "08cdf876484b727a2a501a4ba57b56bf",
+      "state": "{\"filters\":{\"campaignId\":[\"695483\"],\"creatorId\":[],\"network\":[],\"contentType\":[],\"publishedAt\":{\"operator\":\"between\",\"value\":[\"2022-10-01T00:00:00.000Z\",\"2025-12-31T23:59:59.999Z\"]},\"id\":null,\"textSearch\":null,\"isSponsored\":null,\"postText\":null,\"socialUsername\":null,\"hashtags\":[],\"isUsageRightsExpired\":null,\"contentTagId\":[]},\"period\":{\"label\":\"Campaign Dates\",\"datesArray\":[\"2022-10-01\",\"2025-12-31\"],\"name\":\"campaignDates\"},\"campaignDates\":{\"startDate\":\"2022-10-01T00:00:00.000Z\",\"endDate\":\"2025-12-31T00:00:00.000Z\"},\"metricsCategory\":\"combined\"}",
+      "metricsTypeBreakdown": false,
+      "partnerSettings": {
+        "slug": "driveshop",
+        "hash": "195_d6361d8896b009",
+        "divisionHash": null,
+        "__typename": "PublishedReportPartnerSettings"
+      },
+      "settings": {
+        "id": 139956,
+        "type": "ANALYTICS_DASHBOARD",
+        "reportTitle": null,
+        "templateId": null,
+        "networkMetrics": "{}",
+        "reportMetrics": [
+          {
+            "metric": "impressions",
+            "__typename": "ReportSettingsMetrics"
+          },
+          {
+            "metric": "engagementRate",
+            "__typename": "ReportSettingsMetrics"
+          },
+          {
+            "metric": "socialMediaValue",
+            "__typename": "ReportSettingsMetrics"
+          },
+          {
+            "metric": "reach",
+            "__typename": "ReportSettingsMetrics"
+          }
+        ],
+        "postsMetrics": [],
+        "usePostsMetrics": null,
+        "sectionsSettings": [
+          {
+            "uid": "622c8b97-dae6-4e25-83ce-86854fa2c0e5",
+            "type": "CampaignInfo",
+            "isHidden": false,
+            "config": "{\"showTitle\":false,\"showDescription\":true,\"showPostsOnBackground\":false,\"title\":\"Audi Media Spotlight Program\",\"background\":\"linear-gradient(to bottom, #000000 0%,#fafafa 100%)\",\"description\":\"Audi Press Fleet Spotlight Report\",\"reportLogoURL\":\"https://twc-attachments.s3.us-west-1.amazonaws.com/1892459835_AL090142_web_2880.jpg\",\"reportTitle\":\"Audi Media Spotlight Program\",\"showReportTitle\":false,\"showReportLogo\":true,\"showBackgroundImage\":true,\"backgroundImageURL\":\"https://campaign-report-images.s3.us-west-1.amazonaws.com/bb1cd42ddd4df639c085c196e1a68a50.jpeg\",\"showColorOverlay\":true,\"showReportDates\":false,\"reportDates\":null}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "16f633b4-b21b-48d2-bdc1-40d011ff5621",
+            "type": "CampaignOverview",
+            "isHidden": false,
+            "config": "{\"showTitle\":true,\"showDescription\":false,\"title\":\"Campaign Overview\",\"description\":\"Use this section to provide a high-level summary of this campaign.\",\"showCampaignDates\":true,\"html\":\"<p><span class=\\\"ql-size-large\\\" style=\\\"color: rgb(0, 0, 0);\\\"><strong>Objective</strong></span></p><p>To track and monitor the performance of social content on a variety of social platforms, from automotive media, who are active on social media. This will provide Audi with insights and metrics that relate to the loans that DriveShop provides to the media outside of traditional media outlets and clip tracking.</p><p><br></p><p><span class=\\\"ql-size-large\\\" style=\\\"color: rgb(0, 0, 0);\\\"><strong>Strategy</strong></span></p><p><span style=\\\"color: rgb(136, 136, 136);\\\">DriveShop will verify specific journalists (requested by Audi) and ask that they use #Audi on their social content to track and capture metrics from all of their posts. This will be monitored across all social media platforms (as they are used) including: TikTok, YouTube, Instagram, Facebook and X (Twitter).</span></p>\",\"imageLink\":null,\"campaign\":{\"StartDate\":\"2022-10-03\",\"EndDate\":\"2023-12-31\"},\"StartDate\":\"2022-10-03\",\"EndDate\":\"2023-12-31\",\"hideCampaignDates\":true}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "ad0eae6b-32cd-43bb-90e5-28f5272ea295",
+            "type": "CampaignPerformance",
+            "isHidden": false,
+            "config": "{\"Metrics\":[\"Impressions\",\"SocialMediaValue\",\"EngagementRate\",\"Reach\"],\"description\":\"Overview of all key performance metrics for your campaign. Click on any metric to see the corresponding chart.\",\"showDescription\":false,\"showTitle\":1,\"title\":\"Campaign Performance Summary\",\"subSections\":[\"SocialReach\",\"BreakoutByNetwork\",\"Summary\"],\"subSectionsSettings\":{\"BreakoutByNetwork\":{\"Metrics\":[\"Impressions\",\"EngagementRate\",\"SocialMediaValue\",\"Views\"]},\"SocialReach\":{\"Metrics\":[\"Impressions\",\"EngagementRate\",\"SocialMediaValue\",\"Reach\"]},\"Summary\":{\"Metrics\":[\"Impressions\",\"Reach\",\"Engagement\",\"EngagementRate\"]}},\"hideBenchmarks\":false,\"metricSourceType\":\"\",\"metrics\":[\"impressions\",\"reach\",\"engagements\",\"engagementRate\",\"videoViews\",\"socialMediaValue\"],\"networkMetrics\":{},\"useLocalMetrics\":4,\"showChart\":true}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "8610aa23-3cd5-4da1-a1d0-355b57eb4c0c",
+            "type": "SummaryBySocials",
+            "isHidden": false,
+            "config": "{\"useLocalMetrics\":4,\"title\":\"Breakdown by Social Platform\",\"description\":\"Platform-specific data for deeper insights.\",\"showDescription\":true,\"showTitle\":true,\"networkMetrics\":{\"tiktok\":[]},\"metrics\":[\"impressions\",\"engagementRate\",\"socialMediaValue\",\"videoViews\",\"engagements\",\"reach\"],\"orderBy\":\"impressions\",\"orderDirection\":\"desc\"}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "c3e8ccd0-8c54-4dfd-827e-fcc3ac8cdecf",
+            "type": "PerformanceKPIs",
+            "isHidden": false,
+            "config": "{\"description\":\"Performance KPIs description\",\"showDescription\":false,\"showTitle\":true,\"title\":\"Performance KPIs\",\"KPIs\":[{\"isEnabled\":true,\"title\":\"Instagram - Reel\",\"useLocalMetrics\":true,\"network\":\"instagram\",\"contentType\":\"reel\",\"metrics\":[\"impressions\",\"videoViews\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\",\"avgViewTime\",\"totalPlayTime\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"d02bf82d-f573-4d55-9cf6-ceaeff14fa59\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Instagram - Carousel\",\"useLocalMetrics\":true,\"network\":\"instagram\",\"contentType\":\"carousel\",\"metrics\":[\"impressions\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"9e820894-9cd7-4dfa-8e89-b31b1e34c3a7\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Instagram - Image\",\"useLocalMetrics\":true,\"network\":\"instagram\",\"contentType\":\"image\",\"metrics\":[\"impressions\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"e11aace4-0f57-4ed2-b261-a3c59f261cba\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Instagram - Video\",\"useLocalMetrics\":true,\"network\":\"instagram\",\"contentType\":\"video\",\"metrics\":[\"impressions\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"a27ce58c-c89b-4263-9844-8047572501be\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Instagram - Story\",\"useLocalMetrics\":true,\"network\":\"instagram\",\"contentType\":\"story\",\"metrics\":[\"impressions\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"f8b9bdd6-a249-4f83-b463-40e64c2a8da1\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"YouTube - Short\",\"useLocalMetrics\":true,\"network\":\"youtube\",\"contentType\":\"short\",\"metrics\":[\"videoViews\",\"engagements\",\"engagementRate\",\"socialMediaValue\",\"avgViewTime\"],\"networkMetrics\":{\"youtube\":[\"minutesWatched\"]},\"filters\":{},\"isCustom\":false,\"_uid\":\"36b860db-d237-42fd-b6ee-bbdeb9f4b2d4\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"YouTube - Video\",\"useLocalMetrics\":true,\"network\":\"youtube\",\"contentType\":\"video\",\"metrics\":[\"videoViews\",\"engagements\",\"engagementRate\",\"socialMediaValue\",\"avgViewTime\"],\"networkMetrics\":{\"youtube\":[\"minutesWatched\"]},\"filters\":{},\"isCustom\":false,\"_uid\":\"ea9e6892-09e2-49bf-9925-82c09711f279\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"TikTok - Video\",\"useLocalMetrics\":true,\"network\":\"tiktok\",\"contentType\":\"video\",\"metrics\":[\"impressions\",\"videoViews\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\",\"avgViewTime\",\"totalPlayTime\"],\"networkMetrics\":{\"tiktok\":[]},\"filters\":{},\"isCustom\":false,\"_uid\":\"967ef7e5-4dc7-4f31-9d71-f1c031271139\"},{\"isEnabled\":true,\"title\":\"Facebook - Reel\",\"useLocalMetrics\":true,\"network\":\"facebook\",\"contentType\":\"reel\",\"metrics\":[\"impressions\",\"videoViews\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\",\"avgViewTime\",\"totalPlayTime\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"27bd55a9-52ab-4f81-8d6a-5f435b9323cf\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Facebook - Text\",\"useLocalMetrics\":true,\"network\":\"facebook\",\"contentType\":\"text\",\"metrics\":[\"impressions\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"f058f928-b79f-47c2-8bec-be65044354ec\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Facebook - Video\",\"useLocalMetrics\":true,\"network\":\"facebook\",\"contentType\":\"video\",\"metrics\":[\"impressions\",\"videoViews\",\"engagements\",\"engagementRate\",\"socialMediaValue\",\"reach\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"b8e4af75-a023-4edd-a26b-42baee455a86\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"id\":\"facebook-image\",\"network\":\"facebook\",\"contentType\":\"image\",\"title\":\"Facebook - Image\",\"isOutOfRange\":false,\"isEnabled\":true,\"isHidden\":false,\"isCustom\":false,\"metrics\":[],\"networkMetrics\":{},\"layout\":\"cards\",\"_uid\":\"9c8c70ac-24ea-4ddb-8356-560bfba01c19\"},{\"isEnabled\":true,\"title\":\"Twitter - Image\",\"useLocalMetrics\":true,\"network\":\"twitter\",\"contentType\":\"image\",\"metrics\":[\"impressions\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"da2335c7-0b16-40c0-8a41-c1d3af229f23\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Twitter - Text\",\"useLocalMetrics\":true,\"network\":\"twitter\",\"contentType\":\"text\",\"metrics\":[\"impressions\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"4686cb38-0f8b-4b12-aee0-194b904bc658\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"isEnabled\":true,\"title\":\"Twitter - Video\",\"useLocalMetrics\":true,\"network\":\"twitter\",\"contentType\":\"video\",\"metrics\":[\"impressions\",\"videoViews\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"filters\":{},\"isCustom\":false,\"_uid\":\"7618ebd7-31a5-4607-a35e-b8e16473bd82\",\"isOutOfRange\":false,\"isHidden\":false,\"layout\":\"cards\"},{\"id\":\"pinterest-video\",\"network\":\"pinterest\",\"contentType\":\"video\",\"title\":\"Pinterest - Video\",\"isOutOfRange\":false,\"isEnabled\":false,\"isHidden\":true,\"isCustom\":false,\"metrics\":[],\"networkMetrics\":{},\"layout\":\"cards\",\"_uid\":\"c92318ca-fcd2-4dc1-b936-d70a44820d80\"}],\"type\":\"ANALYTICS_DASHBOARD\"}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "704465cc-c115-4b5a-bdc5-579ce50ca20d",
+            "type": "TopCreators",
+            "isHidden": false,
+            "config": "{\"showTitle\":true,\"showDescription\":true,\"title\":\"Top Creators\",\"description\":\"Highlighting the most influential creators in your campaign.\",\"orderBy\":\"impressions\",\"creatorDisplaySetting\":{\"isNetworkItemDisplayed\":true,\"isCreatorNameDisplayed\":true,\"isDescriptionDisplayed\":false,\"showMetricPerNetwork\":false},\"itemsCount\":\"8\",\"layoutType\":\"cards\",\"metricSourceType\":\"\",\"metrics\":[\"impressions\",\"engagementRate\",\"socialMediaValue\",\"reach\",\"videoViews\",\"engagements\"],\"networkMetrics\":{},\"useLocalMetrics\":true,\"orderDirection\":\"desc\"}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "e90025ca-403b-40ee-abfd-43aa0ed10891",
+            "type": "TopPosts",
+            "isHidden": false,
+            "config": "{\"showTitle\":true,\"showDescription\":false,\"title\":\"Highest Performing Content\",\"description\":\"Showcasing the content that excelled.\",\"orderBy\":\"impressions\",\"metricSourceType\":\"\",\"itemsCount\":8,\"layoutType\":\"cards\",\"manualOrder\":[\"21736797\",\"25323949\",\"25390760\",\"27017638\",\"21676425\",\"23728924\",\"22229503\",\"23323283\",\"22055852\",\"21572546\"],\"metrics\":[\"impressions\",\"videoViews\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"networkMetrics\":{},\"useLocalMetrics\":true,\"filters\":{},\"orderDirection\":\"desc\"}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "fc321e74-55f4-4c8e-814f-46afaa1bc032",
+            "type": "Audience",
+            "isHidden": false,
+            "config": "{\"showTitle\":true,\"showDescription\":false,\"title\":\"Audience Breakdown\",\"description\":\"Insights into the audience demographics.\",\"showCountryFlags\":true,\"items\":{\"gender\":{\"title\":\"Gender\",\"order\":0,\"enabled\":true},\"age\":{\"title\":\"Age\",\"order\":1,\"enabled\":true},\"country\":{\"title\":\"Top Countries\",\"order\":2,\"enabled\":true}},\"chartColor\":\"#096bde\"}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "c13d4f2f-4f9f-463b-8042-2f3c52457ce7",
+            "type": "CustomPage",
+            "isHidden": true,
+            "config": "{\"Metrics\":[\"Impressions\",\"SocialMediaValue\",\"EngagementRate\",\"Reach\"],\"description\":\"Add a personalized section to fit your needs.\",\"showDescription\":false,\"showTitle\":false,\"title\":\"Custom Section\"}",
+            "__typename": "SectionsSetting"
+          },
+          {
+            "uid": "7cc453cd-0bc0-4edf-ad71-511a82d4cb94",
+            "type": "LinkTracking",
+            "isHidden": true,
+            "config": "{\"title\":\"Link Tracking Summary\",\"showTitle\":true,\"showDescription\":true,\"description\":\"Monitor the performance of shared links.\"}",
+            "__typename": "SectionsSetting"
+          }
+        ],
+        "wrapupTab": true,
+        "postsTab": true,
+        "creatorsTab": true,
+        "customTab": false,
+        "oneSheetsTab": false,
+        "brandingOptions": {
+          "headerBackgroundColor": "#212d4c",
+          "headerTextColor": "#ffffff",
+          "showTitles": true,
+          "showDescriptions": true,
+          "viewMode": "BackgroundImage",
+          "backgroundImageURL": "https://campaign-report-images.s3.us-west-1.amazonaws.com/bb1cd42ddd4df639c085c196e1a68a50.jpeg",
+          "backgroundColor": "linear-gradient(#fafafa 0%,#fafafa 15%)",
+          "reportBackgroundColor": null,
+          "showColorOverlay": true,
+          "colorOverlayTop": "#000000",
+          "colorOverlayBottom": "#fafafa",
+          "selectedPosts": null,
+          "selectedFilters": "{}",
+          "colorScheme": null,
+          "__typename": "BrandingOptions"
+        },
+        "customTabSettings": "{\"showDescription\":true,\"showTitle\":true,\"tabTitle\":\"Custom tab\",\"title\":\"Custom Page\",\"description\":\"\"}",
+        "oneSheetsTabSettings": "{\"showTitle\":true,\"title\":\"One-Sheets\",\"showDescription\":false,\"description\":\"See list of our One-Sheets:\",\"items\":[],\"tabTitle\":\"One-Sheets\"}",
+        "wrapupTabSettings": "{}",
+        "postsTabSettings": "{\"layoutType\":\"cards\",\"orderBy\":{\"field\":\"engagements\",\"dir\":\"desc\"},\"metrics\":[\"impressions\",\"socialMediaValue\",\"reach\",\"followers\",\"videoViews\",\"engagements\",\"engagementRate\"],\"networkMetrics\":{},\"useLocalMetrics\":true}",
+        "creatorsTabSettings": "{\"showTitle\":false,\"showDescription\":false,\"metrics\":[\"impressions\",\"videoViews\",\"engagements\",\"engagementRate\",\"reach\",\"socialMediaValue\"],\"orderBy\":{\"field\":\"engagements\",\"dir\":\"desc\"},\"networkMetrics\":{},\"useLocalMetrics\":true,\"showCreatorStatus\":false}",
+        "__typename": "ReportSetting"
+      },
+      "__typename": "PublishedReportEntity"
+    }
+  }
+}

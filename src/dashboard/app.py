@@ -48,11 +48,14 @@ sys.path.append(str(project_root))
 
 # Import local modules
 try:
-    from src.ingest.ingest import run_ingest_concurrent
+    from src.ingest.ingest import run_ingest_concurrent, run_ingest_concurrent_with_filters
 except ImportError:
     # Define a stub for when the module is not yet implemented
     def run_ingest_concurrent(file_path):
         st.error("Concurrent ingest module not implemented yet")
+        return False
+    def run_ingest_concurrent_with_filters(url, filters):
+        st.error("Concurrent ingest with filters module not implemented yet")
         return False
 
 def load_person_outlets_mapping():
@@ -105,6 +108,39 @@ def create_reporter_name_to_id_mapping():
     except Exception as e:
         print(f"❌ Error creating reporter name to ID mapping: {e}")
         return {}
+
+def load_loans_data_for_filtering(url: str):
+    """
+    Load loans data from URL for preview and filtering without processing.
+    Returns (success: bool, df: pd.DataFrame, data_info: dict)
+    """
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        headers = [
+            "ArticleID", "Person_ID", "Make", "Office", "WO #", "To", 
+            "Affiliation", "Start Date", "Stop Date", "Model", "Links"
+        ]
+        
+        csv_content = response.content.decode('utf-8')
+        df = pd.read_csv(io.StringIO(csv_content), header=None, names=headers, on_bad_lines='warn')
+        
+        df.columns = [col.strip() for col in df.columns]
+
+        total_records = len(df)
+        offices_count = df['Office'].nunique() if 'Office' in df.columns else 0
+        makes_count = df['Make'].nunique() if 'Make' in df.columns else 0
+
+        data_info = {
+            "total_records": total_records,
+            "offices_count": offices_count,
+            "makes_count": makes_count
+        }
+        return True, df, data_info
+    except Exception as e:
+        st.error(f"Failed to load loans data: {e}")
+        return False, None, {"error": str(e)}
 
 # Load environment variables
 def load_env():
@@ -754,50 +790,122 @@ with st.sidebar:
         del st.session_state.mapping_update_msg
 
     st.markdown("**🔄 Update Person-Outlets Mapping**")
-    default_mapping_url = "https://reports.driveshop.com/?report=file:%2Fhome%2Fdeployer%2Freports%2Fclips%2Fmedia_outlet_list.rpt&init=csv&exportreportdataonly=true&columnnames=true"
+    default_mapping_url = "https://reports.driveshop.com/?report-file=/home/deploys/creatoriq-reports/45805/driveshop_media_outlet_list.csv"
     mapping_url = st.text_input(
         "Paste mapping CSV URL here:",
         value=default_mapping_url,
-        help="Paste the direct link to the latest mapping CSV. Must include columns: Person_ID, Reporter_Name, Outlet_Name, Outlet_URL, Outlet_ID, Impressions."
+        help="Paste the direct link to the latest mapping CSV."
     )
     if st.button("Update Mapping", use_container_width=True):
         with st.spinner("Updating mapping from URL..."):
             success, msg = update_person_outlets_mapping_from_url(mapping_url)
-            # Store message in session state and rerun
             st.session_state.mapping_update_msg = (success, msg)
             st.rerun()
 
-    st.markdown("---")  # Add a visual separator
-
-    st.markdown("**🚀 Process Loans from Live URL**")
-    default_loans_url = "https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv"
-    loans_url = st.text_input("Live 'Loans without Clips' URL:", value=default_loans_url)
-
-    # Add the record limit filter
+    st.markdown("---")
+    st.markdown("### Process Loans from Live URL")
+    
+    loans_url = st.text_input(
+        "Live 'Loans without Clips' URL:",
+        "https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv"
+    )
+    
     record_limit = st.number_input(
-        "Limit records (0 for all):", 
-        min_value=0, 
-        value=10,  # Default to 10 for testing
-        step=10,
+        "Limit records (0 for all):",
+        min_value=0,
+        value=10,
+        step=1,
         help="Set the maximum number of records to process. Set to 0 to process all records."
     )
 
-    if st.button("Process from URL", use_container_width=True):
-        with st.spinner(f"Processing {record_limit if record_limit > 0 else 'all'} loans from URL..."):
-            # The limit should be None if the user enters 0, to process all
-            limit_arg = record_limit if record_limit > 0 else None
-            
-            # Call the backend function with the URL and limit
-            success = run_ingest_concurrent(url=loans_url, limit=limit_arg)
-            
-            if success:
-                st.success("✅ Done! Refreshing data...")
-                st.rerun() # Refresh the page to show new results
-            else:
-                st.error("❌ Processing failed. Check logs for details.")
+    st.markdown("**🔍 Advanced Filters**")
+    
+    offices = ['All Offices']
+    makes = ['All Makes']
+    reporter_names = ['All Reporters']
+    outlets = ['All Outlets']
+    name_to_id_map = create_reporter_name_to_id_mapping()
 
-    st.markdown("---")  # Add a visual separator
+    if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
+        df = st.session_state.get('loaded_loans_df')
+        if df is not None:
+            if 'Office' in df.columns:
+                offices += sorted(df['Office'].dropna().astype(str).unique().tolist())
+            if 'Make' in df.columns:
+                makes += sorted(df['Make'].dropna().astype(str).unique().tolist())
+    
+    mapping_file = os.path.join(project_root, "data", "person_outlets_mapping.csv")
+    if os.path.exists(mapping_file):
+        try:
+            mapping_df = pd.read_csv(mapping_file)
+            if 'Reporter_Name' in mapping_df.columns:
+                reporter_names += sorted(mapping_df['Reporter_Name'].dropna().unique().tolist())
+            if 'Outlet_Name' in mapping_df.columns:
+                outlets += sorted(mapping_df['Outlet_Name'].dropna().unique().tolist())
+        except Exception as e:
+            st.warning(f"Could not load reporter/outlet names: {e}")
 
+    selected_office = st.selectbox("Filter by Office:", offices)
+    selected_make = st.selectbox("Filter by Make:", makes)
+    selected_reporter_name = st.selectbox("Filter by Reporter:", reporter_names)
+    selected_outlet = st.selectbox("Filter by Media Outlet:", outlets)
+
+    if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
+        filtered_df = st.session_state.loaded_loans_df.copy()
+        
+        if selected_office != 'All Offices':
+            filtered_df = filtered_df[filtered_df['Office'] == selected_office]
+        
+        if selected_make != 'All Makes':
+            filtered_df = filtered_df[filtered_df['Make'] == selected_make]
+        
+        if selected_reporter_name != 'All Reporters':
+            person_id = name_to_id_map.get(selected_reporter_name)
+            if person_id:
+                # This includes the fix for the Person_ID data type issue
+                filtered_df['Person_ID'] = pd.to_numeric(filtered_df['Person_ID'], errors='coerce').astype('Int64').astype(str)
+                filtered_df = filtered_df[filtered_df['Person_ID'] == person_id]
+        
+        st.info(f"**{len(filtered_df)}** records match your current filters and will be processed.")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Load Data for Filtering", key='load_data_for_filtering'):
+            with st.spinner("Loading data from URL..."):
+                success, df, data_info = load_loans_data_for_filtering(loans_url)
+                if success:
+                    st.session_state.loans_data_loaded = True
+                    st.session_state.loaded_loans_df = df
+                    st.session_state.loans_data_info = data_info
+                    st.success(f"✅ Loaded {data_info['total_records']} records. Ready to filter.")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to load data.")
+    
+    with col2:
+        if st.button("Process from URL", key='process_from_url_filtered'):
+            with st.spinner(f"Processing {record_limit or 'all'} filtered records... This may take a while."):
+                from src.ingest.ingest import run_ingest_concurrent_with_filters
+                filters = {
+                    "office": selected_office,
+                    "make": selected_make,
+                    "person_id": name_to_id_map.get(selected_reporter_name),
+                    "outlet": selected_outlet,
+                    "limit": record_limit
+                }
+                success = run_ingest_concurrent_with_filters(loans_url, filters)
+                if success:
+                    st.success("✅ Filtered processing complete!")
+                    st.session_state.last_run_timestamp = datetime.now()
+                    st.rerun()
+                else:
+                    st.error("❌ Filtered processing failed.")
+            
+    if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
+        info = st.session_state.get('loans_data_info', {})
+        st.markdown(f"📊 Data loaded: **{info.get('total_records', 0)}** total records, **{info.get('offices_count', 0)}** offices, **{info.get('makes_count', 0)}** makes")
+
+    st.markdown("---")
     st.markdown("**📁 Process from File Upload**")
     uploaded_file = st.file_uploader("Upload Loans CSV/XLSX", type=['csv', 'xlsx'], label_visibility="collapsed")
     

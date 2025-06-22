@@ -1,0 +1,202 @@
+{
+  "data": {
+    "getCampaigns": [
+      {
+        "id": "695483",
+        "name": "Audi Media Spotlight Program",
+        "description": null,
+        "startDate": "2022-10-01T00:00:00.000Z",
+        "endDate": "2025-12-31T00:00:00.000Z",
+        "isPaidMediaOn": true,
+        "isLinkTrackingOn": true,
+        "linkTrackingLevel": "CREATOR",
+        "status": "ACTIVE",
+        "logo": "https://social-pictures-storage.s3.amazonaws.com/bd2a90ed03af494399c641970bfa30e5_3721503.png?time=1668550670",
+        "currencyCode": "USD",
+        "lastUpdatedAt": "2025-06-14T20:12:27.000Z",
+        "isLarge": false,
+        "brand": {
+          "id": "22914",
+          "name": "Audi",
+          "__typename": "Brand"
+        },
+        "customFields": [
+          {
+            "name": "CustomFieldValue1",
+            "displayName": "CustomField1",
+            "description": null,
+            "value": null,
+            "__typename": "CustomField"
+          },
+          {
+            "name": "CustomFieldValue2",
+            "displayName": "CustomField2",
+            "description": null,
+            "value": null,
+            "__typename": "CustomField"
+          },
+          {
+            "name": "CustomFieldValue3",
+            "displayName": "CustomField3",
+            "description": null,
+            "value": null,
+            "__typename": "CustomField"
+          },
+          {
+            "name": "CustomFieldValue4",
+            "displayName": "CustomField4",
+            "description": null,
+            "value": null,
+            "__typename": "CustomField"
+          },
+          {
+            "name": "CustomFieldValue5",
+            "displayName": "CustomField5",
+            "description": null,
+            "value": null,
+            "__typename": "CustomField"
+          }
+        ],
+        "engagementRateBaseMetrics": [
+          {
+            "name": "facebookNonVideoEngagementMetric",
+            "value": "Followers",
+            "network": "FACEBOOK",
+            "videoEngagmentFlag": false,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "facebookNonVideoPaidMediaEngagementMetric",
+            "value": "Impressions",
+            "network": "FACEBOOK",
+            "videoEngagmentFlag": false,
+            "paidMediaFlag": true,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "facebookVideoEngagementMetric",
+            "value": "Followers",
+            "network": "FACEBOOK",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "facebookVideoPaidMediaEngagementMetric",
+            "value": "Views",
+            "network": "FACEBOOK",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": true,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "instagramNonVideoPaidMediaEngagementMetric",
+            "value": "Impressions",
+            "network": "INSTAGRAM",
+            "videoEngagmentFlag": false,
+            "paidMediaFlag": true,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "instagramNonVideoEngagementMetric",
+            "value": "Reach",
+            "network": "INSTAGRAM",
+            "videoEngagmentFlag": false,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "instagramVideoEngagementMetric",
+            "value": "Reach",
+            "network": "INSTAGRAM",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "instagramVideoPaidMediaEngagementMetric",
+            "value": "Views",
+            "network": "INSTAGRAM",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": true,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "pinterestNonVideoEngagementMetric",
+            "value": "Impressions",
+            "network": "PINTEREST",
+            "videoEngagmentFlag": false,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "pinterestVideoEngagementMetric",
+            "value": "Impressions",
+            "network": "PINTEREST",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "snapchatVideoEngagementMetric",
+            "value": "Followers",
+            "network": "SNAPCHAT",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "tiktokVideoEngagementMetric",
+            "value": "Impressions",
+            "network": "TIKTOK",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "twitchNonVideoEngagementMetric",
+            "value": "Views",
+            "network": "TWITCH",
+            "videoEngagmentFlag": false,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "twitchVideoEngagementMetric",
+            "value": "Views",
+            "network": "TWITCH",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "twitterNonVideoEngagementMetric",
+            "value": "Impressions",
+            "network": "TWITTER",
+            "videoEngagmentFlag": false,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "twitterVideoEngagementMetric",
+            "value": "Impressions",
+            "network": "TWITTER",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          },
+          {
+            "name": "youtubeEngagementMetric",
+            "value": "Views",
+            "network": "YOUTUBE",
+            "videoEngagmentFlag": true,
+            "paidMediaFlag": false,
+            "__typename": "EngagementRateBaseMetric"
+          }
+        ],
+        "__typename": "CampaignDetails"
+      }
+    ]
+  }
+}
