@@ -769,28 +769,61 @@ with st.sidebar:
 
     st.markdown("---")  # Add a visual separator
 
-    st.markdown("**🔄 Process**")
-    uploaded_file = st.file_uploader("CSV/XLSX", type=['csv', 'xlsx'], label_visibility="collapsed")
+    st.markdown("**🚀 Process Loans from Live URL**")
+    default_loans_url = "https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv"
+    loans_url = st.text_input("Live 'Loans without Clips' URL:", value=default_loans_url)
+
+    # Add the record limit filter
+    record_limit = st.number_input(
+        "Limit records (0 for all):", 
+        min_value=0, 
+        value=10,  # Default to 10 for testing
+        step=10,
+        help="Set the maximum number of records to process. Set to 0 to process all records."
+    )
+
+    if st.button("Process from URL", use_container_width=True):
+        with st.spinner(f"Processing {record_limit if record_limit > 0 else 'all'} loans from URL..."):
+            # The limit should be None if the user enters 0, to process all
+            limit_arg = record_limit if record_limit > 0 else None
+            
+            # Call the backend function with the URL and limit
+            success = run_ingest_concurrent(url=loans_url, limit=limit_arg)
+            
+            if success:
+                st.success("✅ Done! Refreshing data...")
+                st.rerun() # Refresh the page to show new results
+            else:
+                st.error("❌ Processing failed. Check logs for details.")
+
+    st.markdown("---")  # Add a visual separator
+
+    st.markdown("**📁 Process from File Upload**")
+    uploaded_file = st.file_uploader("Upload Loans CSV/XLSX", type=['csv', 'xlsx'], label_visibility="collapsed")
     
     if uploaded_file is not None:
         temp_file_path = os.path.join(project_root, "data", "fixtures", "temp_upload.csv")
         with open(temp_file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
-        if st.button("🚀 Process", use_container_width=True):
+        if st.button("Process Uploaded File", use_container_width=True):
             with st.spinner("Processing..."):
-                success = run_ingest_concurrent(temp_file_path)
+                success = run_ingest_concurrent(input_file=temp_file_path)
                 if success:
                     st.success("✅ Done!")
+                    st.rerun() # Refresh the page
                 else:
                     st.error("❌ Failed")
     
-    if st.button("🔄 Process Existing", use_container_width=True):
-        with st.spinner("Processing..."):
+    st.markdown("---")
+
+    if st.button("🔄 Process Default File (for testing)", use_container_width=True):
+        with st.spinner("Processing default file..."):
             default_file = os.path.join(project_root, "data", "fixtures", "Loans_without_Clips.csv")
-            success = run_ingest_concurrent(default_file)
+            success = run_ingest_concurrent(input_file=default_file)
             if success:
                 st.success("✅ Done!")
+                st.rerun() # Refresh the page
             else:
                 st.error("❌ Failed")
 

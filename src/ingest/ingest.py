@@ -37,6 +37,7 @@ import logging
 import re
 import argparse
 import dateutil.parser
+import io
 
 # Import local modules
 from src.utils.logger import setup_logger
@@ -145,6 +146,88 @@ def is_content_within_date_range(content_date: Optional[datetime],
     return start_date <= content_date <= latest_date
 
 # NOTE: Make guessing functions removed - now using direct Make column from CSV
+
+def load_loans_data_from_url(url: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Load and parse the loans data from a URL.
+    This is specifically for the new "media_loans_without_clips" report.
+    
+    Args:
+        url: URL to the loans CSV file.
+        limit: Optional integer to limit the number of records returned.
+        
+    Returns:
+        List of dictionaries containing loan information, mapped to the application's expected keys.
+    """
+    logger.info(f"Fetching loans data from URL: {url}")
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    
+    # Define headers manually for this specific report, as it has no header row
+    headers = [
+        "ArticleID", "Person_ID", "Make", "Model", "WO #", "To", 
+        "Affiliation", "Start Date", "Stop Date", "Office", "Links"
+    ]
+    
+    # Use StringIO to treat the string content as a file
+    csv_content = response.content.decode('utf-8')
+    df = pd.read_csv(io.StringIO(csv_content), header=None, names=headers, on_bad_lines='warn')
+    
+    # Clean up column names (just in case)
+    df.columns = [col.strip() for col in df.columns]
+    logger.info(f"Columns assigned: {df.columns.tolist()}")
+    
+    # Apply limit if provided
+    if limit is not None and limit > 0:
+        logger.info(f"Limiting records to the first {limit}")
+        df = df.head(limit)
+        
+    # Convert to a list of dictionaries to process each record
+    records = df.to_dict('records')
+    logger.info(f"Loaded {len(records)} loans from URL.")
+    
+    # Map the columns to the internal variable names the rest of the script expects
+    processed_loans = []
+    for record in records:
+        # Convert to dictionary and handle potential NaN values
+        loan_dict = {k: v if pd.notna(v) else '' for k, v in record.items()}
+        
+        # Parse URLs from the Links field - handle comma-separated URLs properly
+        urls = []
+        links_text = loan_dict.get('Links', '')
+        if links_text:
+            # Split by comma and clean up each URL
+            url_parts = [url.strip() for url in str(links_text).split(',')]
+            for url in url_parts:
+                # Remove quotes if present
+                url = url.strip('"\'')
+                # Skip empty URLs and internal system URLs
+                if url and not url.startswith('https://fms.driveshop.com/'):
+                    urls.append(url)
+        
+        # Log URL parsing for debugging
+        logger.info(f"Loan {loan_dict.get('WO #')}: Parsed {len(urls)} URLs from '{links_text[:100]}...'")
+        
+        processed_loan = {
+            'work_order': loan_dict.get('WO #'),
+            'model': loan_dict.get('Model'),
+            'to': loan_dict.get('To'),
+            'affiliation': loan_dict.get('Affiliation'),
+            'urls': urls,  # Use the properly parsed URLs
+            'start_date': loan_dict.get('Start Date'),
+            'make': loan_dict.get('Make'),
+            # Add the new fields
+            'article_id': loan_dict.get('ArticleID'),
+            'person_id': loan_dict.get('Person_ID'),
+            'office': loan_dict.get('Office')
+        }
+        processed_loans.append(processed_loan)
+
+    logger.info(f"Total loans processed: {len(processed_loans)}")
+    total_urls = sum(len(loan['urls']) for loan in processed_loans)
+    logger.info(f"Total URLs to process: {total_urls}")
+    
+    return processed_loans
 
 def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
     """
@@ -1119,64 +1202,66 @@ async def process_loans_concurrent(loans: List[Dict[str, Any]]) -> List[Dict[str
     logger.info(f"Concurrent processing completed: {len(final_results)} results from {len(loans)} loans")
     return final_results
 
-def run_ingest_concurrent(input_file: str, output_file: Optional[str] = None) -> bool:
+def run_ingest_concurrent(
+    input_file: Optional[str] = None, 
+    output_file: Optional[str] = None,
+    url: Optional[str] = None,
+    limit: Optional[int] = None
+) -> bool:
     """
-    Run the full ingestion pipeline with concurrent processing.
-    
-    This is ChatGPT's recommended approach - same as run_ingest() but with
-    concurrent loan processing for better performance.
-    
-    Args:
-        input_file: Path to the input CSV/Excel file
-        output_file: Path to the output CSV file (optional)
-        
-    Returns:
-        True if successful, False otherwise
+    Main function to run the ingestion process concurrently.
+    Can be initiated from either a local file or a URL.
     """
     start_time = time.time()
+    logger.info("🚀 Starting concurrent ingestion process...")
+    clear_rejected_records()  # Reset rejected records for this run
     
     try:
-        # Set default output file if not provided
-        if not output_file:
-            project_root = Path(__file__).parent.parent.parent
-            output_file = os.path.join(project_root, 'data', 'loan_results.csv')
-        
-        # Clear rejected records from previous run
-        clear_rejected_records()
-        
-        # Load loans data (same as before)
-        loans = load_loans_data(input_file)
+        # Determine the data source and load loans
+        if url:
+            loans = load_loans_data_from_url(url, limit=limit)
+        elif input_file:
+            loans = load_loans_data(input_file)
+        else:
+            logger.error("No input source provided. Must provide either `input_file` or `url`.")
+            return False
         
         if not loans:
-            logger.error(f"No loans data loaded from {input_file}")
-            return False
-        
-        # Process loans concurrently (this is the only change!)
+            logger.warning("No loans found to process.")
+            # Save empty results and rejected files to clear out old data
+            # This is important for the dashboard to reflect the empty state
+            project_root = Path(__file__).parent.parent.parent
+            results_file = os.path.join(project_root, "data", "loan_results.csv")
+            rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
+            save_results([], results_file)
+            save_rejected_records([], rejected_file)
+            return True
+
+        # Process loans concurrently
+        # This runs the asyncio event loop
         results = asyncio.run(process_loans_concurrent(loans))
         
-        # Save results and rejected records
-        results_saved = save_results(results, output_file)
+        # Save results to CSV
+        project_root = Path(__file__).parent.parent.parent
+        if output_file is None:
+            output_file = os.path.join(project_root, "data", "loan_results.csv")
         
-        # Save rejected records for transparency
-        rejected_file = os.path.join(os.path.dirname(output_file), 'rejected_clips.csv')
-        rejected_saved = save_rejected_records(REJECTED_RECORDS, rejected_file)
+        save_results(results, output_file)
         
-        if results_saved and rejected_saved:
-            elapsed_time = time.time() - start_time
-            message = (f"✅ Clip Tracking (Concurrent): Processed {len(loans)} loans, found {len(results)} clips, "
-                      f"rejected {len(REJECTED_RECORDS)} records in {elapsed_time:.1f} seconds")
-            logger.info(message)
-            return True
-        else:
-            return False
-            
+        # Save rejected records
+        rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
+        save_rejected_records(REJECTED_RECORDS, rejected_file)
+        
+        duration = time.time() - start_time
+        logger.info(f"✅ Concurrent ingestion process finished in {duration:.2f} seconds.")
+        # send_slack_message(f"✅ Ingestion complete. Processed {len(loans)} loans in {duration:.2f}s.")
+        return True
+
     except Exception as e:
-        error_message = f"❌ Clip Tracking (Concurrent): Error during ingestion: {e}"
-        logger.error(error_message)
+        duration = time.time() - start_time
+        logger.error(f"❌ Ingestion process failed after {duration:.2f} seconds: {e}", exc_info=True)
+        # send_slack_message(f"❌ Ingestion failed: {e}")
         return False
-    finally:
-        # Clean up resources
-        crawler_manager.close()
 
 if __name__ == "__main__":
     # Parse command line arguments
