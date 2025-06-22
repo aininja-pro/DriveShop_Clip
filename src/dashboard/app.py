@@ -279,7 +279,7 @@ def create_client_excel_report(df, approved_df=None):
     
     # Use the same column names as Bulk Review (exclude Approve/Reject columns)
     bulk_review_columns = [
-        'Office', 'WO #', 'Model', 'Contact', 'Media Outlet', 
+        'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
         'Relevance', 'Sentiment', 'URLs', 'Other URLs'
     ]
     
@@ -287,6 +287,7 @@ def create_client_excel_report(df, approved_df=None):
     column_mapping = {
         'Office': 'Office',
         'WO #': 'WO #',
+        'Make': 'Make',
         'Model': 'Model',
         'To': 'Contact',
         'Affiliation': 'Media Outlet',
@@ -1237,6 +1238,7 @@ with bulk_tab:
                 clean_df = pd.DataFrame()
                 clean_df['Office'] = display_df['Office'] if 'Office' in display_df.columns else 'N/A'
                 clean_df['WO #'] = display_df['WO #'] if 'WO #' in display_df.columns else ''
+                clean_df['Make'] = display_df['Make'] if 'Make' in display_df.columns else ''
                 clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
                 clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
                 
@@ -1247,7 +1249,41 @@ with bulk_tab:
                 clean_df['Person_ID'] = clean_df['Contact'].apply(lambda name: reporter_name_to_id_map.get(name, ''))
                 
                 # Add Media Outlet column right after Contact (replacing Publication)
-                clean_df['Media Outlet'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else ''
+                # Smart matching: find the correct Outlet_Name from Person_outlets_mapping
+                person_outlets_mapping = load_person_outlets_mapping()
+                
+                def smart_outlet_matching(row):
+                    affiliation = str(row.get('Affiliation', ''))
+                    person_id = str(row.get('Person_ID', ''))
+                    
+                    if not affiliation or not person_id or not person_outlets_mapping:
+                        return ''  # Return empty for dropdown
+                    
+                    # Get available outlet options for this person
+                    outlet_options = get_outlet_options_for_person(person_id, person_outlets_mapping)
+                    if not outlet_options:
+                        return ''
+                    
+                    print(f"🔍 Smart matching '{affiliation}' for Person_ID {person_id}")
+                    print(f"   Available options: {outlet_options}")
+                    
+                    # Try exact match first
+                    if affiliation in outlet_options:
+                        print(f"✅ Exact match: '{affiliation}'")
+                        return affiliation
+                    
+                    # Try fuzzy matching - check if outlet name is contained in affiliation
+                    affiliation_lower = affiliation.lower().strip()
+                    for outlet in outlet_options:
+                        outlet_lower = outlet.lower().strip()
+                        if outlet_lower in affiliation_lower:
+                            print(f"🎯 Smart match: '{affiliation}' -> '{outlet}'")
+                            return outlet
+                    
+                    print(f"❌ No match found for '{affiliation}'")
+                    return ''  # Return empty if no match
+                
+                clean_df['Media Outlet'] = display_df.apply(smart_outlet_matching, axis=1)
                 
                 
                 # Format relevance score as "8/10" format
@@ -1578,6 +1614,7 @@ with bulk_tab:
                 # Configure other columns as before
                 gb.configure_column("Office", width=100)
                 gb.configure_column("WO #", width=100)
+                gb.configure_column("Make", width=100)
                 gb.configure_column("Model", width=120)
                 gb.configure_column("Contact", width=150)
                 gb.configure_column("Media Outlet", width=180)
@@ -1619,16 +1656,22 @@ with bulk_tab:
                         const personId = params.data['Person_ID'] || params.data['Contact'];
                         const currentValue = params.value || '';
                         
-                        // Add default option
-                        const defaultOption = document.createElement('option');
-                        defaultOption.value = '';
-                        defaultOption.text = 'Select outlet...';
-                        defaultOption.selected = currentValue === '';
-                        this.eGui.appendChild(defaultOption);
+                        // Debug log to see what value we're working with
+                        console.log('Outlet Dropdown - Person:', personId, 'Current Value:', currentValue);
                         
-                        // Add outlet options based on Person_ID
-                        // This will be populated by the backend
+                        // Get outlet options based on Person_ID
                         const outletOptions = params.data['Outlet_Options'] || [];
+                        
+                        // Add empty option only if no current value is set
+                        if (!currentValue) {
+                          const emptyOption = document.createElement('option');
+                          emptyOption.value = '';
+                          emptyOption.text = 'Select outlet...';
+                          emptyOption.selected = true;
+                          this.eGui.appendChild(emptyOption);
+                        }
+                        
+                        // Add outlet options based on Person_ID (these are the valid Outlet_Names)
                         outletOptions.forEach(outlet => {
                           const option = document.createElement('option');
                           option.value = outlet;
@@ -1637,7 +1680,7 @@ with bulk_tab:
                           this.eGui.appendChild(option);
                         });
                         
-                        // Set current value
+                        // Set the current value (should be pre-selected by backend smart matching)
                         this.eGui.value = currentValue;
                         
                         // Add change event listener
