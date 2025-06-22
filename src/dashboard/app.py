@@ -279,7 +279,7 @@ def create_client_excel_report(df, approved_df=None):
     
     # Use the same column names as Bulk Review (exclude Approve/Reject columns)
     bulk_review_columns = [
-        'Office', 'WO #', 'Model', 'Contact', 'Publication', 
+        'Office', 'WO #', 'Model', 'Contact', 'Media Outlet', 
         'Relevance', 'Sentiment', 'URLs', 'Other URLs'
     ]
     
@@ -289,7 +289,7 @@ def create_client_excel_report(df, approved_df=None):
         'WO #': 'WO #',
         'Model': 'Model',
         'To': 'Contact',
-        'Affiliation': 'Publication',
+        'Affiliation': 'Media Outlet',
         'Relevance Score': 'Relevance',
         'Overall Sentiment': 'Sentiment',  # Fix: Use the correct sentiment column
         'Clip URL': 'URLs',
@@ -1239,13 +1239,15 @@ with bulk_tab:
                 clean_df['WO #'] = display_df['WO #'] if 'WO #' in display_df.columns else ''
                 clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
                 clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
-                clean_df['Publication'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else 'N/A'
                 
                 # --- FIX: Use a name-to-ID mapping to get the correct numeric Person_ID ---
                 reporter_name_to_id_map = create_reporter_name_to_id_mapping()
                 
                 # Use the 'Contact' column to look up the numeric Person_ID
                 clean_df['Person_ID'] = clean_df['Contact'].apply(lambda name: reporter_name_to_id_map.get(name, ''))
+                
+                # Add Media Outlet column right after Contact (replacing Publication)
+                clean_df['Media Outlet'] = display_df['Affiliation'] if 'Affiliation' in display_df.columns else ''
                 
                 
                 # Format relevance score as "8/10" format
@@ -1578,17 +1580,16 @@ with bulk_tab:
                 gb.configure_column("WO #", width=100)
                 gb.configure_column("Model", width=120)
                 gb.configure_column("Contact", width=150)
-                gb.configure_column("Publication", width=180)
+                gb.configure_column("Media Outlet", width=180)
                 gb.configure_column("Relevance", width=80)
                 gb.configure_column("Sentiment", width=100)
                 
                 # Load Person_ID to Media Outlets mapping for dropdown
                 person_outlets_mapping = load_person_outlets_mapping()
                 
-                # Add Media Outlet dropdown column if mapping is available
+                # Configure Media Outlet dropdown column if mapping is available
                 if person_outlets_mapping:
-                    # Add Media Outlet column to the dataframe
-                    clean_df['Media Outlet'] = ''
+                    # Media Outlet column already exists, just configure it as dropdown
                     
                     # Configure the Media Outlet dropdown column
                     gb.configure_column(
