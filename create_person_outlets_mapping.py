@@ -19,7 +19,7 @@ def fetch_driveshop_data():
     response.raise_for_status()
     
     # Parse the CSV data
-    headers = ["Person_ID", "Reporter_Name", "Outlet_ID", "Outlet_Name", "Outlet_URL", "Circulation"]
+    headers = ["Person_ID", "Reporter_Name", "Outlet_ID", "Outlet_Name", "Outlet_URL", "Impressions"]
     df = pd.read_csv(io.StringIO(response.content.decode('utf-8')), header=None, names=headers)
     
     print(f"✅ Loaded {len(df)} records")
@@ -41,7 +41,7 @@ def create_person_outlets_mapping(df: pd.DataFrame):
             'outlet_name': row['Outlet_Name'],
             'outlet_url': row['Outlet_URL'],
             'outlet_id': str(row['Outlet_ID']),
-            'circulation': row['Circulation']
+            'impressions': row['Impressions']
         }
         
         if person_id not in person_outlets:
@@ -80,7 +80,7 @@ def save_mapping_files(person_outlets: dict):
                 'Outlet_Name': outlet['outlet_name'],
                 'Outlet_URL': outlet['outlet_url'],
                 'Outlet_ID': outlet['outlet_id'],
-                'Circulation': outlet['circulation']
+                'Impressions': outlet['impressions']
             })
     
     csv_df = pd.DataFrame(csv_rows)

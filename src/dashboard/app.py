@@ -12,6 +12,7 @@ import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
+import requests
 
 # Add explicit .env loading with debug output
 from dotenv import load_dotenv
@@ -686,8 +687,88 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Compact sidebar
+# --- MAPPING UPDATE FEATURE (SIDEBAR) ---
+def update_person_outlets_mapping_from_url(url):
+    """
+    Download the mapping CSV from the given URL, validate, save, and regenerate the JSON mapping file.
+    Returns (success: bool, message: str)
+    """
+    import requests
+    import pandas as pd
+    import json
+    import os
+    try:
+        # Download CSV
+        resp = requests.get(url, timeout=30)
+        resp.raise_for_status()
+        csv_content = resp.content.decode('utf-8')
+
+        # Define headers manually, as the source CSV doesn't contain them
+        headers = ["Person_ID", "Reporter_Name", "Outlet_ID", "Outlet_Name", "Outlet_URL", "Impressions"]
+        
+        # Parse CSV without reading a header row and assign our defined headers
+        df = pd.read_csv(io.StringIO(csv_content), header=None, names=headers)
+        
+        # Validate that the DataFrame now has the correct columns
+        required_cols = {'Person_ID', 'Reporter_Name', 'Outlet_Name', 'Outlet_URL', 'Outlet_ID', 'Impressions'}
+        if not required_cols.issubset(set(df.columns)):
+            return False, f"Internal Error: Failed to assign correct columns. Please check the function."
+
+        # Save CSV
+        csv_path = os.path.join(project_root, 'data', 'person_outlets_mapping.csv')
+        df.to_csv(csv_path, index=False)
+        # Regenerate JSON mapping
+        person_outlets = {}
+        for _, row in df.iterrows():
+            person_id = str(row['Person_ID'])
+            reporter_name = str(row['Reporter_Name'])
+            outlet_info = {
+                'outlet_name': row['Outlet_Name'],
+                'outlet_url': row['Outlet_URL'],
+                'outlet_id': str(row['Outlet_ID']),
+                'impressions': row['Impressions']
+            }
+            if person_id not in person_outlets:
+                person_outlets[person_id] = {
+                    'reporter_name': reporter_name,
+                    'outlets': []
+                }
+            person_outlets[person_id]['outlets'].append(outlet_info)
+        json_path = os.path.join(project_root, 'data', 'person_outlets_mapping.json')
+        with open(json_path, 'w') as f:
+            json.dump(person_outlets, f, indent=2)
+        return True, f"Mapping updated successfully! {len(person_outlets)} Person_IDs, {len(df)} outlet relationships."
+    except Exception as e:
+        return False, f"Error updating mapping: {e}"
+
+# --- SIDEBAR UI ---
 with st.sidebar:
+    # Display mapping update message if it exists in session state
+    if 'mapping_update_msg' in st.session_state:
+        success, msg = st.session_state.mapping_update_msg
+        if success:
+            st.success(msg)
+        else:
+            st.error(msg)
+        # Clear the message after displaying it
+        del st.session_state.mapping_update_msg
+
+    st.markdown("**🔄 Update Person-Outlets Mapping**")
+    default_mapping_url = "https://reports.driveshop.com/?report=file:%2Fhome%2Fdeployer%2Freports%2Fclips%2Fmedia_outlet_list.rpt&init=csv&exportreportdataonly=true&columnnames=true"
+    mapping_url = st.text_input(
+        "Paste mapping CSV URL here:",
+        value=default_mapping_url,
+        help="Paste the direct link to the latest mapping CSV. Must include columns: Person_ID, Reporter_Name, Outlet_Name, Outlet_URL, Outlet_ID, Impressions."
+    )
+    if st.button("Update Mapping", use_container_width=True):
+        with st.spinner("Updating mapping from URL..."):
+            success, msg = update_person_outlets_mapping_from_url(mapping_url)
+            # Store message in session state and rerun
+            st.session_state.mapping_update_msg = (success, msg)
+            st.rerun()
+
+    st.markdown("---")  # Add a visual separator
+
     st.markdown("**🔄 Process**")
     uploaded_file = st.file_uploader("CSV/XLSX", type=['csv', 'xlsx'], label_visibility="collapsed")
     
