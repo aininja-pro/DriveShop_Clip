@@ -214,13 +214,24 @@ def load_loans_data_from_url(url: str, limit: Optional[int] = None) -> List[Dict
             'to': loan_dict.get('To'),
             'affiliation': loan_dict.get('Affiliation'),
             'urls': urls,  # Use the properly parsed URLs
-            'start_date': loan_dict.get('Start Date'),
+            'start_date': None,  # Initialize as None, then parse below
             'make': loan_dict.get('Make'),
             # Add the new fields
             'article_id': loan_dict.get('ArticleID'),
             'person_id': loan_dict.get('Person_ID'),
             'office': loan_dict.get('Office')
         }
+        
+        # Parse start date properly (same logic as file upload function)
+        start_date_str = loan_dict.get('Start Date')
+        if start_date_str and pd.notna(start_date_str):
+            parsed_date = parse_start_date(start_date_str)
+            if parsed_date:
+                processed_loan['start_date'] = parsed_date
+                logger.debug(f"Parsed start date for {processed_loan['work_order']}: {parsed_date.strftime('%Y-%m-%d')}")
+            else:
+                logger.warning(f"Could not parse start date for {processed_loan['work_order']}: {start_date_str}")
+        
         processed_loans.append(processed_loan)
 
     logger.info(f"Total loans processed: {len(processed_loans)}")
@@ -767,11 +778,23 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if html_content and start_date:
             content_date = extract_date_from_html(html_content, final_url)
             if content_date:
-                days_diff = (content_date - start_date).days
-                if days_diff >= 0:
-                    logger.info(f"📅 Content found: published {days_diff} days after start date (date filtering disabled)")
+                # Safety check: ensure start_date is a datetime object
+                if isinstance(start_date, str):
+                    parsed_start_date = parse_start_date(start_date)
+                    if parsed_start_date:
+                        start_date = parsed_start_date
+                    else:
+                        logger.warning(f"Could not parse start_date string: {start_date}")
+                        start_date = None
+                
+                if start_date and isinstance(start_date, datetime):
+                    days_diff = (content_date - start_date).days
+                    if days_diff >= 0:
+                        logger.info(f"📅 Content found: published {days_diff} days after start date (date filtering disabled)")
+                    else:
+                        logger.info(f"📅 Content found: published {abs(days_diff)} days before start date (date filtering disabled)")
                 else:
-                    logger.info(f"📅 Content found: published {abs(days_diff)} days before start date (date filtering disabled)")
+                    logger.info(f"📅 Content found: start date unavailable for comparison (date filtering disabled)")
             else:
                 logger.info(f"📅 Content found: publication date unknown (date filtering disabled)")
         else:
