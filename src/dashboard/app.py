@@ -810,15 +810,16 @@ with st.sidebar:
         "https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv"
     )
     
-    record_limit = st.number_input(
-        "Limit records (0 for all):",
-        min_value=0,
-        value=10,
-        step=1,
-        help="Set the maximum number of records to process. Set to 0 to process all records."
-    )
+    st.markdown("### Filters")
 
-    st.markdown("**🔍 Advanced Filters**")
+    # This input is now the first filter for a clearer workflow.
+    limit_records = st.number_input(
+        "Limit records to process (0 for all):",
+        min_value=0,
+        value=0,  # Default to 0, which means "All"
+        step=1,
+        help="Set the maximum number of records to process from the filtered set. Set to 0 to process all."
+    )
     
     offices = ['All Offices']
     makes = ['All Makes']
@@ -866,7 +867,10 @@ with st.sidebar:
                 filtered_df['Person_ID'] = pd.to_numeric(filtered_df['Person_ID'], errors='coerce').astype('Int64').astype(str)
                 filtered_df = filtered_df[filtered_df['Person_ID'] == person_id]
         
-        st.info(f"**{len(filtered_df)}** records match your current filters and will be processed.")
+        # Clarify how many records will be processed based on filters and the limit
+        num_filtered = len(filtered_df)
+        limit_text = f"Up to {limit_records} of these will be processed." if limit_records > 0 else "All of these will be processed."
+        st.info(f"**{num_filtered}** records match your filters. {limit_text}")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -886,7 +890,7 @@ with st.sidebar:
         if st.button("Process Filtered", key='process_from_url_filtered'):
             # Only proceed if data has been loaded and filtered
             if 'filtered_df' in locals() and not filtered_df.empty:
-                with st.spinner(f"Processing {len(filtered_df)} filtered records... This may take a while."):
+                with st.spinner(f"Processing filtered records... This may take a while."):
                     from src.ingest.ingest import run_ingest_concurrent_with_filters
                     
                     # Convert filtered dataframe to list of records
@@ -920,7 +924,7 @@ with st.sidebar:
                     # Call the backend with the pre-filtered and correctly mapped data
                     success = run_ingest_concurrent_with_filters(
                         filtered_loans=remapped_records, 
-                        limit=record_limit
+                        limit=limit_records
                     )
                     
                     if success:
