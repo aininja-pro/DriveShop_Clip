@@ -1263,21 +1263,60 @@ def run_ingest_concurrent(
         # send_slack_message(f"❌ Ingestion failed: {e}")
         return False
 
-def run_ingest_concurrent_with_filters(
-    url: str,
-    filters: dict
-) -> bool:
+async def process_loans_concurrently(loans: List[Dict[str, Any]], total_loans: int) -> List[Dict[str, Any]]:
     """
-    Run the ingestion process with filters applied.
+    Process multiple loans concurrently using ChatGPT's approach.
+    
+    This function runs multiple process_loan() calls in parallel
+    without changing any of the internal logic.
     
     Args:
-        url: URL to the loans CSV file
-        filters: Dictionary containing filter criteria:
-            - office: Filter by office name
-            - make: Filter by vehicle make
-            - person_id: Filter by Person_ID
-            - outlet: Filter by media outlet name
-            - limit: Maximum number of records to process
+        loans: List of loan dictionaries
+        total_loans: Total number of loans for logging
+        
+    Returns:
+        List of results (same format as sequential processing)
+    """
+    if not loans:
+        return []
+    
+    # Create semaphore to control concurrency
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    
+    logger.info(f"Starting concurrent processing of {len(loans)} loans (max {MAX_CONCURRENT} concurrent)")
+    
+    # Create tasks for all loans
+    tasks = [
+        process_loan_async(semaphore, loan) 
+        for loan in loans
+    ]
+    
+    # Wait for all tasks to complete
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Filter out None results and exceptions
+    final_results = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            loan = loans[i]
+            work_order = loan.get('work_order', 'Unknown')
+            logger.error(f"Error processing loan {work_order}: {result}")
+        elif result is not None:
+            final_results.append(result)
+    
+    logger.info(f"Concurrent processing completed: {len(final_results)} results from {len(loans)} loans")
+    return final_results
+
+def run_ingest_concurrent_with_filters(
+    filtered_loans: list,
+    limit: int = 0
+) -> bool:
+    """
+    Run the ingestion process with a pre-filtered list of loans.
+    
+    Args:
+        filtered_loans: A list of loan dictionaries that have already been filtered.
+        limit: Maximum number of records to process from the filtered list.
             
     Returns:
         True if successful, False otherwise
@@ -1286,36 +1325,14 @@ def run_ingest_concurrent_with_filters(
     logger.info("🚀 Starting filtered ingestion process...")
     clear_rejected_records()
 
-    df = load_loans_data_from_url(url)
-    if df is None:
-        logger.error("❌ Failed to load or process data from URL for filtered ingest.")
-        return False
+    if not filtered_loans:
+        logger.warning("No filtered loans provided to process.")
+        return True
 
-    all_loans = df.to_dict('records')
-    logger.info(f"Loaded {len(all_loans)} total loans from URL.")
-
-    # Apply filters
-    filtered_loans = all_loans
-    
-    if filters.get("office") and filters["office"] != 'All Offices':
-        logger.info(f"Filtering by Office: {filters['office']}")
-        filtered_loans = [loan for loan in filtered_loans if loan.get('Office') == filters['office']]
-    
-    if filters.get("make") and filters["make"] != 'All Makes':
-        logger.info(f"Filtering by Make: {filters['make']}")
-        filtered_loans = [loan for loan in filtered_loans if loan.get('Make') == filters['make']]
-        
-    if filters.get("person_id"):
-        logger.info(f"Filtering by Person_ID: {filters['person_id']}")
-        # Ensure we compare strings to strings to avoid type issues
-        filtered_loans = [loan for loan in filtered_loans if str(loan.get('Person_ID', '')).split('.')[0] == str(filters['person_id'])]
-        
-    # We are not filtering by outlet name on the backend for now.
-
-    record_limit = filters.get("limit", 0)
-    if record_limit > 0:
-        logger.info(f"Limiting processing to {record_limit} records.")
-        loans_to_process = filtered_loans[:record_limit]
+    # Apply limit if provided
+    if limit > 0:
+        logger.info(f"Limiting processing to {limit} records.")
+        loans_to_process = filtered_loans[:limit]
     else:
         loans_to_process = filtered_loans
 
@@ -1323,10 +1340,20 @@ def run_ingest_concurrent_with_filters(
     logger.info(f"Processing {total_to_process} loans after filtering.")
     
     if not loans_to_process:
-        logger.warning("No loans to process after filtering.")
+        logger.warning("No loans to process after applying limit.")
         return True
 
-    process_loans_concurrently(loans_to_process, total_to_process)
+    # Correctly run the async function from the sync function
+    results = asyncio.run(process_loans_concurrently(loans_to_process, total_to_process))
+    
+    # Save results to CSV
+    project_root = Path(__file__).parent.parent.parent
+    output_file = os.path.join(project_root, "data", "loan_results.csv")
+    save_results(results, output_file)
+    
+    # Save rejected records
+    rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
+    save_rejected_records(REJECTED_RECORDS, rejected_file)
     
     end_time = time.time()
     logger.info(f"✅ Filtered ingestion process finished in {end_time - start_time:.2f} seconds.")
@@ -1351,7 +1378,7 @@ if __name__ == "__main__":
     
     # Run the appropriate ingestion function
     if args.concurrent:
-        success = run_ingest_concurrent(input_file, args.output)
+        success = run_ingest_concurrent(input_file=args.input, output_file=args.output)
     else:
         success = run_ingest(input_file, args.output)
     

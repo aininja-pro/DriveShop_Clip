@@ -883,23 +883,53 @@ with st.sidebar:
                     st.error("❌ Failed to load data.")
     
     with col2:
-        if st.button("Process from URL", key='process_from_url_filtered'):
-            with st.spinner(f"Processing {record_limit or 'all'} filtered records... This may take a while."):
-                from src.ingest.ingest import run_ingest_concurrent_with_filters
-                filters = {
-                    "office": selected_office,
-                    "make": selected_make,
-                    "person_id": name_to_id_map.get(selected_reporter_name),
-                    "outlet": selected_outlet,
-                    "limit": record_limit
-                }
-                success = run_ingest_concurrent_with_filters(loans_url, filters)
-                if success:
-                    st.success("✅ Filtered processing complete!")
-                    st.session_state.last_run_timestamp = datetime.now()
-                    st.rerun()
-                else:
-                    st.error("❌ Filtered processing failed.")
+        if st.button("Process Filtered", key='process_from_url_filtered'):
+            # Only proceed if data has been loaded and filtered
+            if 'filtered_df' in locals() and not filtered_df.empty:
+                with st.spinner(f"Processing {len(filtered_df)} filtered records... This may take a while."):
+                    from src.ingest.ingest import run_ingest_concurrent_with_filters
+                    
+                    # Convert filtered dataframe to list of records
+                    records_to_process = filtered_df.to_dict('records')
+
+                    # FIX: Remap dataframe columns to the format the backend expects
+                    remapped_records = []
+                    for record in records_to_process:
+                        # Split the 'Links' string into a list of URLs
+                        urls = []
+                        if 'Links' in record and pd.notna(record['Links']):
+                            urls = [url.strip() for url in str(record['Links']).split(',') if url.strip()]
+
+                        remapped_records.append({
+                            'work_order': record.get('WO #'),
+                            'model': record.get('Model'),
+                            'to': record.get('To'),
+                            'affiliation': record.get('Affiliation'),
+                            'urls': urls,
+                            'start_date': record.get('Start Date'),
+                            'make': record.get('Make'),
+                            'article_id': record.get('ArticleID'),
+                            'person_id': record.get('Person_ID'),
+                            'office': record.get('Office')
+                        })
+                    
+                    # Add a debug expander to show exactly what's being sent
+                    with st.expander("DEBUG: Data sent to backend"):
+                        st.json(remapped_records)
+
+                    # Call the backend with the pre-filtered and correctly mapped data
+                    success = run_ingest_concurrent_with_filters(
+                        filtered_loans=remapped_records, 
+                        limit=record_limit
+                    )
+                    
+                    if success:
+                        st.session_state.last_run_timestamp = datetime.now()
+                        st.rerun()
+                    else:
+                        st.error("❌ Filtered processing failed.")
+            else:
+                st.warning("No data loaded or no records match filters. Please load data first.")
             
     if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
         info = st.session_state.get('loans_data_info', {})
