@@ -165,8 +165,8 @@ def load_loans_data_from_url(url: str, limit: Optional[int] = None) -> List[Dict
     
     # Define headers manually for this specific report, as it has no header row
     headers = [
-        "ArticleID", "Person_ID", "Make", "Model", "WO #", "To", 
-        "Affiliation", "Start Date", "Stop Date", "Office", "Links"
+        "ArticleID", "Person_ID", "Make", "Model", "WO #", "Office", "To", 
+        "Affiliation", "Start Date", "Stop Date", "Model Short Name", "Links"
     ]
     
     # Use StringIO to treat the string content as a file
@@ -913,6 +913,7 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             # Copy fields from loan to best_clip
             best_clip = {
                 'WO #': work_order,
+                'Article_ID': loan.get('article_id', ''),  # Add Article_ID for approval workflow
                 'Make': make,
                 'Model': model,
                 'Clip URL': actual_url,  # Use the actual URL where content was found (could be from RSS feed)
@@ -1037,7 +1038,7 @@ def save_results(results: List[Dict[str, Any]], output_file: str) -> bool:
             logger.warning(f"No results to save. Creating empty file: {output_file}")
             with open(output_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['WO #', 'Make', 'Model', 'To', 'Affiliation', 'Clip URL', 'Links', 
+                writer.writerow(['WO #', 'Article_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Clip URL', 'Links', 
                                 'Relevance Score', 'Sentiment', 'Summary', 'Brand Alignment', 
                                 'Processed Date', 'Overall Score', 'Overall Sentiment', 'Recommendation',
                                 'Key Mentions', 'Performance Score', 'Performance Note', 'Design Score',
@@ -1078,7 +1079,7 @@ def save_rejected_records(rejected_records: List[Dict[str, Any]], output_file: s
             logger.info(f"No rejected records to save. Creating empty file: {output_file}")
             with open(output_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['WO #', 'Make', 'Model', 'To', 'Affiliation', 'Links', 'URLs_Processed', 'URLs_Successful',
+                writer.writerow(['WO #', 'Article_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Links', 'URLs_Processed', 'URLs_Successful',
                                 'Rejection_Reason', 'URL_Details', 'Processed_Date', 'Loan_Start_Date'])
             return True
         
