@@ -418,7 +418,7 @@ st.set_page_config(
     page_title="DriveShop Clip Tracking",
     page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # DEVELOPMENT MODE: Skip password check
@@ -971,7 +971,7 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-creatoriq_tab, bulk_tab, rejected_tab, analysis_tab = st.tabs(["🎬 CreatorIQ", "📋 Bulk Review", "⚠️ Rejected/Issues", "🔍 Detailed Analysis"])
+bulk_tab, rejected_tab, analysis_tab, creatoriq_tab = st.tabs(["📋 Bulk Review", "⚠️ Rejected/Issues", "🔍 Detailed Analysis", "🎬 CreatorIQ"])
 
 # ========== CREATORIQ TAB ==========
 with creatoriq_tab:
