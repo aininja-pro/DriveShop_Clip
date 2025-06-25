@@ -36,12 +36,15 @@ class BrowserCrawler:
 
     def _initialize_browser(self):
         """Initialize the browser if it hasn't been initialized yet."""
-        if self.browser is None and self._playwright_available:
+        # THREAD SAFETY FIX: Always create a fresh browser instance for each thread
+        # This prevents greenlet threading conflicts in concurrent processing
+        if self._playwright_available:
             try:
                 # Import here to avoid issues if the module is not available
                 from playwright.sync_api import sync_playwright
                 
-                logger.info("Initializing Playwright browser")
+                logger.info("Initializing Playwright browser (thread-safe)")
+                # Always create a new playwright instance for thread safety
                 self.playwright = sync_playwright().start()
                 self.browser = self.playwright.chromium.launch(
                     headless=self.headless,
@@ -53,7 +56,7 @@ class BrowserCrawler:
                 logger.error(f"Failed to initialize Playwright browser: {e}")
                 # Fall back to mock implementation
                 return False
-        return self.browser is not None
+        return False
     
     def crawl(
         self, 
@@ -74,7 +77,7 @@ class BrowserCrawler:
         """
         logger.info(f"Crawling {url}")
         
-        # Check if we should use real Playwright or mock
+        # THREAD SAFETY: Always initialize fresh browser for each crawl
         use_real_browser = self._initialize_browser()
         
         if use_real_browser:
@@ -132,10 +135,15 @@ class BrowserCrawler:
                 page.close()
                 context.close()
                 
+                # THREAD SAFETY: Close browser after each crawl to prevent threading issues
+                self._cleanup_browser()
+                
                 return content, title, None
                 
             except Exception as e:
                 logger.error(f"Error crawling {url} with Playwright: {e}")
+                # THREAD SAFETY: Clean up browser even on error
+                self._cleanup_browser()
                 # Fall back to mock implementation
                 logger.info("Falling back to mock implementation")
                 content, title = self._get_mock_content(url)
@@ -269,17 +277,21 @@ class BrowserCrawler:
         except Exception as e:
             logger.warning(f"Error during page scrolling: {e}")
     
-    def close(self) -> None:
-        """Close the browser."""
+    def _cleanup_browser(self) -> None:
+        """Clean up browser resources for thread safety."""
         if self.browser:
             try:
                 self.browser.close()
                 self.playwright.stop()
                 self.browser = None
                 self.playwright = None
-                logger.info("Closed Playwright browser")
+                logger.debug("Cleaned up Playwright browser (thread-safe)")
             except Exception as e:
-                logger.error(f"Error closing browser: {e}")
+                logger.warning(f"Error cleaning up browser: {e}")
+
+    def close(self) -> None:
+        """Close the browser."""
+        self._cleanup_browser()
                 
     def __del__(self):
         """Destructor to ensure browser is closed."""

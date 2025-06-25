@@ -119,8 +119,8 @@ def load_loans_data_for_filtering(url: str):
         response.raise_for_status()
         
         headers = [
-            "ArticleID", "Person_ID", "Make", "Office", "WO #", "To", 
-            "Affiliation", "Start Date", "Stop Date", "Model", "Links"
+            "ArticleID", "Person_ID", "Make", "Model", "WO #", "Office", "To", 
+            "Affiliation", "Start Date", "Stop Date", "Model Short Name", "Links"
         ]
         
         csv_content = response.content.decode('utf-8')
@@ -278,13 +278,15 @@ def create_client_excel_report(df, approved_df=None):
     results_ws = wb.create_sheet("Detailed Results")
     
     # Use the same column names as Bulk Review (exclude Approve/Reject columns)
+    # Include Article_ID for approval workflow even though it's not visible in UI
     bulk_review_columns = [
-        'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
+        'Article_ID', 'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
         'Relevance', 'Sentiment', 'URLs', 'Other URLs'
     ]
     
     # Map our data columns to Bulk Review column names
     column_mapping = {
+        'Article_ID': 'Article_ID',  # Include Article_ID for approval workflow
         'Office': 'Office',
         'WO #': 'WO #',
         'Make': 'Make',
@@ -1746,7 +1748,7 @@ with bulk_tab:
                     clean_df,
                     gridOptions=grid_options,
                     allow_unsafe_jscode=True,
-                    update_mode=GridUpdateMode.SELECTION_CHANGED,
+                    update_mode=GridUpdateMode.VALUE_CHANGED,  # Capture cell value changes for Media Outlet saves
                     height=650,  # Increased height for better viewing
                     fit_columns_on_grid_load=True,
                     theme="alpine",
@@ -1755,8 +1757,50 @@ with bulk_tab:
                 
                 # Note: URLs are now clickable directly in the "Other URLs" column
                 
-                # Process inline actions from AgGrid
+                # Process Media Outlet changes and save them to the original data
                 changed_df = selected_rows["data"]
+                if not changed_df.empty:
+                    # Check if any Media Outlet values have changed
+                    original_data_changed = False
+                    changed_count = 0
+                    changed_wos = []
+                    
+                    for idx, row in changed_df.iterrows():
+                        wo_num = str(row.get('WO #', ''))
+                        new_outlet = row.get('Media Outlet', '')
+                        
+                        # Find the corresponding row in the original dataframe
+                        if wo_num and new_outlet:
+                            mask = df['WO #'].astype(str) == wo_num
+                            if mask.any():
+                                original_affiliation = df.loc[mask, 'Affiliation'].iloc[0] if 'Affiliation' in df.columns else ''
+                                
+                                # Only update if the new outlet is different from the smart-matched value
+                                if new_outlet != original_affiliation:
+                                    # Update the original dataframe's Affiliation column with the user's selection
+                                    df.loc[mask, 'Affiliation'] = new_outlet
+                                    original_data_changed = True
+                                    changed_count += 1
+                                    changed_wos.append(wo_num)
+                                    print(f"💾 Saved Media Outlet change for WO# {wo_num}: '{original_affiliation}' → '{new_outlet}'")
+                    
+                    # Save the updated data back to the loan_results.csv file
+                    if original_data_changed:
+                        try:
+                            df.to_csv(results_file, index=False)
+                            # Show a dynamic success message with count and timestamp
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            if changed_count == 1:
+                                st.success(f"💾 Media Outlet saved for WO# {changed_wos[0]} at {timestamp}")
+                            else:
+                                st.success(f"💾 {changed_count} Media Outlet selections saved at {timestamp}")
+                            print(f"✅ Updated loan_results.csv with {changed_count} Media Outlet changes")
+                        except Exception as e:
+                            st.error(f"Error saving Media Outlet changes: {e}")
+                            print(f"❌ Error saving changes: {e}")
+                
+                # Process inline actions from AgGrid
                 if not changed_df.empty:
                     # Find which rows were approved or rejected
                     approved_rows = changed_df[changed_df['✅ Approve'] == True]
@@ -1829,6 +1873,33 @@ with bulk_tab:
                                 st.warning("No approved clips file found")
                         except Exception as e:
                             st.error(f"Error exporting clips: {e}")
+                    
+                    # Excel Export Button
+                    if st.button("📊 Excel Report"):
+                        try:
+                            # Load approved clips if available
+                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                            approved_df = None
+                            if os.path.exists(approved_file):
+                                approved_df = pd.read_csv(approved_file)
+                            
+                            # Create professional Excel report using current display data
+                            wb = create_client_excel_report(df, approved_df)
+                            
+                            # Save to bytes
+                            import io
+                            excel_buffer = io.BytesIO()
+                            wb.save(excel_buffer)
+                            excel_buffer.seek(0)
+                            
+                            st.download_button(
+                                label="📥 Download Excel Report",
+                                data=excel_buffer.getvalue(),
+                                file_name=f"DriveShop_Bulk_Review_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+                        except Exception as e:
+                            st.error(f"Error creating Excel report: {e}")
                 
                 with col3:
                     if st.button("🔄 Refresh Data"):
