@@ -165,7 +165,7 @@ def load_loans_data_from_url(url: str, limit: Optional[int] = None) -> List[Dict
     
     # Define headers manually for this specific report, as it has no header row
     headers = [
-        "ArticleID", "Person_ID", "Make", "Model", "WO #", "Office", "To", 
+        "ActivityID", "Person_ID", "Make", "Model", "WO #", "Office", "To", 
         "Affiliation", "Start Date", "Stop Date", "Model Short Name", "Links"
     ]
     
@@ -217,7 +217,7 @@ def load_loans_data_from_url(url: str, limit: Optional[int] = None) -> List[Dict
             'start_date': None,  # Initialize as None, then parse below
             'make': loan_dict.get('Make'),
             # Add the new fields
-            'article_id': loan_dict.get('ArticleID'),
+            'activity_id': loan_dict.get('ActivityID'),
             'person_id': loan_dict.get('Person_ID'),
             'office': loan_dict.get('Office')
         }
@@ -512,7 +512,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                     'url': url,
                     'content': transcript,
                     'content_type': 'video',
-                    'title': title
+                    'title': title,
+                    'published_date': video_date
                 }
             else:
                 logger.info(f"No transcript available for video {video_id}, trying metadata fallback")
@@ -525,7 +526,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                         'content_type': 'video_metadata',
                         'title': metadata.get('title', f"YouTube Video {video_id}"),
                         'channel_name': metadata.get('channel_name', ''),
-                        'view_count': metadata.get('view_count', '0')
+                        'view_count': metadata.get('view_count', '0'),
+                        'published_date': video_date
                     }
                 else:
                     logger.warning(f"No content available for video: {url}")
@@ -644,7 +646,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                     'url': video['url'],
                                     'content': transcript,
                                     'content_type': 'video',
-                                    'title': video['title']
+                                    'title': video['title'],
+                                    'published_date': video_date
                                 }
                             else:
                                 # Fallback to metadata if no transcript
@@ -657,7 +660,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                         'content_type': 'video_metadata',
                                         'title': metadata.get('title', video['title']),
                                         'channel_name': metadata.get('channel_name', ''),
-                                        'view_count': metadata.get('view_count', '0')
+                                        'view_count': metadata.get('view_count', '0'),
+                                        'published_date': video_date
                                     }
             
             # If we found something in this time window, stop looking
@@ -694,7 +698,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                 'content_type': 'video_metadata',
                                 'title': metadata.get('title', video_info['title']),
                                 'channel_name': metadata.get('channel_name', ''),
-                                'view_count': metadata.get('view_count', '0')
+                                'view_count': metadata.get('view_count', '0'),
+                                'published_date': video_info.get('published_date')
                             }
                         
                         # Only try transcript as fallback if metadata failed
@@ -705,7 +710,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                 'url': video_info['url'],
                                 'content': transcript,
                                 'content_type': 'video',
-                                'title': video_info['title']
+                                'title': video_info['title'],
+                                'published_date': video_info.get('published_date')
                             }
             else:
                 logger.info(f"ScrapingBee found no relevant videos for {make} {model} in channel")
@@ -771,34 +777,38 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             logger.warning(f"No content retrieved from {url}")
             return None
         
-        # Extract publication date for logging purposes only (not for filtering)
+        # Extract publication date for both logging and saving to results
         html_content = result.get('content', '')
         final_url = result.get('url', url)
+        published_date = None
         
-        if html_content and start_date:
-            content_date = extract_date_from_html(html_content, final_url)
-            if content_date:
-                # Safety check: ensure start_date is a datetime object
-                if isinstance(start_date, str):
-                    parsed_start_date = parse_start_date(start_date)
-                    if parsed_start_date:
-                        start_date = parsed_start_date
-                    else:
-                        logger.warning(f"Could not parse start_date string: {start_date}")
-                        start_date = None
-                
-                if start_date and isinstance(start_date, datetime):
-                    days_diff = (content_date - start_date).days
-                    if days_diff >= 0:
-                        logger.info(f"📅 Content found: published {days_diff} days after start date (date filtering disabled)")
-                    else:
-                        logger.info(f"📅 Content found: published {abs(days_diff)} days before start date (date filtering disabled)")
+        # Try to extract the publication date from the content
+        if html_content:
+            published_date = extract_date_from_html(html_content, final_url)
+            
+        # Log date information for debugging
+        if published_date and start_date:
+            # Safety check: ensure start_date is a datetime object
+            if isinstance(start_date, str):
+                parsed_start_date = parse_start_date(start_date)
+                if parsed_start_date:
+                    start_date = parsed_start_date
                 else:
-                    logger.info(f"📅 Content found: start date unavailable for comparison (date filtering disabled)")
+                    logger.warning(f"Could not parse start_date string: {start_date}")
+                    start_date = None
+            
+            if start_date and isinstance(start_date, datetime):
+                days_diff = (published_date - start_date).days
+                if days_diff >= 0:
+                    logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} ({days_diff} days after start date)")
+                else:
+                    logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} ({abs(days_diff)} days before start date)")
             else:
-                logger.info(f"📅 Content found: publication date unknown (date filtering disabled)")
+                logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} (start date unavailable for comparison)")
+        elif published_date:
+            logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} (no start date to compare)")
         else:
-            logger.info(f"📅 Content found: no date information available (date filtering disabled)")
+            logger.info(f"📅 Content found: publication date could not be determined")
             
         logger.info(f"✅ Successfully crawled content - bypassing date restrictions")
             
@@ -818,7 +828,8 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             'content_type': 'article',
             'title': result.get('title', url),
             'tier_used': tier_used,
-            'cached': cached
+            'cached': cached,
+            'published_date': published_date  # Add the extracted publication date
         }
         
     except Exception as e:
@@ -913,7 +924,7 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             # Copy fields from loan to best_clip
             best_clip = {
                 'WO #': work_order,
-                'Article_ID': loan.get('article_id', ''),  # Add Article_ID for approval workflow
+                'Activity_ID': loan.get('activity_id', ''),  # Add Activity_ID for approval workflow
                 'Person_ID': loan.get('person_id', ''),  # Add Person_ID for smart outlet matching
                 'Make': make,
                 'Model': model,
@@ -924,6 +935,7 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 'Summary': analysis.get('summary', ''),
                 'Brand Alignment': analysis.get('brand_alignment', False),
                 'Processed Date': datetime.now().isoformat(),
+                'Published Date': clip_data.get('published_date').isoformat() if clip_data.get('published_date') else None,
                 # Add comprehensive GPT analysis fields
                 'Overall Score': analysis.get('overall_score', 0),
                 'Overall Sentiment': analysis.get('overall_sentiment', 'neutral'),
@@ -1039,9 +1051,9 @@ def save_results(results: List[Dict[str, Any]], output_file: str) -> bool:
             logger.warning(f"No results to save. Creating empty file: {output_file}")
             with open(output_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['WO #', 'Article_ID', 'Person_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Clip URL', 'Links', 
+                writer.writerow(['WO #', 'Activity_ID', 'Person_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Clip URL', 'Links', 
                                 'Relevance Score', 'Sentiment', 'Summary', 'Brand Alignment', 
-                                'Processed Date', 'Overall Score', 'Overall Sentiment', 'Recommendation',
+                                'Processed Date', 'Published Date', 'Overall Score', 'Overall Sentiment', 'Recommendation',
                                 'Key Mentions', 'Performance Score', 'Performance Note', 'Design Score',
                                 'Design Note', 'Interior Score', 'Interior Note', 'Technology Score',
                                 'Technology Note', 'Value Score', 'Value Note', 'Pros', 'Cons'])
@@ -1080,7 +1092,7 @@ def save_rejected_records(rejected_records: List[Dict[str, Any]], output_file: s
             logger.info(f"No rejected records to save. Creating empty file: {output_file}")
             with open(output_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['WO #', 'Article_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Links', 'URLs_Processed', 'URLs_Successful',
+                writer.writerow(['WO #', 'Activity_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Links', 'URLs_Processed', 'URLs_Successful',
                                 'Rejection_Reason', 'URL_Details', 'Processed_Date', 'Loan_Start_Date'])
             return True
         

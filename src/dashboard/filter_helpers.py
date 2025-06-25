@@ -21,8 +21,8 @@ def load_loans_data_for_filtering(url: str):
         
         # Define headers manually for this specific report
         headers = [
-            "ArticleID", "Person_ID", "Make", "Model", "WO #", "To", 
-            "Affiliation", "Start Date", "Stop Date", "Office", "Links"
+            "ActivityID", "Person_ID", "Make", "Model", "WO #", "To", 
+            "Affiliation", "Start Date", "Stop Date", "Model Short Name", "Links"
         ]
         
         # Parse CSV

@@ -121,7 +121,7 @@ def load_loans_data_for_filtering(url: str):
         response.raise_for_status()
         
         headers = [
-            "ArticleID", "Person_ID", "Make", "Model", "WO #", "Office", "To", 
+            "ActivityID", "Person_ID", "Make", "Model", "WO #", "Office", "To", 
             "Affiliation", "Start Date", "Stop Date", "Model Short Name", "Links"
         ]
         
@@ -282,15 +282,15 @@ def create_client_excel_report(df, approved_df=None):
     results_ws = wb.create_sheet("Detailed Results")
     
     # Use the same column names as Bulk Review (exclude Approve/Reject columns)
-    # Include Article_ID for approval workflow even though it's not visible in UI
+    # Include Activity_ID for approval workflow even though it's not visible in UI
     bulk_review_columns = [
-        'Article_ID', 'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
+        'Activity_ID', 'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
         'Relevance', 'Sentiment', 'URLs', 'Other URLs'
     ]
     
     # Map our data columns to Bulk Review column names
     column_mapping = {
-        'Article_ID': 'Article_ID',  # Include Article_ID for approval workflow
+        'Activity_ID': 'Activity_ID',  # Include Activity_ID for approval workflow
         'Office': 'Office',
         'WO #': 'WO #',
         'Make': 'Make',
@@ -971,13 +971,13 @@ with st.sidebar:
         info = st.session_state.batch_info
         st.success(f"""
         **📊 Last Batch Completed at {info['timestamp']}:**
+        - **Last Activity ID:** {info['last_processed_id']}
         - **Records Processed:** {info['records_processed']}
-        - **Last Article ID:** {info['last_processed_id']}
-        - **Next Batch Should Start With:** `{info['next_suggested_id']}`
+        - **Completed At:** {info['timestamp']}
         """)
         
-        # Add a button to auto-fill the next Article ID
-        if st.button("📋 Use Suggested ID for Next Batch", key="use_suggested_id", help="Auto-fill the suggested Article ID"):
+        # Add a button to auto-fill the next Activity ID
+        if st.button("📋 Use Suggested ID for Next Batch", key="use_suggested_id", help="Auto-fill the suggested Activity ID"):
             st.session_state.suggested_id_to_use = info['next_suggested_id']
             st.rerun()
         
@@ -986,11 +986,13 @@ with st.sidebar:
             suggested_value = st.session_state.suggested_id_to_use
             del st.session_state.suggested_id_to_use
     
-    # Article ID range filter for batch processing
-    start_article_id = st.text_input(
-        "Starting with Article ID (optional):",
-        value=suggested_value,
-        help="Enter an Article ID to start processing from that record onwards. Leave blank to start from the beginning."
+    # Position-based filter for batch processing (much simpler!)
+    skip_records = st.number_input(
+        "Skip first X records (optional):",
+        min_value=0,
+        value=0,
+        step=1,
+        help="Enter number of records to skip from the beginning. For example, enter 200 to start processing from record 201."
     )
 
     if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
@@ -1009,25 +1011,13 @@ with st.sidebar:
                 filtered_df['Person_ID'] = pd.to_numeric(filtered_df['Person_ID'], errors='coerce').astype('Int64').astype(str)
                 filtered_df = filtered_df[filtered_df['Person_ID'] == person_id]
         
-        # Filter by starting Article ID for batch processing
-        if start_article_id and start_article_id.strip():
-            try:
-                start_id = int(start_article_id.strip())
-                if 'Article_ID' in filtered_df.columns:
-                    # Convert Article_ID to numeric for comparison
-                    filtered_df['Article_ID_numeric'] = pd.to_numeric(filtered_df['Article_ID'], errors='coerce')
-                    filtered_df = filtered_df[filtered_df['Article_ID_numeric'] >= start_id]
-                    # Drop the temporary numeric column
-                    filtered_df = filtered_df.drop('Article_ID_numeric', axis=1)
-                elif 'ArticleID' in filtered_df.columns:
-                    # Handle alternative column name
-                    filtered_df['ArticleID_numeric'] = pd.to_numeric(filtered_df['ArticleID'], errors='coerce')
-                    filtered_df = filtered_df[filtered_df['ArticleID_numeric'] >= start_id]
-                    filtered_df = filtered_df.drop('ArticleID_numeric', axis=1)
-                else:
-                    st.warning("Article ID column not found in data")
-            except ValueError:
-                st.warning("Please enter a valid numeric Article ID")
+        # Apply position-based filtering (skip first X records)
+        if skip_records > 0:
+            if skip_records < len(filtered_df):
+                filtered_df = filtered_df.iloc[skip_records:].reset_index(drop=True)
+                st.info(f"📍 Skipping first {skip_records} records, starting from position {skip_records + 1}")
+            else:
+                st.warning(f"Skip value ({skip_records}) is greater than available records ({len(filtered_df)}). Processing all records.")
         
         # Clarify how many records will be processed based on filters and the limit
         num_filtered = len(filtered_df)
@@ -1074,7 +1064,7 @@ with st.sidebar:
                             'urls': urls,
                             'start_date': record.get('Start Date'),
                             'make': record.get('Make'),
-                            'article_id': record.get('Article_ID'),  # Fixed: Use Article_ID (with underscore)
+                            'article_id': record.get('Activity_ID'),  # Fixed: Use Activity_ID (with underscore)
                             'person_id': record.get('Person_ID'),
                             'office': record.get('Office')
                         })
@@ -1092,22 +1082,22 @@ with st.sidebar:
                     if success:
                         # Store batch processing info for next batch suggestion
                         if remapped_records:
-                            # Get the last Article ID from the processed records
-                            processed_article_ids = [r.get('article_id') for r in remapped_records if r.get('article_id')]
-                            if processed_article_ids:
-                                last_processed_id = processed_article_ids[-1]
+                            # Get the last Activity ID from the processed records
+                            processed_activity_ids = [r.get('article_id') for r in remapped_records if r.get('article_id')]
+                            if processed_activity_ids:
+                                last_processed_id = processed_activity_ids[-1]
                                 
-                                # Find the next Article ID in the original data for batch suggestion
+                                # Find the next Activity ID in the original data for batch suggestion
                                 original_df = st.session_state.loaded_loans_df
-                                if 'Article_ID' in original_df.columns:
+                                if 'Activity_ID' in original_df.columns:
                                     # Convert to numeric and sort to find next ID
                                     original_df_sorted = original_df.copy()
-                                    original_df_sorted['Article_ID_numeric'] = pd.to_numeric(original_df_sorted['Article_ID'], errors='coerce')
-                                    original_df_sorted = original_df_sorted.dropna(subset=['Article_ID_numeric']).sort_values('Article_ID_numeric')
+                                    original_df_sorted['Activity_ID_numeric'] = pd.to_numeric(original_df_sorted['Activity_ID'], errors='coerce')
+                                    original_df_sorted = original_df_sorted.dropna(subset=['Activity_ID_numeric']).sort_values('Activity_ID_numeric')
                                     
                                     # Find the next ID after the last processed one
                                     last_processed_numeric = pd.to_numeric(last_processed_id, errors='coerce')
-                                    next_ids = original_df_sorted[original_df_sorted['Article_ID_numeric'] > last_processed_numeric]['Article_ID']
+                                    next_ids = original_df_sorted[original_df_sorted['Activity_ID_numeric'] > last_processed_numeric]['Activity_ID']
                                     
                                     if not next_ids.empty:
                                         next_suggested_id = str(int(next_ids.iloc[0]))
@@ -1160,7 +1150,13 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_tab, rejected_tab, analysis_tab, creatoriq_tab = st.tabs(["📋 Bulk Review", "⚠️ Rejected/Issues", "🔍 Detailed Analysis", "🎬 CreatorIQ"])
+bulk_review_tab, analysis_tab, rejected_tab, creatoriq_tab, history_tab = st.tabs([
+    "📋 Bulk Review", 
+    "📊 Detailed Analysis", 
+    "⚠️ Rejected/Issues", 
+    "🎬 CreatorIQ Export",
+    "📚 File History"
+])
 
 # ========== CREATORIQ TAB ==========
 with creatoriq_tab:
@@ -1388,7 +1384,7 @@ with creatoriq_tab:
         st.info("Please ensure the CreatorIQ module is properly installed.")
 
 # ========== BULK REVIEW TAB (Compact Interface) ==========
-with bulk_tab:
+with bulk_review_tab:
     
     # Try to load results file
     results_file = os.path.join(project_root, "data", "loan_results.csv")
@@ -1944,26 +1940,31 @@ with bulk_tab:
                     clean_df,
                     gridOptions=grid_options,
                     allow_unsafe_jscode=True,
-                    update_mode=GridUpdateMode.VALUE_CHANGED,  # Capture cell value changes for Media Outlet saves
+                    update_mode=GridUpdateMode.MANUAL,  # Manual updates to prevent refresh loops
                     height=650,  # Increased height for better viewing
                     fit_columns_on_grid_load=True,
                     theme="alpine",
-                    enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
+                    enable_enterprise_modules=True,  # REQUIRED for Set Filters with checkboxes
+                    reload_data=False  # Prevent automatic data reloading
                 )
                 
                 # Note: URLs are now clickable directly in the "Other URLs" column
                 
-                # Process Media Outlet changes and save them to the original data
+                # Process AgGrid changes
                 changed_df = selected_rows["data"]
                 
-                # Initialize session state for tracking last saved state
+                # Initialize session state for tracking
                 if 'last_saved_outlets' not in st.session_state:
                     st.session_state.last_saved_outlets = {}
+                if 'selected_for_approval' not in st.session_state:
+                    st.session_state.selected_for_approval = set()
+                if 'selected_for_rejection' not in st.session_state:
+                    st.session_state.selected_for_rejection = set()
                 
-                # Process changes from AgGrid
+                # Process changes from AgGrid WITHOUT triggering reruns
                 if not changed_df.empty:
-                    # Check if any Media Outlet values have changed
-                    original_data_changed = False
+                    # 1. First handle Media Outlet changes (non-blocking)
+                    outlet_changed = False
                     changed_count = 0
                     changed_wos = []
                     
@@ -1976,63 +1977,67 @@ with bulk_tab:
                             mask = df['WO #'].astype(str) == wo_num
                             if mask.any():
                                 original_affiliation = df.loc[mask, 'Affiliation'].iloc[0] if 'Affiliation' in df.columns else ''
-                                
-                                # Check if this is a new change (different from what we last saved)
                                 last_saved = st.session_state.last_saved_outlets.get(wo_num, '')
                                 
-                                # Save if: 1) Different from original, OR 2) Different from last saved value
+                                # Save if different from original OR different from last saved
                                 if new_outlet != original_affiliation or new_outlet != last_saved:
-                                    # Update the original dataframe's Affiliation column with the user's selection
+                                    # Update the original dataframe silently
                                     df.loc[mask, 'Affiliation'] = new_outlet
-                                    original_data_changed = True
+                                    outlet_changed = True
                                     changed_count += 1
                                     changed_wos.append(wo_num)
-                                    
-                                    # Update our tracking
                                     st.session_state.last_saved_outlets[wo_num] = new_outlet
                                     print(f"💾 Saved Media Outlet change for WO# {wo_num}: '{original_affiliation}' → '{new_outlet}'")
                     
-                    # Save the updated data back to the loan_results.csv file
-                    if original_data_changed:
+                    # Save outlet changes to file (background operation)
+                    if outlet_changed:
                         try:
                             df.to_csv(results_file, index=False)
-                            # Show a dynamic success message with count and timestamp
+                            # Use session state to show success message without rerun
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%H:%M:%S")
                             if changed_count == 1:
-                                st.success(f"💾 Media Outlet saved for WO# {changed_wos[0]} at {timestamp}")
+                                st.session_state.outlet_save_message = f"💾 Media Outlet saved for WO# {changed_wos[0]} at {timestamp}"
                             else:
-                                st.success(f"💾 {changed_count} Media Outlet selections saved at {timestamp}")
+                                st.session_state.outlet_save_message = f"💾 {changed_count} Media Outlet selections saved at {timestamp}"
                             print(f"✅ Updated loan_results.csv with {changed_count} Media Outlet changes")
                         except Exception as e:
-                            st.error(f"Error saving Media Outlet changes: {e}")
+                            st.session_state.outlet_save_message = f"❌ Error saving Media Outlet changes: {e}"
                             print(f"❌ Error saving changes: {e}")
-                
-                # Store selected clips in session state (no immediate processing)
-                if not changed_df.empty:
-                    # Find which rows are currently selected for approval
+                    
+                    # 2. Then handle approval/rejection checkboxes (stable tracking)
                     approved_rows = changed_df[changed_df['✅ Approve'] == True]
                     rejected_rows = changed_df[changed_df['❌ Reject'] == True]
                     
-                    # Store selections in session state for later processing
-                    if 'selected_for_approval' not in st.session_state:
-                        st.session_state.selected_for_approval = set()
-                    if 'selected_for_rejection' not in st.session_state:
-                        st.session_state.selected_for_rejection = set()
-                    
-                    # Update selections based on current checkboxes
+                    # Get current checkbox states
                     current_approved_wos = set(approved_rows['WO #'].astype(str))
                     current_rejected_wos = set(rejected_rows['WO #'].astype(str))
                     
-                    # Update session state
-                    st.session_state.selected_for_approval = current_approved_wos
-                    st.session_state.selected_for_rejection = current_rejected_wos
+                    # REPLACE the session state entirely with current checkbox states
+                    # This prevents accumulation and refresh issues
+                    st.session_state.selected_for_approval = current_approved_wos.copy()
+                    st.session_state.selected_for_rejection = current_rejected_wos.copy()
                     
-                    # Show current selection count
+                    # Ensure mutual exclusivity (approve overrides reject)
                     if current_approved_wos:
-                        st.info(f"📋 {len(current_approved_wos)} clips selected for approval")
-                    if current_rejected_wos:
-                        st.info(f"📋 {len(current_rejected_wos)} clips selected for rejection")
+                        st.session_state.selected_for_rejection -= current_approved_wos
+                
+                # Display persistent messages
+                if hasattr(st.session_state, 'outlet_save_message') and st.session_state.outlet_save_message:
+                    if st.session_state.outlet_save_message.startswith("💾"):
+                        st.success(st.session_state.outlet_save_message)
+                    else:
+                        st.error(st.session_state.outlet_save_message)
+                    # Clear message after showing
+                    st.session_state.outlet_save_message = None
+                
+                # Show current selection counts
+                approved_count = len(st.session_state.selected_for_approval)
+                rejected_count = len(st.session_state.selected_for_rejection)
+                if approved_count > 0:
+                    st.info(f"📋 {approved_count} clips selected for approval")
+                if rejected_count > 0:
+                    st.info(f"📋 {rejected_count} clips selected for rejection")
                 
                 # Action buttons below table
                 st.markdown("---")
@@ -2129,7 +2134,7 @@ with bulk_tab:
                                     json_data.append({
                                         # Basic Information
                                         "work_order": str(row.get('WO #', '')),
-                                        "article_id": str(row.get('Article_ID', '')),
+                                        "activity_id": str(row.get('Activity_ID', '')),
                                         "make": str(row.get('Make', '')),
                                         "vehicle_model": str(row.get('Model', '')),
                                         "contact": str(row.get('To', '')),
@@ -2276,7 +2281,7 @@ with bulk_tab:
                 fields = list(sample_clip.keys())
                 
                 # Group fields by category for better display
-                basic_fields = [f for f in fields if f in ['work_order', 'article_id', 'make', 'vehicle_model', 'contact', 'media_outlet', 'office']]
+                basic_fields = [f for f in fields if f in ['work_order', 'activity_id', 'make', 'vehicle_model', 'contact', 'media_outlet', 'office']]
                 analysis_fields = [f for f in fields if 'score' in f or f in ['sentiment', 'summary', 'recommendation', 'key_mentions', 'brand_alignment']]
                 detail_fields = [f for f in fields if 'note' in f or f in ['pros', 'cons']]
                 tech_fields = [f for f in fields if f in ['clip_url', 'original_links', 'url_tracking', 'urls_processed', 'urls_successful', 'processed_date', 'approval_timestamp']]
@@ -2301,6 +2306,8 @@ with bulk_tab:
                         st.markdown(f"• `{field}`")
                 
                 st.markdown(f"**Total approved clips in JSON:** {len(st.session_state.latest_json_data)}")
+
+
 
 # ========== REJECTED/ISSUES TAB (Transparency Dashboard) ==========
 with rejected_tab:
@@ -2871,6 +2878,103 @@ with analysis_tab:
             """)
             
             # Add extra bottom spacing
-            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True) 
+            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+
+# ========== FILE HISTORY TAB ==========
+with history_tab:
+    st.markdown("## 📚 File History")
+    st.markdown("*Access all your previous approval session files and generate reports*")
+    
+    # Get all JSON files from data directory
+    data_dir = os.path.join(project_root, "data")
+    json_files = []
+    if os.path.exists(data_dir):
+        for file in os.listdir(data_dir):
+            if file.startswith("approved_clips_") and file.endswith(".json"):
+                file_path = os.path.join(data_dir, file)
+                file_stats = os.stat(file_path)
+                # Extract date from filename: approved_clips_20250625_163543.json
+                try:
+                    date_str = file.replace("approved_clips_", "").replace(".json", "")
+                    date_part = date_str.split("_")[0]  # 20250625
+                    time_part = date_str.split("_")[1]  # 163543
+                    formatted_date = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
+                    formatted_time = f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
+                    display_name = f"{formatted_date} at {formatted_time}"
+                except:
+                    display_name = file.replace("approved_clips_", "").replace(".json", "")
+                
+                json_files.append({
+                    'filename': file,
+                    'filepath': file_path,
+                    'display_name': display_name,
+                    'size': file_stats.st_size,
+                    'modified': file_stats.st_mtime
+                })
+    
+    # Sort by modification time (newest first)
+    json_files.sort(key=lambda x: x['modified'], reverse=True)
+    
+    if json_files:
+        st.markdown(f"**Found {len(json_files)} previous approval sessions:**")
+        
+        # Create a more compact display
+        for i, file_info in enumerate(json_files):
+            # Use filename as unique identifier to avoid key conflicts
+            file_key = file_info['filename'].replace('.json', '').replace('approved_clips_', '')
+            
+            with st.expander(f"📅 {file_info['display_name']} ({file_info['size']/1024:.1f} KB)", expanded=(i==0)):
+                col_json_hist, col_excel_hist, col_info = st.columns([1, 1, 1])
+                
+                with col_json_hist:
+                    # Load and provide JSON download
+                    try:
+                        with open(file_info['filepath'], 'r') as f:
+                            json_data = json.load(f)
+                        st.download_button(
+                            label="📋 Download JSON",
+                            data=json.dumps(json_data, indent=2),
+                            file_name=file_info['filename'],
+                            mime="application/json",
+                            key=f"json_download_{file_key}",
+                            help="Download this JSON file"
+                        )
+                    except Exception as e:
+                        st.error(f"Error loading JSON: {e}")
+                
+                with col_excel_hist:
+                    # Excel generation temporarily disabled for historical files
+                    # to avoid compatibility issues
+                    st.info("💡 **Excel Generation**\n\nFor historical sessions, use the JSON download and import into the current session for Excel generation.")
+                    st.caption("This ensures compatibility with the latest Excel format.")
+                
+                with col_info:
+                    # Show file info
+                    try:
+                        with open(file_info['filepath'], 'r') as f:
+                            json_data = json.load(f)
+                        if json_data:
+                            st.metric("Clips", len(json_data))
+                            avg_relevance = sum(clip.get('relevance_score', 0) for clip in json_data) / len(json_data)
+                            st.metric("Avg Score", f"{avg_relevance:.1f}")
+                        else:
+                            st.metric("Clips", 0)
+                    except:
+                        st.metric("Clips", "Error")
+    else:
+        st.info("No previous approval sessions found. Approve some clips to create downloadable files!")
+        
+        # Show helpful instructions
+        st.markdown("""
+        **How File History works:**
+        1. 📋 **Approve clips** in the Bulk Review tab
+        2. 📁 **Files are automatically saved** with timestamps
+        3. 📚 **Access them here** anytime - even after browser restart
+        4. 📊 **Generate fresh Excel reports** from any historical session
+        5. 📋 **Download original JSON** for data integration
+        
+        **File naming:** `approved_clips_YYYYMMDD_HHMMSS.json`
+        **Example:** `approved_clips_20250625_163543.json` = June 25th, 2025 at 4:35 PM
+        """)
 
  
