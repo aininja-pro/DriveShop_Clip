@@ -914,6 +914,7 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             best_clip = {
                 'WO #': work_order,
                 'Article_ID': loan.get('article_id', ''),  # Add Article_ID for approval workflow
+                'Person_ID': loan.get('person_id', ''),  # Add Person_ID for smart outlet matching
                 'Make': make,
                 'Model': model,
                 'Clip URL': actual_url,  # Use the actual URL where content was found (could be from RSS feed)
@@ -1038,7 +1039,7 @@ def save_results(results: List[Dict[str, Any]], output_file: str) -> bool:
             logger.warning(f"No results to save. Creating empty file: {output_file}")
             with open(output_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['WO #', 'Article_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Clip URL', 'Links', 
+                writer.writerow(['WO #', 'Article_ID', 'Person_ID', 'Make', 'Model', 'To', 'Affiliation', 'Office', 'Clip URL', 'Links', 
                                 'Relevance Score', 'Sentiment', 'Summary', 'Brand Alignment', 
                                 'Processed Date', 'Overall Score', 'Overall Sentiment', 'Recommendation',
                                 'Key Mentions', 'Performance Score', 'Performance Note', 'Design Score',

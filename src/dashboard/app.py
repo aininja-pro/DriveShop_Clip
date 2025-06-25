@@ -102,7 +102,9 @@ def create_reporter_name_to_id_mapping():
         
         # Create a dictionary from the two columns, dropping duplicates
         # In case a name is associated with multiple IDs, this takes the first one.
-        name_to_id_map = df.drop_duplicates('Reporter_Name').set_index('Reporter_Name')['Person_ID'].to_dict()
+        # NORMALIZE names to handle spacing and case variations
+        df['Reporter_Name_Normalized'] = df['Reporter_Name'].str.strip().str.replace(r'\s+', ' ', regex=True).str.title()
+        name_to_id_map = df.drop_duplicates('Reporter_Name_Normalized').set_index('Reporter_Name_Normalized')['Person_ID'].to_dict()
         print(f"✅ Created Reporter Name to Person_ID mapping for {len(name_to_id_map)} reporters.")
         return name_to_id_map
     except Exception as e:
@@ -853,6 +855,34 @@ with st.sidebar:
     selected_make = st.selectbox("Filter by Make:", makes)
     selected_reporter_name = st.selectbox("Filter by Reporter:", reporter_names)
     selected_outlet = st.selectbox("Filter by Media Outlet:", outlets)
+    
+    # Show batch processing info if available
+    suggested_value = ""
+    if 'batch_info' in st.session_state:
+        info = st.session_state.batch_info
+        st.success(f"""
+        **📊 Last Batch Completed at {info['timestamp']}:**
+        - **Records Processed:** {info['records_processed']}
+        - **Last Article ID:** {info['last_processed_id']}
+        - **Next Batch Should Start With:** `{info['next_suggested_id']}`
+        """)
+        
+        # Add a button to auto-fill the next Article ID
+        if st.button("📋 Use Suggested ID for Next Batch", key="use_suggested_id", help="Auto-fill the suggested Article ID"):
+            st.session_state.suggested_id_to_use = info['next_suggested_id']
+            st.rerun()
+        
+        # Check if we should use the suggested value
+        if 'suggested_id_to_use' in st.session_state:
+            suggested_value = st.session_state.suggested_id_to_use
+            del st.session_state.suggested_id_to_use
+    
+    # Article ID range filter for batch processing
+    start_article_id = st.text_input(
+        "Starting with Article ID (optional):",
+        value=suggested_value,
+        help="Enter an Article ID to start processing from that record onwards. Leave blank to start from the beginning."
+    )
 
     if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
         filtered_df = st.session_state.loaded_loans_df.copy()
@@ -869,6 +899,26 @@ with st.sidebar:
                 # This includes the fix for the Person_ID data type issue
                 filtered_df['Person_ID'] = pd.to_numeric(filtered_df['Person_ID'], errors='coerce').astype('Int64').astype(str)
                 filtered_df = filtered_df[filtered_df['Person_ID'] == person_id]
+        
+        # Filter by starting Article ID for batch processing
+        if start_article_id and start_article_id.strip():
+            try:
+                start_id = int(start_article_id.strip())
+                if 'Article_ID' in filtered_df.columns:
+                    # Convert Article_ID to numeric for comparison
+                    filtered_df['Article_ID_numeric'] = pd.to_numeric(filtered_df['Article_ID'], errors='coerce')
+                    filtered_df = filtered_df[filtered_df['Article_ID_numeric'] >= start_id]
+                    # Drop the temporary numeric column
+                    filtered_df = filtered_df.drop('Article_ID_numeric', axis=1)
+                elif 'ArticleID' in filtered_df.columns:
+                    # Handle alternative column name
+                    filtered_df['ArticleID_numeric'] = pd.to_numeric(filtered_df['ArticleID'], errors='coerce')
+                    filtered_df = filtered_df[filtered_df['ArticleID_numeric'] >= start_id]
+                    filtered_df = filtered_df.drop('ArticleID_numeric', axis=1)
+                else:
+                    st.warning("Article ID column not found in data")
+            except ValueError:
+                st.warning("Please enter a valid numeric Article ID")
         
         # Clarify how many records will be processed based on filters and the limit
         num_filtered = len(filtered_df)
@@ -915,7 +965,7 @@ with st.sidebar:
                             'urls': urls,
                             'start_date': record.get('Start Date'),
                             'make': record.get('Make'),
-                            'article_id': record.get('ArticleID'),
+                            'article_id': record.get('Article_ID'),  # Fixed: Use Article_ID (with underscore)
                             'person_id': record.get('Person_ID'),
                             'office': record.get('Office')
                         })
@@ -931,6 +981,34 @@ with st.sidebar:
                     )
                     
                     if success:
+                        # Store batch processing info for next batch suggestion
+                        if remapped_records:
+                            # Get the last Article ID from the processed records
+                            processed_article_ids = [r.get('article_id') for r in remapped_records if r.get('article_id')]
+                            if processed_article_ids:
+                                last_processed_id = processed_article_ids[-1]
+                                
+                                # Find the next Article ID in the original data for batch suggestion
+                                original_df = st.session_state.loaded_loans_df
+                                if 'Article_ID' in original_df.columns:
+                                    # Convert to numeric and sort to find next ID
+                                    original_df_sorted = original_df.copy()
+                                    original_df_sorted['Article_ID_numeric'] = pd.to_numeric(original_df_sorted['Article_ID'], errors='coerce')
+                                    original_df_sorted = original_df_sorted.dropna(subset=['Article_ID_numeric']).sort_values('Article_ID_numeric')
+                                    
+                                    # Find the next ID after the last processed one
+                                    last_processed_numeric = pd.to_numeric(last_processed_id, errors='coerce')
+                                    next_ids = original_df_sorted[original_df_sorted['Article_ID_numeric'] > last_processed_numeric]['Article_ID']
+                                    
+                                    if not next_ids.empty:
+                                        next_suggested_id = str(int(next_ids.iloc[0]))
+                                        st.session_state.batch_info = {
+                                            'last_processed_id': str(last_processed_id),
+                                            'next_suggested_id': next_suggested_id,
+                                            'records_processed': len(remapped_records),
+                                            'timestamp': datetime.now().strftime("%H:%M:%S")
+                                        }
+                        
                         st.session_state.last_run_timestamp = datetime.now()
                         st.rerun()
                     else:
@@ -1248,7 +1326,16 @@ with bulk_tab:
                 reporter_name_to_id_map = create_reporter_name_to_id_mapping()
                 
                 # Use the 'Contact' column to look up the numeric Person_ID
-                clean_df['Person_ID'] = clean_df['Contact'].apply(lambda name: reporter_name_to_id_map.get(name, ''))
+                # NORMALIZE contact names to match the mapping (handle double spaces, case variations)
+                def lookup_person_id(name):
+                    if pd.isna(name) or not name:
+                        return ''
+                    # Normalize: strip, replace multiple spaces with single space, title case
+                    normalized_name = str(name).strip().replace(r'\s+', ' ').title()
+                    normalized_name = ' '.join(normalized_name.split())  # Extra normalization for multiple spaces
+                    return reporter_name_to_id_map.get(normalized_name, '')
+                
+                clean_df['Person_ID'] = clean_df['Contact'].apply(lookup_person_id)
                 
                 # Add Media Outlet column right after Contact (replacing Publication)
                 # Smart matching: find the correct Outlet_Name from Person_outlets_mapping
