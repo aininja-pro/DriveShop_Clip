@@ -226,8 +226,10 @@ def create_client_excel_report(df, approved_df=None):
             rejected_df = pd.read_csv(rejected_file)
             clips_not_found = len(rejected_df)
         else:
+            rejected_df = None
             clips_not_found = 0
     except:
+        rejected_df = None
         clips_not_found = 0
     
     # Calculate total records
@@ -382,22 +384,97 @@ def create_client_excel_report(df, approved_df=None):
         adjusted_width = min(max_length + 2, 50)
         results_ws.column_dimensions[column].width = adjusted_width
     
-    # 3. Approved Clips Sheet (if available)
-    if approved_df is not None and len(approved_df) > 0:
-        approved_ws = wb.create_sheet("Approved Clips")
+    # 3. Rejected Loans Sheet (if rejected data is available)
+    if rejected_df is not None and len(rejected_df) > 0:
+        rejected_ws = wb.create_sheet("Rejected Loans")
         
-        # Add approved clips data
-        for r in dataframe_to_rows(approved_df, index=False, header=True):
-            approved_ws.append(r)
+        # Define columns for rejected loans report
+        rejected_columns = [
+            'WO #', 'Model', 'Contact', 'Media Outlet', 'Rejection Reason', 'URLs Searched', 'Details'
+        ]
         
-        # Style header
-        for cell in approved_ws[1]:
+        # Create rejected export dataframe
+        rejected_export_df = pd.DataFrame()
+        
+        # Map rejected data to export columns
+        rejected_export_df['WO #'] = rejected_df['WO #']
+        rejected_export_df['Model'] = rejected_df['Model']
+        rejected_export_df['Contact'] = rejected_df['To']
+        rejected_export_df['Media Outlet'] = rejected_df['Affiliation']
+        rejected_export_df['Rejection Reason'] = rejected_df['Rejection_Reason']
+        
+        # Extract the actual URLs from the URL_Details field
+        def extract_urls_from_details(url_details):
+            """Extract just the URLs from the detailed rejection info"""
+            if pd.isna(url_details) or not url_details:
+                return "No URLs processed"
+            
+            urls = []
+            # Split by semicolon and extract URLs
+            for detail in str(url_details).split(';'):
+                detail = detail.strip()
+                if detail.startswith(('http://', 'https://')):
+                    # Find the colon that separates URL from description (not the :// in https)
+                    # Look for ": " (colon followed by space) which indicates the description starts
+                    if ': ' in detail:
+                        url_part = detail.split(': ')[0].strip()
+                        urls.append(url_part)
+                    else:
+                        # If no description separator found, take the whole thing as URL
+                        urls.append(detail)
+            
+            return '\n'.join(urls) if urls else "No URLs found"
+        
+        rejected_export_df['URLs Searched'] = rejected_df['URL_Details'].apply(extract_urls_from_details)
+        rejected_export_df['Details'] = rejected_df['URL_Details']
+        
+        # Add header row
+        rejected_headers = list(rejected_export_df.columns)
+        rejected_ws.append(rejected_headers)
+        
+        # Add data rows
+        for idx, row in rejected_export_df.iterrows():
+            row_data = []
+            for col_name, value in row.items():
+                # Handle URL columns by making them clickable if they contain URLs
+                if col_name == 'URLs Searched' and value and 'http' in str(value):
+                    row_data.append(str(value))
+                else:
+                    row_data.append(value)
+            rejected_ws.append(row_data)
+        
+        # Style the header row with a red theme for rejected items
+        rejected_header_fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
+        for cell in rejected_ws[1]:
             cell.font = header_font
-            cell.fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+            cell.fill = rejected_header_fill
             cell.alignment = Alignment(horizontal="center", vertical="center")
         
-        # Auto-size columns
-        for col in approved_ws.columns:
+        # Make URLs clickable in the URLs Searched column
+        urls_searched_col_idx = rejected_headers.index('URLs Searched') + 1
+        for row_idx in range(2, rejected_ws.max_row + 1):
+            cell = rejected_ws.cell(row=row_idx, column=urls_searched_col_idx)
+            if cell.value and 'http' in str(cell.value):
+                urls_text = str(cell.value)
+                # Check if there are multiple URLs (newline separated)
+                if '\n' in urls_text:
+                    # Multiple URLs - make text blue and add line breaks for readability
+                    cell.font = XLFont(color="0000FF")
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+                    # For the first URL, we can still make it a hyperlink
+                    first_url = urls_text.split('\n')[0].strip()
+                    if first_url.startswith(('http://', 'https://')):
+                        cell.hyperlink = first_url
+                        cell.font = url_font
+                else:
+                    # Single URL can be a hyperlink
+                    url = urls_text.strip()
+                    if url.startswith(('http://', 'https://')):
+                        cell.hyperlink = url
+                        cell.font = url_font
+        
+        # Auto-size columns for rejected sheet
+        for col in rejected_ws.columns:
             max_length = 0
             column = col[0].column_letter
             for cell in col:
@@ -406,8 +483,40 @@ def create_client_excel_report(df, approved_df=None):
                         max_length = len(str(cell.value))
                 except:
                     pass
-            adjusted_width = min(max_length + 2, 50)
-            approved_ws.column_dimensions[column].width = adjusted_width
+            adjusted_width = min(max_length + 2, 80)  # Wider for rejection details
+            rejected_ws.column_dimensions[column].width = adjusted_width
+    
+    # 4. Approved Clips Sheet (filter to match current dataset only)
+    if approved_df is not None and len(approved_df) > 0:
+        # Filter approved clips to only include WO #s that exist in the current detailed results
+        current_wo_numbers = set(df['WO #'].astype(str))
+        current_approved_df = approved_df[approved_df['WO #'].astype(str).isin(current_wo_numbers)]
+        
+        if not current_approved_df.empty:
+            approved_ws = wb.create_sheet("Approved Clips")
+            
+            # Add approved clips data (only from current dataset)
+            for r in dataframe_to_rows(current_approved_df, index=False, header=True):
+                approved_ws.append(r)
+            
+            # Style header
+            for cell in approved_ws[1]:
+                cell.font = header_font
+                cell.fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            
+            # Auto-size columns
+            for col in approved_ws.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                approved_ws.column_dimensions[column].width = adjusted_width
     
     return wb
 
@@ -1846,6 +1955,12 @@ with bulk_tab:
                 
                 # Process Media Outlet changes and save them to the original data
                 changed_df = selected_rows["data"]
+                
+                # Initialize session state for tracking last saved state
+                if 'last_saved_outlets' not in st.session_state:
+                    st.session_state.last_saved_outlets = {}
+                
+                # Process changes from AgGrid
                 if not changed_df.empty:
                     # Check if any Media Outlet values have changed
                     original_data_changed = False
@@ -1862,13 +1977,19 @@ with bulk_tab:
                             if mask.any():
                                 original_affiliation = df.loc[mask, 'Affiliation'].iloc[0] if 'Affiliation' in df.columns else ''
                                 
-                                # Only update if the new outlet is different from the smart-matched value
-                                if new_outlet != original_affiliation:
+                                # Check if this is a new change (different from what we last saved)
+                                last_saved = st.session_state.last_saved_outlets.get(wo_num, '')
+                                
+                                # Save if: 1) Different from original, OR 2) Different from last saved value
+                                if new_outlet != original_affiliation or new_outlet != last_saved:
                                     # Update the original dataframe's Affiliation column with the user's selection
                                     df.loc[mask, 'Affiliation'] = new_outlet
                                     original_data_changed = True
                                     changed_count += 1
                                     changed_wos.append(wo_num)
+                                    
+                                    # Update our tracking
+                                    st.session_state.last_saved_outlets[wo_num] = new_outlet
                                     print(f"💾 Saved Media Outlet change for WO# {wo_num}: '{original_affiliation}' → '{new_outlet}'")
                     
                     # Save the updated data back to the loan_results.csv file
@@ -1887,80 +2008,59 @@ with bulk_tab:
                             st.error(f"Error saving Media Outlet changes: {e}")
                             print(f"❌ Error saving changes: {e}")
                 
-                # Process inline actions from AgGrid
+                # Store selected clips in session state (no immediate processing)
                 if not changed_df.empty:
-                    # Find which rows were approved or rejected
+                    # Find which rows are currently selected for approval
                     approved_rows = changed_df[changed_df['✅ Approve'] == True]
                     rejected_rows = changed_df[changed_df['❌ Reject'] == True]
                     
-                    # Process approvals
-                    if not approved_rows.empty:
-                        approved_wos = approved_rows['WO #'].tolist()
-                        approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                        selected_rows = df[df['WO #'].astype(str).isin(map(str, approved_wos))]
-                        
-                        if os.path.exists(approved_file):
-                            approved_df = pd.read_csv(approved_file)
-                            if 'WO #' in approved_df.columns:
-                                approved_df['WO #'] = approved_df['WO #'].astype(str)
-                            # Only add rows that aren't already approved
-                            new_rows = selected_rows[~selected_rows['WO #'].astype(str).isin(approved_df['WO #'].astype(str))]
-                            if not new_rows.empty:
-                                approved_df = pd.concat([approved_df, new_rows], ignore_index=True)
-                                approved_df.to_csv(approved_file, index=False)
-                        else:
-                            selected_rows.to_csv(approved_file, index=False)
-                        
-                        if len(approved_wos) > 0:
-                            st.success(f"✅ Approved {len(approved_wos)} clips!")
-                            st.rerun()
+                    # Store selections in session state for later processing
+                    if 'selected_for_approval' not in st.session_state:
+                        st.session_state.selected_for_approval = set()
+                    if 'selected_for_rejection' not in st.session_state:
+                        st.session_state.selected_for_rejection = set()
                     
-                    # Process rejections  
-                    if not rejected_rows.empty:
-                        rejected_wos = rejected_rows['WO #'].tolist()
-                        st.success(f"❌ Rejected {len(rejected_wos)} clips!")
-                        st.rerun()
+                    # Update selections based on current checkboxes
+                    current_approved_wos = set(approved_rows['WO #'].astype(str))
+                    current_rejected_wos = set(rejected_rows['WO #'].astype(str))
+                    
+                    # Update session state
+                    st.session_state.selected_for_approval = current_approved_wos
+                    st.session_state.selected_for_rejection = current_rejected_wos
+                    
+                    # Show current selection count
+                    if current_approved_wos:
+                        st.info(f"📋 {len(current_approved_wos)} clips selected for approval")
+                    if current_rejected_wos:
+                        st.info(f"📋 {len(current_rejected_wos)} clips selected for rejection")
                 
-                # Quick bulk actions below table
+                # Action buttons below table
                 st.markdown("---")
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
+                
                 with col1:
-                    if st.button("✅ Approve All High Quality (9+)"):
+                    # Submit Approved Clips Button
+                    selected_count = len(st.session_state.get('selected_for_approval', set()))
+                    if st.button(f"✅ Submit {selected_count} Approved Clips", disabled=selected_count == 0):
+                        if selected_count > 0:
+                            # Show confirmation dialog
+                            st.session_state.show_approval_dialog = True
+                
+                with col2:
+                    if st.button("✅ Auto-Approve High Quality (9+)"):
                         high_quality_df = df[df['Relevance Score'] >= 9]
                         if not high_quality_df.empty:
-                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                            if os.path.exists(approved_file):
-                                approved_df = pd.read_csv(approved_file)
-                                approved_df = pd.concat([approved_df, high_quality_df], ignore_index=True)
-                            else:
-                                approved_df = high_quality_df.copy()
-                            approved_df.to_csv(approved_file, index=False)
-                            st.success(f"✅ Approved {len(high_quality_df)} high-quality clips!")
+                            # Add to session state selections
+                            if 'selected_for_approval' not in st.session_state:
+                                st.session_state.selected_for_approval = set()
+                            high_quality_wos = set(high_quality_df['WO #'].astype(str))
+                            st.session_state.selected_for_approval.update(high_quality_wos)
+                            st.success(f"📋 Added {len(high_quality_wos)} high-quality clips to selection!")
                             st.rerun()
                         else:
                             st.info("No high-quality clips (9+) found")
                 
-                with col2:
-                    if st.button("📄 Export Approved Clips"):
-                        try:
-                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                            if os.path.exists(approved_file):
-                                approved_df = pd.read_csv(approved_file)
-                                if not approved_df.empty:
-                                    csv_data = approved_df.to_csv(index=False)
-                                    st.download_button(
-                                        label="💾 Download Approved Clips CSV",
-                                        data=csv_data,
-                                        file_name=f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                                        mime="text/csv"
-                                    )
-                                else:
-                                    st.warning("No approved clips to export")
-                            else:
-                                st.warning("No approved clips file found")
-                        except Exception as e:
-                            st.error(f"Error exporting clips: {e}")
-                    
+                with col3:
                     # Excel Export Button
                     if st.button("📊 Excel Report"):
                         try:
@@ -1988,15 +2088,219 @@ with bulk_tab:
                         except Exception as e:
                             st.error(f"Error creating Excel report: {e}")
                 
-                with col3:
+                with col4:
                     if st.button("🔄 Refresh Data"):
                         st.rerun()
+                
+                # Approval confirmation dialog
+                if st.session_state.get('show_approval_dialog', False):
+                    st.markdown("---")
+                    st.warning(f"⚠️ **Confirm Approval**")
+                    st.write(f"You are about to approve **{selected_count} clips**. This action will:")
+                    st.write("• Save approved clips to the database")
+                    st.write("• Generate Excel and JSON files for client delivery")
+                    st.write("• Mark these clips as processed")
+                    
+                    col_confirm, col_cancel = st.columns(2)
+                    with col_confirm:
+                        if st.button("✅ Confirm Approval", type="primary"):
+                            # Process the approvals
+                            selected_wos = st.session_state.selected_for_approval
+                            if selected_wos:
+                                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                                selected_rows = df[df['WO #'].astype(str).isin(selected_wos)]
+                                
+                                # Save to approved clips CSV
+                                if os.path.exists(approved_file):
+                                    approved_df = pd.read_csv(approved_file)
+                                    if 'WO #' in approved_df.columns:
+                                        approved_df['WO #'] = approved_df['WO #'].astype(str)
+                                    # Only add rows that aren't already approved
+                                    new_rows = selected_rows[~selected_rows['WO #'].astype(str).isin(approved_df['WO #'].astype(str))]
+                                    if not new_rows.empty:
+                                        approved_df = pd.concat([approved_df, new_rows], ignore_index=True)
+                                        approved_df.to_csv(approved_file, index=False)
+                                else:
+                                    selected_rows.to_csv(approved_file, index=False)
+                                
+                                # Create comprehensive JSON file for client with ALL fields
+                                json_data = []
+                                for _, row in selected_rows.iterrows():
+                                    json_data.append({
+                                        # Basic Information
+                                        "work_order": str(row.get('WO #', '')),
+                                        "article_id": str(row.get('Article_ID', '')),
+                                        "make": str(row.get('Make', '')),
+                                        "vehicle_model": str(row.get('Model', '')),
+                                        "contact": str(row.get('To', '')),
+                                        "media_outlet": str(row.get('Affiliation', '')),
+                                        "office": str(row.get('Office', '')),
+                                        
+                                        # URLs and Links
+                                        "clip_url": str(row.get('Clip URL', '')),
+                                        "original_links": str(row.get('Links', '')),
+                                        
+                                        # AI Analysis Results
+                                        "relevance_score": row.get('Relevance Score', 0),
+                                        "overall_score": row.get('Overall Score', 0),
+                                        "sentiment": str(row.get('Sentiment', '')),
+                                        "overall_sentiment": str(row.get('Overall Sentiment', '')),
+                                        "summary": str(row.get('Summary', '')),
+                                        "brand_alignment": row.get('Brand Alignment', False),
+                                        "recommendation": str(row.get('Recommendation', '')),
+                                        "key_mentions": str(row.get('Key Mentions', '')),
+                                        
+                                        # Detailed Aspect Scores
+                                        "performance_score": row.get('Performance Score', 0),
+                                        "performance_note": str(row.get('Performance Note', '')),
+                                        "design_score": row.get('Design Score', 0),
+                                        "design_note": str(row.get('Design Note', '')),
+                                        "interior_score": row.get('Interior Score', 0),
+                                        "interior_note": str(row.get('Interior Note', '')),
+                                        "technology_score": row.get('Technology Score', 0),
+                                        "technology_note": str(row.get('Technology Note', '')),
+                                        "value_score": row.get('Value Score', 0),
+                                        "value_note": str(row.get('Value Note', '')),
+                                        
+                                        # Pros and Cons
+                                        "pros": str(row.get('Pros', '')),
+                                        "cons": str(row.get('Cons', '')),
+                                        
+                                        # Processing Information
+                                        "url_tracking": str(row.get('URL_Tracking', '')),
+                                        "urls_processed": row.get('URLs_Processed', 0),
+                                        "urls_successful": row.get('URLs_Successful', 0),
+                                        "processed_date": str(row.get('Processed Date', '')),
+                                        "approval_timestamp": datetime.now().isoformat()
+                                    })
+                                
+                                # Save JSON file
+                                json_filename = f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                                json_filepath = os.path.join(project_root, "data", json_filename)
+                                import json
+                                with open(json_filepath, 'w') as f:
+                                    json.dump(json_data, f, indent=2)
+                                
+                                # Store JSON data in session state for persistent access
+                                st.session_state.latest_json_data = json_data
+                                st.session_state.latest_json_filename = json_filename
+                                
+                                # Provide download buttons for both files
+                                st.success(f"✅ Successfully approved {len(selected_wos)} clips!")
+                                st.info("📁 **Both Excel and JSON files are ready for download below**")
+                                
+                                # Download buttons
+                                col_excel, col_json = st.columns(2)
+                                with col_excel:
+                                    # Excel download
+                                    wb = create_client_excel_report(df, pd.read_csv(approved_file))
+                                    excel_buffer = io.BytesIO()
+                                    wb.save(excel_buffer)
+                                    excel_buffer.seek(0)
+                                    st.download_button(
+                                        label="📥 Download Excel Report",
+                                        data=excel_buffer.getvalue(),
+                                        file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key="excel_download_primary"
+                                    )
+                                
+                                with col_json:
+                                    # JSON download
+                                    st.download_button(
+                                        label="📄 Download JSON Report",
+                                        data=json.dumps(json_data, indent=2),
+                                        file_name=json_filename,
+                                        mime="application/json",
+                                        key="json_download_primary"
+                                    )
+                                
+                                # Clear selections and dialog
+                                st.session_state.selected_for_approval = set()
+                                st.session_state.show_approval_dialog = False
+                                st.rerun()
+                    
+                    with col_cancel:
+                        if st.button("❌ Cancel"):
+                            st.session_state.show_approval_dialog = False
+                            st.rerun()
             else:
                 st.info("No clips to review. Process loans first.")
         except Exception as e:
             st.error(f"Error loading clips: {e}")
     else:
         st.info("No results file found. Upload and process loans to begin.")
+
+    # ========== PERSISTENT DOWNLOAD SECTION ==========
+    # Show download buttons for the latest approved clips (if any exist)
+    if hasattr(st.session_state, 'latest_json_data') and st.session_state.latest_json_data:
+        st.markdown("---")
+        st.markdown("### 📁 Download Latest Approved Clips")
+        st.markdown("*Your most recent approval session files are ready for download*")
+        
+        col_excel_persist, col_json_persist = st.columns(2)
+        
+        with col_excel_persist:
+            # Excel download
+            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+            if os.path.exists(approved_file):
+                wb = create_client_excel_report(df if 'df' in locals() else pd.DataFrame(), pd.read_csv(approved_file))
+                excel_buffer = io.BytesIO()
+                wb.save(excel_buffer)
+                excel_buffer.seek(0)
+                st.download_button(
+                    label="📊 Download Excel Report",
+                    data=excel_buffer.getvalue(),
+                    file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="excel_download_persistent",
+                    help="Download Excel file with multiple tabs including Approved Clips details"
+                )
+        
+        with col_json_persist:
+            # JSON download
+            st.download_button(
+                label="📋 Download JSON Report",
+                data=json.dumps(st.session_state.latest_json_data, indent=2),
+                file_name=st.session_state.latest_json_filename,
+                mime="application/json",
+                key="json_download_persistent",
+                help="Download comprehensive JSON with all clip data including scores, recommendations, pros/cons"
+            )
+        
+        # Show a preview of what's in the JSON
+        with st.expander("🔍 Preview JSON Structure"):
+            if st.session_state.latest_json_data:
+                sample_clip = st.session_state.latest_json_data[0]
+                st.markdown("**JSON contains these fields for each approved clip:**")
+                fields = list(sample_clip.keys())
+                
+                # Group fields by category for better display
+                basic_fields = [f for f in fields if f in ['work_order', 'article_id', 'make', 'vehicle_model', 'contact', 'media_outlet', 'office']]
+                analysis_fields = [f for f in fields if 'score' in f or f in ['sentiment', 'summary', 'recommendation', 'key_mentions', 'brand_alignment']]
+                detail_fields = [f for f in fields if 'note' in f or f in ['pros', 'cons']]
+                tech_fields = [f for f in fields if f in ['clip_url', 'original_links', 'url_tracking', 'urls_processed', 'urls_successful', 'processed_date', 'approval_timestamp']]
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Basic Info:**")
+                    for field in basic_fields:
+                        st.markdown(f"• `{field}`")
+                    
+                    st.markdown("**Analysis Results:**")
+                    for field in analysis_fields:
+                        st.markdown(f"• `{field}`")
+                
+                with col2:
+                    st.markdown("**Detailed Notes:**")
+                    for field in detail_fields:
+                        st.markdown(f"• `{field}`")
+                    
+                    st.markdown("**Technical Data:**")
+                    for field in tech_fields:
+                        st.markdown(f"• `{field}`")
+                
+                st.markdown(f"**Total approved clips in JSON:** {len(st.session_state.latest_json_data)}")
 
 # ========== REJECTED/ISSUES TAB (Transparency Dashboard) ==========
 with rejected_tab:
