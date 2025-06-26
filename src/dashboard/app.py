@@ -16,6 +16,7 @@ import requests
 
 # Add explicit .env loading with debug output
 from dotenv import load_dotenv
+from PIL import Image
 
 # Determine the location of the .env file
 # Check both the current directory and project root
@@ -196,6 +197,325 @@ def parse_url_tracking(df_row):
             'relevance_score': df_row.get('Relevance Score', 0),
             'content_type': 'inferred'
         }]
+
+
+# Custom CSS for dark charcoal sidebar with logo
+def apply_custom_sidebar_styling():
+    """Apply custom CSS styling for dark charcoal sidebar with white logo"""
+    st.markdown("""
+    <style>
+    /* Dark charcoal sidebar styling */
+    .css-1d391kg, .css-1lcbmhc, .css-17lntkn, .css-1y4p8pa, 
+    .stSidebar > div:first-child, .css-12oz5g7, .css-1cypcdb {
+        background-color: #2C3E50 !important;
+    }
+    
+    /* Sidebar content styling */
+    .stSidebar {
+        background-color: #2C3E50 !important;
+    }
+    
+    /* All text in sidebar to white */
+    .stSidebar * {
+        color: white !important;
+    }
+    
+    /* Sidebar headers and labels */
+    .stSidebar .stMarkdown h1,
+    .stSidebar .stMarkdown h2, 
+    .stSidebar .stMarkdown h3,
+    .stSidebar .stMarkdown h4,
+    .stSidebar .stMarkdown h5,
+    .stSidebar .stMarkdown h6 {
+        color: white !important;
+        font-weight: 600;
+    }
+    
+    /* Sidebar radio buttons and selectbox text */
+    .stSidebar .stRadio label,
+    .stSidebar .stSelectbox label,
+    .stSidebar .stMultiSelect label,
+    .stSidebar .stTextInput label,
+    .stSidebar .stNumberInput label {
+        color: white !important;
+        font-weight: 500;
+    }
+    
+    /* Radio button options */
+    .stSidebar .stRadio > div > div > div > label {
+        color: white !important;
+    }
+    
+    /* Selectbox dropdown styling */
+    .stSidebar .stSelectbox > div > div {
+        background-color: #34495e !important;
+        border: 1px solid #5a6c7d !important;
+        color: white !important;
+    }
+    
+    /* Fix input text colors - make text dark in input fields */
+    .stSidebar .stTextInput > div > div > input {
+        color: #2c3e50 !important;
+        background-color: white !important;
+    }
+    
+    .stSidebar .stNumberInput > div > div > input {
+        color: #2c3e50 !important;
+        background-color: white !important;
+    }
+    
+    .stSidebar .stSelectbox > div > div > div {
+        color: #2c3e50 !important;
+        background-color: white !important;
+    }
+    
+    /* Dropdown options styling */
+    .stSidebar .stSelectbox option {
+        color: #2c3e50 !important;
+        background-color: white !important;
+    }
+    
+    /* Fix all input elements in sidebar */
+    .stSidebar input {
+        color: #2c3e50 !important;
+        background-color: white !important;
+    }
+    
+    /* Simple fix for number input buttons */
+    .stSidebar button {
+        color: #0058A3 !important;
+        font-weight: bold !important;
+    }
+    
+    /* Fix multiselect and other input types */
+    .stSidebar .stMultiSelect > div > div > div {
+        color: #2c3e50 !important;
+        background-color: white !important;
+    }
+    
+    /* Ensure placeholder text is visible */
+    .stSidebar input::placeholder {
+        color: #6c757d !important;
+    }
+    
+    /* Fix text area if any */
+    .stSidebar textarea {
+        color: #2c3e50 !important;
+        background-color: white !important;
+    }
+    
+    /* Fix file uploader visibility */
+    .stSidebar .stFileUploader {
+        color: white !important;
+    }
+    
+    .stSidebar .stFileUploader label {
+        color: white !important;
+        font-weight: 500;
+    }
+    
+    .stSidebar .stFileUploader > div {
+        background-color: white !important;
+        border: 2px dashed #0058A3 !important;
+        border-radius: 6px !important;
+    }
+    
+    .stSidebar .stFileUploader > div > div {
+        color: #2c3e50 !important;
+        font-weight: 600 !important;
+    }
+    
+    .stSidebar .stFileUploader button {
+        color: white !important;
+        background-color: #0058A3 !important;
+        border: 1px solid #0058A3 !important;
+        font-weight: 600 !important;
+        padding: 8px 16px !important;
+        border-radius: 4px !important;
+    }
+    
+    .stSidebar .stFileUploader button:hover {
+        background-color: #004080 !important;
+        border-color: #004080 !important;
+    }
+    
+    /* Fix file uploader text and button visibility - make text darker */
+    .stSidebar .stFileUploader span,
+    .stSidebar .stFileUploader p,
+    .stSidebar .stFileUploader div[data-testid="stFileUploaderDropzone"] {
+        color: #2c3e50 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+    }
+    
+    .stSidebar .stFileUploader div[data-testid="stFileUploaderDropzone"] span {
+        color: #2c3e50 !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Make drag and drop text more visible */
+    .stSidebar .stFileUploader div[data-testid="stFileUploaderDropzone"] p {
+        color: #2c3e50 !important;
+        font-weight: 600 !important;
+        margin: 0 !important;
+    }
+    
+    /* Button styling in sidebar */
+    .stSidebar .stButton > button {
+        background-color: #0058A3 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-weight: 500;
+        transition: background-color 0.3s ease;
+    }
+    
+    .stSidebar .stButton > button:hover {
+        background-color: #004080 !important;
+        color: white !important;
+    }
+    
+    /* Logo container styling */
+    .sidebar-logo {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem 0 2rem 0;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #5a6c7d;
+    }
+    
+    .sidebar-logo img {
+        max-width: 180px;
+        height: auto;
+        filter: brightness(1.1);
+    }
+    
+    /* Style Streamlit's image component in sidebar */
+    .stSidebar .stImage {
+        display: flex;
+        justify-content: center;
+        padding: 1rem 0 2rem 0;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #5a6c7d;
+    }
+    
+    .stSidebar .stImage img {
+        filter: brightness(1.1);
+        border-radius: 4px;
+    }
+    
+    /* Sidebar metrics styling */
+    .stSidebar .metric-container {
+        background-color: #34495e !important;
+        padding: 0.5rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+        border: 1px solid #5a6c7d;
+    }
+    
+    /* Fix for any remaining black text */
+    .stSidebar p, .stSidebar span, .stSidebar div {
+        color: white !important;
+    }
+    
+    /* Tab styling adjustments for better contrast with dark sidebar */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #f8f9fa;
+        border-radius: 6px 6px 0 0;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #0058A3;
+        color: white;
+    }
+    
+    /* 1) Invert / restore visibility of number-input spinners in WebKit browsers */
+    .stSidebar input[type="number"]::-webkit-inner-spin-button,
+    .stSidebar input[type="number"]::-webkit-outer-spin-button {
+        -webkit-appearance: initial !important;
+        filter: invert(1) contrast(200%) !important;
+        opacity: 1 !important;
+    }
+
+    /* 2) Firefox: turn numbers back into textfields (hides native arrows) */
+    .stSidebar input[type="number"] {
+        -moz-appearance: textfield !important;
+    }
+
+    /* 3) Add a visible border around inputs so they don't vanish on white */
+    .stSidebar .stTextInput > div > div > input,
+    .stSidebar .stNumberInput > div > div > input {
+        border: 1px solid #5A6C7D !important;
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+    }
+
+    /* 4) Make the file-uploader icon and emoji darker so it shows on charcoal */
+    .stSidebar .stFileUploader div[data-testid="stFileUploaderDropzone"] svg {
+        filter: brightness(0) invert(1) !important;
+        width: 1.2rem !important; height: 1.2rem !important;
+    }
+
+    /* 5) Tidy up any stray SVGs or emojis inside buttons */
+    .stSidebar .stButton > button svg,
+    .stSidebar .stButton > button {
+        filter: none !important;
+        color: white !important;
+    }
+    
+    /* --- Always show +/– on number inputs --- */
+    .stSidebar input[type="number"]::-webkit-inner-spin-button,
+    .stSidebar input[type="number"]::-webkit-outer-spin-button {
+      /* Make sure they're rendered as controls */
+      -webkit-appearance: inner-spin-button !important;
+      display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
+      width: 1.2em !important;
+      height: 1.2em !important;
+    }
+
+    /* Firefox fallback — revert to textfield so at least you can type */
+    .stSidebar input[type="number"] {
+      -moz-appearance: textfield !important;
+    }
+
+    /* Tidy up the outline and border so you can see the control region */
+    .stSidebar .stNumberInput > div > div > input {
+      border: 1px solid #5a6c7d !important;
+      padding-right: 1.6em !important;  /* leave room for the spinner */
+      border-radius: 4px !important;
+      background-clip: padding-box !important;
+    }
+    
+    /* ALWAYS VISIBLE & DARKENED steppers */
+    .stSidebar input[type="number"]::-webkit-inner-spin-button,
+    .stSidebar input[type="number"]::-webkit-outer-spin-button {
+      /* treat them as real controls */
+      -webkit-appearance: inner-spin-button !important;
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+
+      /* tint them dark */
+      filter: brightness(0%) contrast(100%) !important;
+    }
+
+    /* Firefox fallback — hide arrows, let user type */
+    .stSidebar input[type="number"] {
+      -moz-appearance: textfield !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 def create_client_excel_report(df, approved_df=None):
     """Create a professional Excel report for client presentation"""
@@ -599,6 +919,48 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Apply custom dark charcoal sidebar styling
+apply_custom_sidebar_styling()
+
+# Add logo to sidebar
+with st.sidebar:
+    # DriveShop Logo at the top - use Streamlit's built-in image display
+    try:
+        # Debug current working directory
+        print(f"Current working directory: {os.getcwd()}")
+        print(f"Project root: {project_root}")
+        
+        # Try multiple possible paths
+        possible_paths = [
+            os.path.join(project_root, "assets", "DriveShop_WebLogo.png"),
+            "assets/DriveShop_WebLogo.png",
+            "./assets/DriveShop_WebLogo.png",
+            "DriveShop_WebLogo.png"
+        ]
+        
+        logo_loaded = False
+        for logo_path in possible_paths:
+            print(f"Trying logo path: {logo_path}")
+            print(f"Path exists: {os.path.exists(logo_path)}")
+            if os.path.exists(logo_path):
+                try:
+                    logo = Image.open(logo_path)
+                    st.image(logo, width=180)
+                    print(f"✅ Logo loaded successfully from: {logo_path}")
+                    logo_loaded = True
+                    break
+                except Exception as img_error:
+                    print(f"❌ Failed to load image from {logo_path}: {img_error}")
+                    continue
+        
+        if not logo_loaded:
+            print("❌ No logo paths worked, using text fallback")
+            st.markdown("**DriveShop**")
+            
+    except Exception as e:
+        print(f"Logo loading error: {e}")
+        st.markdown("**DriveShop**")
 
 # DEVELOPMENT MODE: Skip password check
 # Main application
