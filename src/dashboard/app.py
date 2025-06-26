@@ -1929,6 +1929,8 @@ with bulk_review_tab:
                     st.session_state.selected_for_approval = set()
                 if 'selected_for_rejection' not in st.session_state:
                     st.session_state.selected_for_rejection = set()
+                if 'show_rejection_dialog' not in st.session_state:
+                    st.session_state.show_rejection_dialog = False
                 
                 # Process changes from AgGrid WITHOUT triggering reruns
                 if not changed_df.empty:
@@ -2030,6 +2032,20 @@ with bulk_review_tab:
                         if selected_count > 0:
                             # Show confirmation dialog
                             st.session_state.show_approval_dialog = True
+                    
+                    # Submit Rejected Clips Button (NEW)
+                    rejected_count = len(st.session_state.get('selected_for_rejection', set()))
+                    if st.button(f"❌ Submit {rejected_count} Rejected Clips", disabled=rejected_count == 0):
+                        if rejected_count > 0:
+                            # Show rejection confirmation dialog
+                            st.session_state.show_rejection_dialog = True
+                    
+                    # Submit Rejected Clips Button (NEW)
+                    rejected_count = len(st.session_state.get('selected_for_rejection', set()))
+                    if st.button(f"❌ Submit {rejected_count} Rejected Clips", disabled=rejected_count == 0):
+                        if rejected_count > 0:
+                            # Show rejection confirmation dialog
+                            st.session_state.show_rejection_dialog = True
                 
                 with col2:
                     if st.button("✅ Auto-Approve High Quality (9+)"):
@@ -2226,25 +2242,30 @@ with bulk_review_tab:
                                 
                                 # Download buttons - Generate files ONLY when clicked
                                 col_excel, col_json = st.columns(2)
+                                
                                 with col_excel:
-                                    # Excel download - LAZY GENERATION (only when clicked)
+                                    # Excel download - GENERATE ON DEMAND (slower but includes all data)
                                     def generate_excel():
-                                        wb = create_client_excel_report(df, pd.read_csv(approved_file))
-                                        excel_buffer = io.BytesIO()
-                                        wb.save(excel_buffer)
-                                        excel_buffer.seek(0)
-                                        return excel_buffer.getvalue()
+                                        try:
+                                            # Load the most current approved data
+                                            current_approved_df = pd.read_csv(approved_file, dtype=str) if os.path.exists(approved_file) else pd.DataFrame()
+                                            # Create Excel with all approved clips
+                                            excel_wb = create_client_excel_report(current_approved_df, current_approved_df)
+                                            excel_buffer = io.BytesIO()
+                                            excel_wb.save(excel_buffer)
+                                            excel_buffer.seek(0)
+                                            return excel_buffer.getvalue()
+                                        except Exception as e:
+                                            st.error(f"Error generating Excel: {e}")
+                                            return None
                                     
-                                    if st.button("📥 Generate & Download Excel Report", key="excel_gen_btn"):
-                                        with st.spinner("Generating Excel report..."):
-                                            excel_data = generate_excel()
-                                            st.download_button(
-                                                label="📥 Download Excel Report",
-                                                data=excel_data,
-                                                file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                                key="excel_download_primary"
-                                            )
+                                    st.download_button(
+                                        label="📊 Download Excel Report",
+                                        data=generate_excel(),
+                                        file_name=f"DriveShop_FINAL_CORRECT_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key="excel_download_primary"
+                                    )
                                 
                                 with col_json:
                                     # JSON download - INSTANT (already generated)
@@ -2265,6 +2286,82 @@ with bulk_review_tab:
                         if st.button("❌ Cancel"):
                             st.session_state.show_approval_dialog = False
                             st.rerun()
+                
+                # NEW: Rejection confirmation dialog
+                if st.session_state.get('show_rejection_dialog', False):
+                    st.markdown("---")
+                    st.error(f"⚠️ **Confirm Rejection**")
+                    rejected_count = len(st.session_state.get('selected_for_rejection', set()))
+                    st.write(f"You are about to reject **{rejected_count} clips**. This action will:")
+                    st.write("• Move clips to the Rejected/Issues tab")
+                    st.write("• Remove them from the Bulk Review table")
+                    st.write("• Add rejection reason for transparency")
+                    
+                    col_confirm, col_cancel = st.columns(2)
+                    with col_confirm:
+                        if st.button("❌ Confirm Rejection", type="secondary"):
+                            # Process the rejections
+                            selected_rejected_wos = st.session_state.selected_for_rejection
+                            if selected_rejected_wos:
+                                rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
+                                selected_rejected_rows = df[df['WO #'].astype(str).isin(selected_rejected_wos)]
+                                
+                                # Prepare rejected records with proper format
+                                rejected_records = []
+                                for _, row in selected_rejected_rows.iterrows():
+                                    rejected_record = {
+                                        'WO #': str(row.get('WO #', '')),
+                                        'Activity_ID': str(row.get('Activity_ID', '')),
+                                        'Make': str(row.get('Make', '')),
+                                        'Model': str(row.get('Model', '')),
+                                        'To': str(row.get('To', '')),
+                                        'Affiliation': str(row.get('Affiliation', '')),
+                                        'Office': str(row.get('Office', '')),
+                                        'Links': str(row.get('Links', '')),
+                                        'URLs_Processed': row.get('URLs_Processed', 0),
+                                        'URLs_Successful': row.get('URLs_Successful', 0),
+                                        'Rejection_Reason': 'Manual rejection by reviewer',
+                                        'URL_Details': str(row.get('URL_Tracking', '')),
+                                        'Processed_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                        'Loan_Start_Date': str(row.get('Start Date', ''))
+                                    }
+                                    rejected_records.append(rejected_record)
+                                
+                                # Save to rejected clips CSV
+                                if os.path.exists(rejected_file):
+                                    # Load existing rejected records and append
+                                    existing_rejected_df = pd.read_csv(rejected_file)
+                                    if 'WO #' in existing_rejected_df.columns:
+                                        existing_rejected_df['WO #'] = existing_rejected_df['WO #'].astype(str)
+                                    # Only add rows that aren't already rejected
+                                    new_rejected_df = pd.DataFrame(rejected_records)
+                                    new_rejected_df['WO #'] = new_rejected_df['WO #'].astype(str)
+                                    new_rows = new_rejected_df[~new_rejected_df['WO #'].isin(existing_rejected_df['WO #'])]
+                                    if not new_rows.empty:
+                                        combined_rejected_df = pd.concat([existing_rejected_df, new_rows], ignore_index=True)
+                                        combined_rejected_df.to_csv(rejected_file, index=False)
+                                else:
+                                    # Create new rejected file
+                                    pd.DataFrame(rejected_records).to_csv(rejected_file, index=False)
+                                
+                                # Remove rejected records from the main results file
+                                # This makes them disappear from Bulk Review table
+                                remaining_df = df[~df['WO #'].astype(str).isin(selected_rejected_wos)]
+                                remaining_df.to_csv(results_file, index=False)
+                                
+                                st.success(f"❌ Successfully rejected {len(selected_rejected_wos)} clips!")
+                                st.info("📁 **Rejected clips moved to Rejected/Issues tab**")
+                                
+                                # Clear selections and dialog
+                                st.session_state.selected_for_rejection = set()
+                                st.session_state.show_rejection_dialog = False
+                                st.rerun()
+                    
+                    with col_cancel:
+                        if st.button("❌ Cancel Rejection"):
+                            st.session_state.show_rejection_dialog = False
+                            st.rerun()
+
             else:
                 st.info("No clips to review. Process loans first.")
         except Exception as e:
