@@ -1764,7 +1764,7 @@ with bulk_review_tab:
                 gb.configure_column(
                     "📄 View", 
                     cellRenderer=cellRenderer_view,
-                    width=80,
+                    width=120,
                     sortable=False,
                     filter=False
                 )
@@ -1783,6 +1783,7 @@ with bulk_review_tab:
                 gb.configure_column("Model", width=120)
                 gb.configure_column("Contact", width=150)
                 gb.configure_column("Media Outlet", width=180)
+                gb.configure_column("Person_ID", width=80)  # Narrow for small ID numbers
                 gb.configure_column("Relevance", width=80)
                 gb.configure_column("Sentiment", width=100)
                 gb.configure_column("📅 Published Date", width=120)
@@ -2496,6 +2497,20 @@ with rejected_tab:
                 if 'Office' in rejected_df.columns:
                     pass  # Keep original name
                 
+                # Extract the searched URL from URL_Details for the View column
+                def extract_searched_url(url_details):
+                    """Extract the main URL that was searched from URL_Details"""
+                    if pd.isna(url_details) or not url_details:
+                        return ""
+                    
+                    # Split by colon and take the first part (the URL)
+                    url_part = str(url_details).split(':')[0].strip()
+                    return url_part
+                
+                # Add the View column with the searched URL
+                clean_df['Searched URL'] = clean_df['URL_Details'].apply(extract_searched_url) if 'URL_Details' in clean_df.columns else ""
+                clean_df['📄 View'] = clean_df['Searched URL']  # Create View column for cellRenderer
+                
                 # Rename columns for better display
                 column_mapping = {
                     'Office': 'Office',  # Add office column first
@@ -2503,8 +2518,7 @@ with rejected_tab:
                     'Model': 'Model', 
                     'To': 'Media Contact',
                     'Affiliation': 'Publication',
-                    'Links': '🔗 Original URLs',
-            
+                    '📄 View': '📄 View',  # Add View column
                     'Rejection_Reason': '⚠️ Rejection Reason',
                     'URL_Details': '📋 Details',
                     'Processed_Date': '📅 Processed'
@@ -2518,37 +2532,17 @@ with rejected_tab:
                             clean_df = clean_df.rename(columns={old_col: new_col})
                         display_columns.append(new_col)
                 
-                # Create HTML cell renderer for Original URLs column (clickable links - same as bulk review)
-                cellRenderer_original_urls = JsCode("""
-                class OriginalUrlsCellRenderer {
+                # Create cellRenderer for View column (clickable URL - same as bulk review)
+                cellRenderer_view = JsCode("""
+                class UrlCellRenderer {
                   init(params) {
-                    this.eGui = document.createElement('div');
-                    this.eGui.style.display = 'flex';
-                    this.eGui.style.justifyContent = 'flex-start';
-                    this.eGui.style.alignItems = 'center';
-                    this.eGui.style.height = '100%';
-                    this.eGui.style.fontSize = '0.8rem';
-                    this.eGui.style.lineHeight = '1.3';
-                    
-                    const urlsValue = params.value;
-                    if (urlsValue && urlsValue.trim() !== '') {
-                      // Split URLs by semicolon and create clickable links
-                      const urls = urlsValue.split(';').map(url => url.trim()).filter(url => url);
-                      const links = urls.map(url => {
-                        try {
-                          const domain = new URL(url).hostname.replace('www.', '');
-                          return `<a href="${url}" target="_blank" style="color: #1f77b4; text-decoration: underline; margin-right: 8px;">${domain}</a>`;
-                        } catch (e) {
-                          // Fallback for invalid URLs
-                          const domain = url.replace(/^https?:\\/\\//g, '').replace(/^www\\./g, '').split('/')[0];
-                          return `<a href="${url}" target="_blank" style="color: #1f77b4; text-decoration: underline; margin-right: 8px;">${domain}</a>`;
-                        }
-                      });
-                      this.eGui.innerHTML = links.join('<br/>');
-                    } else {
-                      this.eGui.innerText = '—';
-                      this.eGui.style.color = '#6c757d';
-                    }
+                    this.eGui = document.createElement('a');
+                    this.eGui.innerText = '📄 View';
+                    this.eGui.href = params.value;
+                    this.eGui.target = '_blank';
+                    this.eGui.style.color = '#1f77b4';
+                    this.eGui.style.textDecoration = 'underline';
+                    this.eGui.style.cursor = 'pointer';
                   }
 
                   getGui() {
@@ -2561,6 +2555,7 @@ with rejected_tab:
                 }
                 """)
                 
+
                 # Configure AgGrid for rejected records (no pagination for full transparency)
                 gb = GridOptionsBuilder.from_dataframe(clean_df[display_columns])
                 # Removed pagination to show all rejected records at once
@@ -2590,16 +2585,17 @@ with rejected_tab:
                 gb.configure_column("Media Contact", width=260)  # Extra wide for contact names
                 gb.configure_column("Publication", width=260)  # Extra wide for publication names
                 
-                # Configure Original URLs column with clickable links
-                gb.configure_column(
-                    "🔗 Original URLs", 
-                    cellRenderer=cellRenderer_original_urls,
-                    width=350,  # Extra wide for URL display
-                    wrapText=True, 
-                    autoHeight=True,
-                    sortable=False,
-                    filter=False
-                )
+                # Configure the View column with the custom renderer (same as bulk review)
+                if "📄 View" in display_columns:
+                    gb.configure_column(
+                        "📄 View", 
+                        cellRenderer=cellRenderer_view,
+                        width=120,
+                        sortable=False,
+                        filter=False
+                    )
+                    # Hide the Searched URL column since it's only used for the cellRenderer
+                    gb.configure_column("Searched URL", hide=True)
                 
 
                 gb.configure_column("⚠️ Rejection Reason", width=280, wrapText=True, autoHeight=True)  # Extra wide for rejection reasons
