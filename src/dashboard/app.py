@@ -2028,26 +2028,20 @@ with bulk_review_tab:
                 with col1:
                     # Submit Approved Clips Button
                     selected_count = len(st.session_state.get('selected_for_approval', set()))
-                    if st.button(f"✅ Submit {selected_count} Approved Clips", disabled=selected_count == 0):
+                    if st.button(f"✅ Submit {selected_count} Approved Clips", disabled=selected_count == 0, key="submit_approved_main"):
                         if selected_count > 0:
                             # Show confirmation dialog
                             st.session_state.show_approval_dialog = True
-                    
-                    # Submit Rejected Clips Button (NEW)
+                
+                with col2:
+                    # Submit Rejected Clips Button (side by side with approved)
                     rejected_count = len(st.session_state.get('selected_for_rejection', set()))
-                    if st.button(f"❌ Submit {rejected_count} Rejected Clips", disabled=rejected_count == 0):
-                        if rejected_count > 0:
-                            # Show rejection confirmation dialog
-                            st.session_state.show_rejection_dialog = True
-                    
-                    # Submit Rejected Clips Button (NEW)
-                    rejected_count = len(st.session_state.get('selected_for_rejection', set()))
-                    if st.button(f"❌ Submit {rejected_count} Rejected Clips", disabled=rejected_count == 0):
+                    if st.button(f"❌ Submit {rejected_count} Rejected Clips", disabled=rejected_count == 0, key="submit_rejected_main"):
                         if rejected_count > 0:
                             # Show rejection confirmation dialog
                             st.session_state.show_rejection_dialog = True
                 
-                with col2:
+                with col3:
                     if st.button("✅ Auto-Approve High Quality (9+)"):
                         high_quality_df = df[df['Relevance Score'] >= 9]
                         if not high_quality_df.empty:
@@ -2061,7 +2055,7 @@ with bulk_review_tab:
                         else:
                             st.info("No high-quality clips (9+) found")
                 
-                with col3:
+                with col4:
                     # Excel Export Button
                     if st.button("📊 Excel Report"):
                         try:
@@ -2089,22 +2083,16 @@ with bulk_review_tab:
                         except Exception as e:
                             st.error(f"Error creating Excel report: {e}")
                 
-                with col4:
-                    if st.button("🔄 Refresh Data"):
-                        st.rerun()
+
                 
                 # Approval confirmation dialog
                 if st.session_state.get('show_approval_dialog', False):
                     st.markdown("---")
-                    st.warning(f"⚠️ **Confirm Approval**")
-                    st.write(f"You are about to approve **{selected_count} clips**. This action will:")
-                    st.write("• Save approved clips to the database")
-                    st.write("• Generate Excel and JSON files for client delivery")
-                    st.write("• Mark these clips as processed")
+                    st.warning(f"⚠️ **Approve {selected_count} clips?** This will save them and generate client files.")
                     
                     col_confirm, col_cancel = st.columns(2)
                     with col_confirm:
-                        if st.button("✅ Confirm Approval", type="primary"):
+                        if st.button("✅ Confirm Approval", type="primary", key="confirm_approval_btn"):
                             # Process the approvals
                             selected_wos = st.session_state.selected_for_approval
                             if selected_wos:
@@ -2283,23 +2271,19 @@ with bulk_review_tab:
                                 st.rerun()
                     
                     with col_cancel:
-                        if st.button("❌ Cancel"):
+                        if st.button("❌ Cancel", key="cancel_approval_btn"):
                             st.session_state.show_approval_dialog = False
                             st.rerun()
                 
                 # NEW: Rejection confirmation dialog
                 if st.session_state.get('show_rejection_dialog', False):
                     st.markdown("---")
-                    st.error(f"⚠️ **Confirm Rejection**")
                     rejected_count = len(st.session_state.get('selected_for_rejection', set()))
-                    st.write(f"You are about to reject **{rejected_count} clips**. This action will:")
-                    st.write("• Move clips to the Rejected/Issues tab")
-                    st.write("• Remove them from the Bulk Review table")
-                    st.write("• Add rejection reason for transparency")
+                    st.error(f"⚠️ **Reject {rejected_count} clips?** This will move them to Rejected/Issues tab.")
                     
                     col_confirm, col_cancel = st.columns(2)
                     with col_confirm:
-                        if st.button("❌ Confirm Rejection", type="secondary"):
+                        if st.button("❌ Confirm Rejection", type="secondary", key="confirm_rejection_btn"):
                             # Process the rejections
                             selected_rejected_wos = st.session_state.selected_for_rejection
                             if selected_rejected_wos:
@@ -2358,7 +2342,7 @@ with bulk_review_tab:
                                 st.rerun()
                     
                     with col_cancel:
-                        if st.button("❌ Cancel Rejection"):
+                        if st.button("❌ Cancel Rejection", key="cancel_rejection_btn"):
                             st.session_state.show_rejection_dialog = False
                             st.rerun()
 
