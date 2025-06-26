@@ -2454,9 +2454,6 @@ with bulk_review_tab:
 
 # ========== REJECTED/ISSUES TAB (Transparency Dashboard) ==========
 with rejected_tab:
-    st.markdown("## ⚠️ Rejected/Issues Dashboard")
-    st.markdown("*Complete transparency: See everything that was processed but didn't make the cut*")
-    
     # Try to load rejected records file
     rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
     if os.path.exists(rejected_file):
@@ -2585,19 +2582,19 @@ with rejected_tab:
                     }
                 )
                 
-                # Configure specific columns
+                # Configure specific columns with extra wide widths to make rows skinnier
                 if "Office" in display_columns:
-                    gb.configure_column("Office", width=90, pinned='left')
-                gb.configure_column("WO #", width=100, pinned='left')
-                gb.configure_column("Model", width=120)
-                gb.configure_column("Media Contact", width=120)
-                gb.configure_column("Publication", width=120)
+                    gb.configure_column("Office", width=200, pinned='left')  # Extra wide for office names
+                gb.configure_column("WO #", width=160, pinned='left')  # Extra wide for work order numbers
+                gb.configure_column("Model", width=380)  # Extra wide for long model names
+                gb.configure_column("Media Contact", width=260)  # Extra wide for contact names
+                gb.configure_column("Publication", width=260)  # Extra wide for publication names
                 
                 # Configure Original URLs column with clickable links
                 gb.configure_column(
                     "🔗 Original URLs", 
                     cellRenderer=cellRenderer_original_urls,
-                    width=200, 
+                    width=350,  # Extra wide for URL display
                     wrapText=True, 
                     autoHeight=True,
                     sortable=False,
@@ -2605,9 +2602,9 @@ with rejected_tab:
                 )
                 
 
-                gb.configure_column("⚠️ Rejection Reason", width=150, wrapText=True, autoHeight=True)
-                gb.configure_column("📋 Details", width=250, wrapText=True, autoHeight=True)
-                gb.configure_column("📅 Processed", width=120)
+                gb.configure_column("⚠️ Rejection Reason", width=280, wrapText=True, autoHeight=True)  # Extra wide for rejection reasons
+                gb.configure_column("📋 Details", width=1600, wrapText=True, autoHeight=True)  # Maximum wide for detailed information
+                gb.configure_column("📅 Processed", width=200)  # Extra wide for date/time stamps
                 
                 # Build grid options
                 grid_options = gb.build()
