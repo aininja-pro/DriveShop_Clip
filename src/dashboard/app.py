@@ -285,7 +285,7 @@ def create_client_excel_report(df, approved_df=None):
     # Include Activity_ID for approval workflow even though it's not visible in UI
     bulk_review_columns = [
         'Activity_ID', 'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
-        'Relevance', 'Sentiment'
+        'URL', 'Relevance', 'Sentiment'
     ]
     
     # Map our data columns to Bulk Review column names
@@ -297,10 +297,9 @@ def create_client_excel_report(df, approved_df=None):
         'Model': 'Model',
         'To': 'Contact',
         'Affiliation': 'Media Outlet',
+        'Clip URL': 'URL',  # Add the primary URL from the View column
         'Relevance Score': 'Relevance',
         'Overall Sentiment': 'Sentiment',  # Fix: Use the correct sentiment column
-
-
     }
     
     # Create export dataframe with Bulk Review column structure
@@ -361,6 +360,10 @@ def create_client_excel_report(df, approved_df=None):
         for col_idx, col_name in enumerate(headers, 1):
             cell = results_ws.cell(row=row_idx, column=col_idx)
             
+            # Make URLs clickable
+            if col_name == 'URL' and cell.value and str(cell.value).startswith(('http://', 'https://')):
+                cell.hyperlink = str(cell.value)
+                cell.font = url_font
 
     
     # Auto-size columns
@@ -2164,7 +2167,7 @@ with bulk_review_tab:
                                     json_data.append({
                                         # Basic Information
                                         "work_order": str(row.get('WO #', '')),
-                                        "activity_id": str(row.get('Activity_ID', '')),
+                                        "activity_id": str(int(float(row.get('Activity_ID', 0)))) if row.get('Activity_ID') and str(row.get('Activity_ID')).replace('.', '').isdigit() else str(row.get('Activity_ID', '')),
                                         "make": str(row.get('Make', '')),
                                         "vehicle_model": str(row.get('Model', '')),
                                         "contact": str(row.get('To', '')),
@@ -2235,9 +2238,23 @@ with bulk_review_tab:
                                     # Excel download - GENERATE ON DEMAND (slower but includes all data)
                                     def generate_excel():
                                         try:
-                                            # Load the most current approved data
-                                            current_approved_df = pd.read_csv(approved_file, dtype=str) if os.path.exists(approved_file) else pd.DataFrame()
-                                            # Create Excel with all approved clips
+                                            # Load the most current approved data with proper data cleaning
+                                            if os.path.exists(approved_file):
+                                                current_approved_df = pd.read_csv(approved_file, dtype=str)
+                                                
+                                                # Clean problematic data that might cause Excel conversion errors
+                                                for col in current_approved_df.columns:
+                                                    # Convert any extremely long strings to truncated versions
+                                                    if current_approved_df[col].dtype == 'object':
+                                                        current_approved_df[col] = current_approved_df[col].astype(str).apply(
+                                                            lambda x: x[:500] + '...' if len(str(x)) > 500 else str(x)
+                                                        )
+                                                    # Handle any NaN or None values
+                                                    current_approved_df[col] = current_approved_df[col].fillna('')
+                                            else:
+                                                current_approved_df = pd.DataFrame()
+                                            
+                                            # Create Excel with cleaned data
                                             excel_wb = create_client_excel_report(current_approved_df, current_approved_df)
                                             excel_buffer = io.BytesIO()
                                             excel_wb.save(excel_buffer)
@@ -2247,13 +2264,17 @@ with bulk_review_tab:
                                             st.error(f"Error generating Excel: {e}")
                                             return None
                                     
-                                    st.download_button(
-                                        label="📊 Download Excel Report",
-                                        data=generate_excel(),
-                                        file_name=f"DriveShop_FINAL_CORRECT_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key="excel_download_primary"
-                                    )
+                                    excel_data = generate_excel()
+                                    if excel_data:
+                                        st.download_button(
+                                            label="📊 Download Excel Report",
+                                            data=excel_data,
+                                            file_name=f"DriveShop_FINAL_CORRECT_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                            key="excel_download_primary"
+                                        )
+                                    else:
+                                        st.error("❌ Excel generation failed. Please try the JSON download instead.")
                                 
                                 with col_json:
                                     # JSON download - INSTANT (already generated)
