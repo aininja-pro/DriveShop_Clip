@@ -1940,7 +1940,7 @@ with bulk_review_tab:
                     clean_df,
                     gridOptions=grid_options,
                     allow_unsafe_jscode=True,
-                    update_mode=GridUpdateMode.MANUAL,  # Manual updates to prevent refresh loops
+                    update_mode=GridUpdateMode.MODEL_CHANGED,  # Capture checkbox changes automatically
                     height=650,  # Increased height for better viewing
                     fit_columns_on_grid_load=True,
                     theme="alpine",
@@ -1963,6 +1963,12 @@ with bulk_review_tab:
                 
                 # Process changes from AgGrid WITHOUT triggering reruns
                 if not changed_df.empty:
+                    # Debug: Print current checkbox states
+                    approved_rows = changed_df[changed_df['✅ Approve'] == True]
+                    rejected_rows = changed_df[changed_df['❌ Reject'] == True]
+                    if not approved_rows.empty or not rejected_rows.empty:
+                        print(f"🔍 Checkbox changes detected: {len(approved_rows)} approved, {len(rejected_rows)} rejected")
+                    
                     # 1. First handle Media Outlet changes (non-blocking)
                     outlet_changed = False
                     changed_count = 0
@@ -2017,6 +2023,11 @@ with bulk_review_tab:
                     # This prevents accumulation and refresh issues
                     st.session_state.selected_for_approval = current_approved_wos.copy()
                     st.session_state.selected_for_rejection = current_rejected_wos.copy()
+                    
+                    # Debug: Print session state updates
+                    if current_approved_wos or current_rejected_wos:
+                        print(f"📊 Session state updated: {len(current_approved_wos)} approved, {len(current_rejected_wos)} rejected")
+                        print(f"   Approved WOs: {list(current_approved_wos)[:5]}...")  # Show first 5
                     
                     # Ensure mutual exclusivity (approve overrides reject)
                     if current_approved_wos:
@@ -2145,6 +2156,11 @@ with bulk_review_tab:
                                         "clip_url": str(row.get('Clip URL', '')),
                                         "original_links": str(row.get('Links', '')),
                                         
+                                        # Date Information (matching Excel Approved Clips tab)
+                                        "article_published_date": str(row.get('Published Date', '')),  # When media outlet published
+                                        "loan_end_date": str(row.get('published_date', '')),  # From source data Stop Date
+                                        "processed_date": str(row.get('Processed Date', '')),  # When our system processed it
+                                        
                                         # AI Analysis Results
                                         "relevance_score": row.get('Relevance Score', 0),
                                         "overall_score": row.get('Overall Score', 0),
@@ -2175,7 +2191,6 @@ with bulk_review_tab:
                                         "url_tracking": str(row.get('URL_Tracking', '')),
                                         "urls_processed": row.get('URLs_Processed', 0),
                                         "urls_successful": row.get('URLs_Successful', 0),
-                                        "processed_date": str(row.get('Processed Date', '')),
                                         "approval_timestamp": datetime.now().isoformat()
                                     })
                                 
@@ -2284,7 +2299,8 @@ with bulk_review_tab:
                 basic_fields = [f for f in fields if f in ['work_order', 'activity_id', 'make', 'vehicle_model', 'contact', 'media_outlet', 'office']]
                 analysis_fields = [f for f in fields if 'score' in f or f in ['sentiment', 'summary', 'recommendation', 'key_mentions', 'brand_alignment']]
                 detail_fields = [f for f in fields if 'note' in f or f in ['pros', 'cons']]
-                tech_fields = [f for f in fields if f in ['clip_url', 'original_links', 'url_tracking', 'urls_processed', 'urls_successful', 'processed_date', 'approval_timestamp']]
+                date_fields = [f for f in fields if 'date' in f]  # All date-related fields
+                tech_fields = [f for f in fields if f in ['clip_url', 'original_links', 'url_tracking', 'urls_processed', 'urls_successful', 'approval_timestamp']]
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -2294,6 +2310,10 @@ with bulk_review_tab:
                     
                     st.markdown("**Analysis Results:**")
                     for field in analysis_fields:
+                        st.markdown(f"• `{field}`")
+                    
+                    st.markdown("**Date Information:**")
+                    for field in date_fields:
                         st.markdown(f"• `{field}`")
                 
                 with col2:
