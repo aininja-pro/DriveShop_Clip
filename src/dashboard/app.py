@@ -285,7 +285,7 @@ def create_client_excel_report(df, approved_df=None):
     # Include Activity_ID for approval workflow even though it's not visible in UI
     bulk_review_columns = [
         'Activity_ID', 'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
-        'Relevance', 'Sentiment', 'URLs', 'Other URLs'
+        'Relevance', 'Sentiment', 'URLs'
     ]
     
     # Map our data columns to Bulk Review column names
@@ -300,7 +300,7 @@ def create_client_excel_report(df, approved_df=None):
         'Relevance Score': 'Relevance',
         'Overall Sentiment': 'Sentiment',  # Fix: Use the correct sentiment column
         'Clip URL': 'URLs',
-        'Links': 'Other URLs'
+
     }
     
     # Create export dataframe with Bulk Review column structure
@@ -343,7 +343,7 @@ def create_client_excel_report(df, approved_df=None):
                 formatted_value = sentiment_map.get(cleaned_value, f"{cleaned_value} 😐")
                 row_data.append(formatted_value)
             # Check if this is a URL column and make it clickable
-            elif col_name in ['URLs', 'Other URLs'] and value and str(value).startswith('http'):
+            elif col_name in ['URLs'] and value and str(value).startswith('http'):
                 # We'll handle URL linking after adding the data
                 row_data.append(str(value))
             else:
@@ -365,7 +365,7 @@ def create_client_excel_report(df, approved_df=None):
             cell = results_ws.cell(row=row_idx, column=col_idx)
             
             # Make URL columns clickable
-            if col_name in ['URLs', 'Other URLs'] and cell.value and str(cell.value).startswith('http'):
+            if col_name in ['URLs'] and cell.value and str(cell.value).startswith('http'):
                 url = str(cell.value)
                 cell.hyperlink = url
                 cell.font = url_font
@@ -1615,66 +1615,7 @@ with bulk_review_tab:
                 
                 clean_df['URLs'] = display_df.apply(get_url_count, axis=1)
                 
-                # Add Other URLs column with direct clickable links
-                def get_other_urls_html(row):
-                    try:
-                        if 'URL_Tracking' in row and pd.notna(row['URL_Tracking']):
-                            url_tracking = parse_url_tracking(row)
-                            successful_urls = [u for u in url_tracking if u.get('success', False)]
-                            
-                            if len(successful_urls) <= 1:
-                                return "—"
-                            else:
-                                # Get the main URL (already shown in View column)
-                                main_url = row.get('Clip URL', '')
-                                other_urls = [u for u in successful_urls if u.get('actual_url') != main_url]
-                                
-                                if len(other_urls) == 0:
-                                    return "—"
-                                
-                                # Create clickable links for other URLs
-                                link_parts = []
-                                for url_data in other_urls[:2]:  # Show max 2 additional links
-                                    url = url_data.get('actual_url', url_data.get('original_url', ''))
-                                    content_type = url_data.get('content_type', 'web')
-                                    icon = "🎥" if "youtube" in content_type.lower() else "📄"
-                                    
-                                    # Create short name for link
-                                    if "motor1" in url.lower():
-                                        name = "Motor1"
-                                    elif "youtube" in url.lower():
-                                        name = "YouTube"
-                                    elif "caranddriver" in url.lower():
-                                        name = "C&D"
-                                    elif "autoblog" in url.lower():
-                                        name = "Autoblog"
-                                    else:
-                                        name = "Link"
-                                    
-                                    link_parts.append(f'<a href="{url}" target="_blank" style="color: #1f77b4; text-decoration: none;">{icon} {name}</a>')
-                                
-                                # If there are more than 2 additional URLs, show count
-                                if len(other_urls) > 2:
-                                    extra_count = len(other_urls) - 2
-                                    link_parts.append(f'+{extra_count} more')
-                                
-                                return ' | '.join(link_parts)
-                        else:
-                            # Fallback for old data format
-                            links = str(row.get('Links', ''))
-                            if ',' in links or ';' in links:
-                                separator = ',' if ',' in links else ';'
-                                urls = [u.strip() for u in links.split(separator) if u.strip()]
-                                if len(urls) > 1:
-                                    return f"+{len(urls)-1} more*"
-                                else:
-                                    return "—"
-                            else:
-                                return "—"
-                    except Exception as e:
-                        return "—"
-                
-                clean_df['Other URLs'] = display_df.apply(get_other_urls_html, axis=1)
+
                 
                 # Add Published Date column - use same logic as JSON (read from approved_clips.csv)
                 def get_published_date(row):
@@ -1817,37 +1758,7 @@ with bulk_review_tab:
                 }
                 """)
                 
-                # Create HTML cell renderer for Other URLs column (clickable links)
-                cellRenderer_other_urls = JsCode("""
-                class OtherUrlsCellRenderer {
-                  init(params) {
-                    this.eGui = document.createElement('div');
-                    this.eGui.style.display = 'flex';
-                    this.eGui.style.justifyContent = 'center';
-                    this.eGui.style.alignItems = 'center';
-                    this.eGui.style.height = '100%';
-                    this.eGui.style.fontSize = '0.8rem';
-                    
-                    const htmlContent = params.value;
-                    if (htmlContent && htmlContent !== '—') {
-                      // Render HTML content directly (contains clickable links)
-                      this.eGui.innerHTML = htmlContent;
-                    } else {
-                      // Show plain text for "—"
-                      this.eGui.innerText = htmlContent;
-                      this.eGui.style.color = '#6c757d';
-                    }
-                  }
 
-                  getGui() {
-                    return this.eGui;
-                  }
-
-                  refresh(params) {
-                    return false;
-                  }
-                }
-                """)
                 
                 # Configure the grid
                 gb = GridOptionsBuilder.from_dataframe(clean_df)
@@ -1887,14 +1798,7 @@ with bulk_review_tab:
                 # Configure URLs column
                 gb.configure_column("URLs", width=70)
                 
-                # Configure Other URLs column with HTML renderer
-                gb.configure_column(
-                    "Other URLs", 
-                    cellRenderer=cellRenderer_other_urls,
-                    width=150,  # Wider to accommodate multiple links
-                    sortable=False,
-                    filter=False
-                )
+
                 
                 # Configure selection
                 gb.configure_selection(selection_mode="multiple", use_checkbox=False)
@@ -2043,7 +1947,7 @@ with bulk_review_tab:
                     reload_data=False  # Prevent automatic data reloading
                 )
                 
-                # Note: URLs are now clickable directly in the "Other URLs" column
+
                 
                 # Process AgGrid changes
                 changed_df = selected_rows["data"]
