@@ -490,23 +490,94 @@ def create_client_excel_report(df, approved_df=None):
     if approved_df is not None and len(approved_df) > 0:
         # Filter approved clips to only include WO #s that exist in the current detailed results
         current_wo_numbers = set(df['WO #'].astype(str))
-        current_approved_df = approved_df[approved_df['WO #'].astype(str).isin(current_wo_numbers)]
+        current_approved_df = approved_df[approved_df['WO #'].astype(str).isin(current_wo_numbers)].copy()
         
         if not current_approved_df.empty:
-            approved_ws = wb.create_sheet("Approved Clips")
+            # FIX: Get actual loan end dates from source data for Excel
+            source_mapping = {}
+            try:
+                import requests
+                response = requests.get("https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv", timeout=30)
+                if response.status_code == 200:
+                    source_lines = response.text.strip().split('\n')
+                    for line in source_lines:
+                        if line.strip() and not line.startswith('"Activity_ID"'):  # Skip header
+                            # Parse CSV line properly (handle quoted fields)
+                            import csv
+                            from io import StringIO
+                            reader = csv.reader(StringIO(line))
+                            parts = next(reader)
+                            if len(parts) >= 10:
+                                # Position mapping: Activity_ID(1st), Person_ID(2nd), Make(3rd), Model(4th), WO#(5th), ..., Stop_Date(10th)
+                                wo_number = parts[4].strip()  # WO# is in 5th position
+                                stop_date = parts[9].strip()  # Stop Date is in 10th position
+                                source_mapping[wo_number] = stop_date
+            except Exception as e:
+                print(f"Warning: Could not fetch source data for loan end dates: {e}")
             
-            # Add approved clips data (only from current dataset)
-            for r in dataframe_to_rows(current_approved_df, index=False, header=True):
-                approved_ws.append(r)
+            # FIX: Rename Activity_ID to Activity_ID for consistency
+            if 'Article_ID' in current_approved_df.columns and 'Activity_ID' not in current_approved_df.columns:
+                current_approved_df['Activity_ID'] = current_approved_df['Article_ID']
+                current_approved_df.drop('Article_ID', axis=1, inplace=True)
             
-            # Style header
-            for cell in approved_ws[1]:
+            # FIX: Clean up date columns - keep only ONE published date and add loan end date
+            # Remove the confusing 'published_date' column (it's not the loan end date)
+            if 'published_date' in current_approved_df.columns:
+                current_approved_df.drop('published_date', axis=1, inplace=True)
+            
+            # Add actual loan end dates from source data
+            current_approved_df['Loan End Date'] = current_approved_df['WO #'].astype(str).map(source_mapping).fillna('')
+            
+            # Rename the Published Date column to be clear about what it is
+            column_renames = {}
+            if 'Published Date' in current_approved_df.columns:
+                column_renames['Published Date'] = 'Article Published Date'
+            
+            if column_renames:
+                current_approved_df.rename(columns=column_renames, inplace=True)
+            
+            # Move Activity_ID to first column
+            if 'Activity_ID' in current_approved_df.columns:
+                cols = current_approved_df.columns.tolist()
+                cols.remove('Activity_ID')
+                current_approved_df = current_approved_df[['Activity_ID'] + cols]
+            
+            # Create Approved Clips sheet using openpyxl syntax (not xlsxwriter)
+            approved_sheet = wb.create_sheet('Approved Clips')
+            
+            # Write headers with openpyxl formatting (using already imported Font)
+            header_font = Font(bold=True, size=12, color="FFFFFF")
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            
+            for col_num, header in enumerate(current_approved_df.columns, 1):
+                cell = approved_sheet.cell(row=1, column=col_num, value=header)
                 cell.font = header_font
-                cell.fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+                cell.fill = header_fill
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             
+            # Write data using openpyxl
+            url_font = Font(color="0000FF", underline="single")
+            
+            for row_num, (_, row_data) in enumerate(current_approved_df.iterrows(), 2):  # Start from row 2
+                for col_num, value in enumerate(row_data, 1):
+                    cell = approved_sheet.cell(row=row_num, column=col_num)
+                    
+                    if pd.isna(value):
+                        cell.value = ''
+                    elif isinstance(value, (int, float)):
+                        cell.value = value
+                    else:
+                        # Handle URLs with hyperlinks
+                        str_value = str(value)
+                        if str_value.startswith(('http://', 'https://')):
+                            cell.value = str_value
+                            cell.hyperlink = str_value
+                            cell.font = url_font
+                        else:
+                            cell.value = str_value
+            
             # Auto-size columns
-            for col in approved_ws.columns:
+            for col in approved_sheet.columns:
                 max_length = 0
                 column = col[0].column_letter
                 for cell in col:
@@ -516,7 +587,7 @@ def create_client_excel_report(df, approved_df=None):
                     except:
                         pass
                 adjusted_width = min(max_length + 2, 50)
-                approved_ws.column_dimensions[column].width = adjusted_width
+                approved_sheet.column_dimensions[column].width = adjusted_width
     
     return wb
 
@@ -1412,7 +1483,9 @@ with bulk_review_tab:
                     approved_file = os.path.join(project_root, "data", "approved_clips.csv")
                     approved_count = 0
                     if os.path.exists(approved_file):
-                        approved_df = pd.read_csv(approved_file)
+                        # Read approved clips CSV - PREVENT DATE AUTO-CONVERSION
+                        # Use dtype=str to keep date values as raw strings like "1/8/25" instead of datetime objects
+                        approved_df = pd.read_csv(approved_file, dtype=str)
                         approved_count = len(approved_df)
                     st.metric("Approved", approved_count)
                 
@@ -2141,7 +2214,53 @@ with bulk_review_tab:
                                 
                                 # Create comprehensive JSON file for client with ALL fields
                                 json_data = []
-                                for _, row in selected_rows.iterrows():
+                                
+                                # CRITICAL FIX: Read approved_clips.csv with dtype=str to prevent date auto-conversion
+                                # This ensures dates like "1/8/25" stay as strings instead of becoming datetime objects
+                                if os.path.exists(approved_file):
+                                    approved_df_for_json = pd.read_csv(approved_file, dtype=str)
+                                    # Filter to only the selected WO numbers for JSON
+                                    selected_approved_rows = approved_df_for_json[approved_df_for_json['WO #'].isin(selected_wos)]
+                                else:
+                                    selected_approved_rows = pd.DataFrame()
+                                
+                                # FIXED: Get actual loan end dates from source data
+                                source_mapping = {}
+                                try:
+                                    import requests
+                                    response = requests.get("https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv", timeout=30)
+                                    if response.status_code == 200:
+                                        source_lines = response.text.strip().split('\n')
+                                        for line in source_lines:
+                                            if line.strip() and not line.startswith('"Activity_ID"'):  # Skip header
+                                                # Parse CSV line properly (handle quoted fields)
+                                                import csv
+                                                from io import StringIO
+                                                reader = csv.reader(StringIO(line))
+                                                parts = next(reader)
+                                                if len(parts) >= 10:
+                                                    # Position mapping: Activity_ID(1st), Person_ID(2nd), Make(3rd), Model(4th), WO#(5th), ..., Stop_Date(10th)
+                                                    wo_number = parts[4].strip()  # WO# is in 5th position
+                                                    stop_date = parts[9].strip()  # Stop Date is in 10th position
+                                                    source_mapping[wo_number] = stop_date
+                                except Exception as e:
+                                    print(f"Warning: Could not fetch source data for loan end dates: {e}")
+                                
+                                for _, row in selected_approved_rows.iterrows():
+                                    # Get the work order number for this row
+                                    wo_number = str(row.get('WO #', ''))
+                                    
+                                    # Get the article published date - now as raw string from dtype=str CSV read
+                                    raw_article_date = row.get('Published Date', '')
+                                    if pd.isna(raw_article_date) or str(raw_article_date).lower() in ['nan', 'none', '']:
+                                        article_published_date = ''
+                                    else:
+                                        # Keep the raw date string (like "1/8/25") - no conversion needed
+                                        article_published_date = str(raw_article_date).strip()
+                                    
+                                    # Get the loan end date from source data mapping (this is the real loan end date)
+                                    loan_end_date = source_mapping.get(wo_number, '')
+                                    
                                     json_data.append({
                                         # Basic Information
                                         "work_order": str(row.get('WO #', '')),
@@ -2156,9 +2275,9 @@ with bulk_review_tab:
                                         "clip_url": str(row.get('Clip URL', '')),
                                         "original_links": str(row.get('Links', '')),
                                         
-                                        # Date Information (matching Excel Approved Clips tab)
-                                        "article_published_date": str(row.get('Published Date', '')),  # When media outlet published
-                                        "loan_end_date": str(row.get('published_date', '')),  # From source data Stop Date
+                                        # Date Information (FIXED: proper date handling)
+                                        "article_published_date": article_published_date,  # From Published Date column (when media outlet published)
+                                        "loan_end_date": loan_end_date,  # From source data Stop Date (10th position - when loan ended)
                                         "processed_date": str(row.get('Processed Date', '')),  # When our system processed it
                                         
                                         # AI Analysis Results
@@ -2209,24 +2328,30 @@ with bulk_review_tab:
                                 st.success(f"✅ Successfully approved {len(selected_wos)} clips!")
                                 st.info("📁 **Both Excel and JSON files are ready for download below**")
                                 
-                                # Download buttons
+                                # Download buttons - Generate files ONLY when clicked
                                 col_excel, col_json = st.columns(2)
                                 with col_excel:
-                                    # Excel download
-                                    wb = create_client_excel_report(df, pd.read_csv(approved_file))
-                                    excel_buffer = io.BytesIO()
-                                    wb.save(excel_buffer)
-                                    excel_buffer.seek(0)
-                                    st.download_button(
-                                        label="📥 Download Excel Report",
-                                        data=excel_buffer.getvalue(),
-                                        file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key="excel_download_primary"
-                                    )
+                                    # Excel download - LAZY GENERATION (only when clicked)
+                                    def generate_excel():
+                                        wb = create_client_excel_report(df, pd.read_csv(approved_file))
+                                        excel_buffer = io.BytesIO()
+                                        wb.save(excel_buffer)
+                                        excel_buffer.seek(0)
+                                        return excel_buffer.getvalue()
+                                    
+                                    if st.button("📥 Generate & Download Excel Report", key="excel_gen_btn"):
+                                        with st.spinner("Generating Excel report..."):
+                                            excel_data = generate_excel()
+                                            st.download_button(
+                                                label="📥 Download Excel Report",
+                                                data=excel_data,
+                                                file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                                key="excel_download_primary"
+                                            )
                                 
                                 with col_json:
-                                    # JSON download
+                                    # JSON download - INSTANT (already generated)
                                     st.download_button(
                                         label="📄 Download JSON Report",
                                         data=json.dumps(json_data, indent=2),
