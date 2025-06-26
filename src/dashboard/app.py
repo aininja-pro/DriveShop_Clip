@@ -1676,6 +1676,27 @@ with bulk_review_tab:
                 
                 clean_df['Other URLs'] = display_df.apply(get_other_urls_html, axis=1)
                 
+                # Add Published Date column - use same logic as JSON (read from approved_clips.csv)
+                def get_published_date(row):
+                    try:
+                        wo_number = str(row.get('WO #', ''))
+                        # Read from approved_clips.csv (same as JSON) to get correct date format
+                        approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                        if os.path.exists(approved_file) and wo_number:
+                            # Use dtype=str to prevent date auto-conversion (same as JSON logic)
+                            approved_df_dates = pd.read_csv(approved_file, dtype=str)
+                            # Find matching WO # in approved clips
+                            matching_rows = approved_df_dates[approved_df_dates['WO #'].astype(str) == wo_number]
+                            if not matching_rows.empty:
+                                raw_date = matching_rows.iloc[0].get('Published Date', '')
+                                if pd.notna(raw_date) and str(raw_date).strip() and str(raw_date).lower() not in ['nan', 'none']:
+                                    return str(raw_date).strip()  # Return raw date string like "1/8/25"
+                        return "—"
+                    except:
+                        return "—"
+                
+                clean_df['📅 Published Date'] = display_df.apply(get_published_date, axis=1)
+                
                 # Store the full URL tracking data for popup (hidden column)
                 clean_df['URL_Tracking_Data'] = display_df.apply(lambda row: json.dumps(parse_url_tracking(row)), axis=1)
                 
@@ -1887,6 +1908,7 @@ with bulk_review_tab:
                 gb.configure_column("Media Outlet", width=180)
                 gb.configure_column("Relevance", width=80)
                 gb.configure_column("Sentiment", width=100)
+                gb.configure_column("📅 Published Date", width=120)
                 
                 # Load Person_ID to Media Outlets mapping for dropdown
                 person_outlets_mapping = load_person_outlets_mapping()
