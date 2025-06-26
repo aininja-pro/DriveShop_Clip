@@ -285,7 +285,7 @@ def create_client_excel_report(df, approved_df=None):
     # Include Activity_ID for approval workflow even though it's not visible in UI
     bulk_review_columns = [
         'Activity_ID', 'Office', 'WO #', 'Make', 'Model', 'Contact', 'Media Outlet', 
-        'Relevance', 'Sentiment', 'URLs'
+        'Relevance', 'Sentiment'
     ]
     
     # Map our data columns to Bulk Review column names
@@ -299,7 +299,7 @@ def create_client_excel_report(df, approved_df=None):
         'Affiliation': 'Media Outlet',
         'Relevance Score': 'Relevance',
         'Overall Sentiment': 'Sentiment',  # Fix: Use the correct sentiment column
-        'Clip URL': 'URLs',
+
 
     }
     
@@ -342,10 +342,7 @@ def create_client_excel_report(df, approved_df=None):
                 cleaned_value = str(value).lower().strip()
                 formatted_value = sentiment_map.get(cleaned_value, f"{cleaned_value} 😐")
                 row_data.append(formatted_value)
-            # Check if this is a URL column and make it clickable
-            elif col_name in ['URLs'] and value and str(value).startswith('http'):
-                # We'll handle URL linking after adding the data
-                row_data.append(str(value))
+
             else:
                 row_data.append(value)
         results_ws.append(row_data)
@@ -364,12 +361,7 @@ def create_client_excel_report(df, approved_df=None):
         for col_idx, col_name in enumerate(headers, 1):
             cell = results_ws.cell(row=row_idx, column=col_idx)
             
-            # Make URL columns clickable
-            if col_name in ['URLs'] and cell.value and str(cell.value).startswith('http'):
-                url = str(cell.value)
-                cell.hyperlink = url
-                cell.font = url_font
-                cell.value = url  # Keep full URL visible
+
     
     # Auto-size columns
     for col in results_ws.columns:
@@ -1592,28 +1584,7 @@ with bulk_review_tab:
                     clean_df['📄 View'] = 'No URL found'
                 
                 # ===== NEW: Add URL tracking columns =====
-                # Add URLs count column (e.g., "2/2", "1/1")
-                def get_url_count(row):
-                    try:
-                        # Check if new URL tracking fields exist
-                        if 'URLs_Processed' in row and pd.notna(row['URLs_Processed']):
-                            urls_processed = int(row['URLs_Processed'])
-                            urls_successful = int(row.get('URLs_Successful', 1))
-                            return f"{urls_successful}/{urls_processed}"
-                        else:
-                            # Fallback for old data format - infer from Links field
-                            links = str(row.get('Links', ''))
-                            if ',' in links or ';' in links:
-                                # Multiple URLs in Links field
-                                separator = ',' if ',' in links else ';'
-                                url_count = len([u for u in links.split(separator) if u.strip()])
-                                return f"1/{url_count}"  # We know 1 was successful (this row exists)
-                            else:
-                                return "1/1"  # Single URL
-                    except:
-                        return "1/1"
-                
-                clean_df['URLs'] = display_df.apply(get_url_count, axis=1)
+
                 
 
                 
@@ -1795,8 +1766,7 @@ with bulk_review_tab:
                     filter=False
                 )
                 
-                # Configure URLs column
-                gb.configure_column("URLs", width=70)
+
                 
 
                 
@@ -2435,7 +2405,7 @@ with rejected_tab:
                     'To': 'Media Contact',
                     'Affiliation': 'Publication',
                     'Links': '🔗 Original URLs',
-                    'URLs_Processed': 'URLs',
+            
                     'Rejection_Reason': '⚠️ Rejection Reason',
                     'URL_Details': '📋 Details',
                     'Processed_Date': '📅 Processed'
@@ -2532,7 +2502,7 @@ with rejected_tab:
                     filter=False
                 )
                 
-                gb.configure_column("URLs", width=60, type=["numericColumn"])
+
                 gb.configure_column("⚠️ Rejection Reason", width=150, wrapText=True, autoHeight=True)
                 gb.configure_column("📋 Details", width=250, wrapText=True, autoHeight=True)
                 gb.configure_column("📅 Processed", width=120)
