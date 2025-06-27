@@ -350,6 +350,54 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
     content_excerpt = content[:500] + "..." if len(content) > 500 else content
     logger.info(f"Content being sent to GPT (excerpt):\n{content_excerpt}")
     
+    # 💰 SMART PRE-FILTERS: Block content that would result in relevance=0 (saves OpenAI costs)
+    
+    # Filter 1: Content Length Check (avoid analyzing titles or tiny snippets)
+    MIN_CONTENT_LENGTH = 200  # Conservative threshold
+    if len(content.strip()) < MIN_CONTENT_LENGTH:
+        logger.info(f"💰 PRE-FILTER: Content too short ({len(content)} chars < {MIN_CONTENT_LENGTH}) - skipping GPT analysis")
+        return None
+    
+    # Filter 2: Basic Model/Make Keyword Check (avoid completely irrelevant content)
+    make_lower = make.lower() if make else ""
+    model_lower = model.lower() if model else ""
+    content_lower = content.lower()
+    
+    # Check if either make OR model is mentioned (conservative approach)
+    make_found = bool(make_lower) and (make_lower in content_lower)
+    model_found = bool(model_lower) and (model_lower in content_lower)
+    
+    if not make_found and not model_found:
+        logger.info(f"💰 PRE-FILTER: Neither '{make}' nor '{model}' found in content - skipping GPT analysis")
+        return None
+    
+    # Filter 3: Binary/Corrupted Content Detection (avoid analyzing garbage data)
+    try:
+        # Check if content is mostly printable characters
+        printable_chars = sum(1 for c in content if c.isprintable())
+        printable_ratio = printable_chars / len(content) if content else 0
+        
+        if printable_ratio < 0.8:  # Less than 80% printable characters
+            logger.info(f"💰 PRE-FILTER: Content appears corrupted (only {printable_ratio:.1%} printable) - skipping GPT analysis")
+            return None
+    except Exception:
+        pass  # If character checking fails, continue with analysis
+    
+    # Filter 4: Generic Page Detection (avoid obvious category pages)
+    generic_indicators = [
+        'browse all', 'view all', 'more articles', 'related stories',
+        'recent posts', 'popular articles', 'trending now', 'categories:',
+        'filter by:', 'sort by:', 'page 1 of', 'showing results'
+    ]
+    
+    generic_count = sum(1 for indicator in generic_indicators if indicator in content_lower)
+    if generic_count >= 2:  # Multiple generic indicators suggest index/category page
+        logger.info(f"💰 PRE-FILTER: Content appears to be generic page ({generic_count} indicators) - skipping GPT analysis")
+        return None
+    
+    # If we get here, content passed all filters and is worth analyzing
+    logger.info(f"✅ PRE-FILTERS PASSED: Content is substantial ({len(content)} chars) and relevant - proceeding with GPT analysis")
+    
     # Select appropriate prompt template based on content type
     if is_youtube:
         prompt_template = YOUTUBE_PROMPT_TEMPLATE
