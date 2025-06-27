@@ -752,10 +752,9 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Get person name for caching if available
         person_name = loan.get('to', loan.get('affiliation', ''))
         
-        # DISABLED DATE FILTERING: Accept any successfully crawled content
-        # Date logic was buggy (showing April 2025 as "156 days BEFORE" Feb 2025)
-        # GPT can handle relevance filtering instead
-        logger.info(f"🔓 Date filtering DISABLED - accepting any successfully crawled content")
+        # ENABLED DATE FILTERING: Check if article was published after loan start date
+        # Articles published BEFORE loan start date should be rejected
+        logger.info(f"🔒 Date filtering ENABLED - checking article publish date vs loan start date")
         
         # Get person name for caching if available
         start_date = loan.get('start_date')
@@ -786,7 +785,7 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if html_content:
             published_date = extract_date_from_html(html_content, final_url)
             
-        # Log date information for debugging
+        # CRITICAL: Check if article was published BEFORE loan start date
         if published_date and start_date:
             # Safety check: ensure start_date is a datetime object
             if isinstance(start_date, str):
@@ -800,17 +799,19 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             if start_date and isinstance(start_date, datetime):
                 days_diff = (published_date - start_date).days
                 if days_diff >= 0:
-                    logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} ({days_diff} days after start date)")
+                    logger.info(f"📅 ✅ Content published: {published_date.strftime('%Y-%m-%d')} ({days_diff} days after start date) - VALID")
                 else:
-                    logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} ({abs(days_diff)} days before start date)")
+                    logger.warning(f"📅 ❌ Content published: {published_date.strftime('%Y-%m-%d')} ({abs(days_diff)} days BEFORE start date - REJECTING")
+                    logger.warning(f"❌ RULE VIOLATION: Articles must be published AFTER loan start date {start_date.strftime('%Y-%m-%d')}")
+                    return None  # REJECT articles published before loan start date
             else:
                 logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} (start date unavailable for comparison)")
         elif published_date:
             logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} (no start date to compare)")
         else:
-            logger.info(f"📅 Content found: publication date could not be determined")
+            logger.info(f"📅 Content found: publication date could not be determined - allowing")
             
-        logger.info(f"✅ Successfully crawled content - bypassing date restrictions")
+        logger.info(f"✅ Successfully crawled content - date validation passed")
             
         # Log which tier was successful
         tier_used = result.get('tier_used', 'Unknown')

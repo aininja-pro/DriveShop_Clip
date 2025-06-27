@@ -411,11 +411,12 @@ class EnhancedCrawlerManager:
         except Exception as e:
             logger.warning(f"Tier 3: ScrapFly error for {url}: {e}")
 
-        # Tier 4: ScrapingBee (backup service)
-        logger.info(f"Tier 4: Trying ScrapingBee as backup for {url}")
+        # Tier 4: ScrapingBee (backup service) - DISABLED FOR TESTING
+        logger.info(f"Tier 4: ScrapingBee DISABLED for testing - skipping to Index Discovery")
         
-        bee_content = self.scraping_bee.scrape_url(url)
-        if bee_content:
+        # bee_content = self.scraping_bee.scrape_url(url)
+        bee_content = None  # Force skip ScrapingBee
+        if False:  # bee_content:
             # EXTRACT CONTENT FIRST to test quality (same as Enhanced HTTP)
             from src.utils.content_extractor import extract_article_content
             expected_topic = f"{make} {model}"
@@ -629,20 +630,20 @@ class EnhancedCrawlerManager:
         except Exception as e:
             logger.warning(f"❌ ScrapFly error: {e}")
             
-        # Tier 3: Try ScrapingBee as backup (fallback service)
-        logger.info(f"Tier 3: Trying ScrapingBee as backup for specific URL: {url}")
-        bee_content = self.scraping_bee.scrape_url(url)
-        if bee_content:
-            logger.info(f"ScrapingBee backup success for specific URL: {url}")
-            return {
-                'success': True,
-                'content': bee_content,
-                'title': 'ScrapingBee Backup Result',
-                'url': url,
-                'tier_used': 'ScrapingBee Backup'
-            }
-        else:
-            logger.warning(f"ScrapingBee backup failed for specific URL: {url}")
+        # Tier 3: Try ScrapingBee as backup (fallback service) - DISABLED FOR TESTING
+        logger.info(f"Tier 3: ScrapingBee DISABLED for testing - skipping to Tier 4")
+        # bee_content = self.scraping_bee.scrape_url(url)
+        # if bee_content:
+        #     logger.info(f"ScrapingBee backup success for specific URL: {url}")
+        #     return {
+        #         'success': True,
+        #         'content': bee_content,
+        #         'title': 'ScrapingBee Backup Result',
+        #         'url': url,
+        #         'tier_used': 'ScrapingBee Backup'
+        #     }
+        # else:
+        #     logger.warning(f"ScrapingBee backup failed for specific URL: {url}")
         
         # Tier 4: Use headless browser directly (skip RSS for specific URLs)
         logger.info(f"Tier 4: Using headless browser directly for specific URL: {url}")
@@ -777,12 +778,42 @@ class EnhancedCrawlerManager:
             article_result = self._crawl_specific_url(article_url, make, model)
             if article_result['success']:
                 logger.info(f"✅ INDEX DISCOVERY SUCCESS: Successfully crawled specific article: {article_url}")
+                
+                # EXTRACT AUTHOR INFORMATION for attribution transparency
+                attribution_strength = 'unknown'
+                actual_byline = None
+                
+                if person_name:
+                    logger.info(f"🔍 INDEX DISCOVERY: Extracting author information for {person_name}")
+                    try:
+                        # Extract actual byline from the article content
+                        actual_byline = self._extract_byline_from_content(article_result['content'], article_url)
+                        if actual_byline:
+                            logger.info(f"📝 INDEX DISCOVERY: Found byline author: {actual_byline}")
+                            # Check if expected author matches actual byline
+                            if person_name.lower() in actual_byline.lower():
+                                attribution_strength = 'strong'
+                                logger.info(f"✅ INDEX DISCOVERY: Strong attribution - {person_name} found in byline")
+                            else:
+                                attribution_strength = 'delegated'
+                                logger.info(f"⚠️ INDEX DISCOVERY: Delegated content - {person_name} not in byline, actual: {actual_byline}")
+                        else:
+                            attribution_strength = 'unknown'
+                            logger.info(f"❓ INDEX DISCOVERY: Could not extract byline from article")
+                    except Exception as e:
+                        logger.warning(f"❌ INDEX DISCOVERY: Error extracting author info: {e}")
+                        attribution_strength = 'unknown'
+                        actual_byline = None
+                
                 return {
                     'success': True,
                     'content': article_result['content'],
                     'title': article_title,
                     'url': article_url,
                     'tier_used': f"Index Discovery -> {article_result.get('tier_used', 'Unknown')}",
+                    # ADD ATTRIBUTION INFORMATION
+                    'attribution_strength': attribution_strength,
+                    'actual_byline': actual_byline,
                     'discovery_details': {
                         'index_url': index_url,
                         'total_links': len(article_links),
@@ -820,9 +851,9 @@ class EnhancedCrawlerManager:
             # Try Enhanced HTTP first (fast and free)
             page_content = self.enhanced_http.fetch_url(current_url)
             if not page_content or len(page_content) < 1000:
-                # Try ScrapingBee if Enhanced HTTP fails
-                logger.info(f"Enhanced HTTP failed for page {page_count}, trying ScrapingBee")
-                page_content = self.scraping_bee.scrape_url(current_url)
+                # Try ScrapingBee if Enhanced HTTP fails - DISABLED FOR TESTING
+                logger.info(f"Enhanced HTTP failed for page {page_count}, ScrapingBee DISABLED - skipping")
+                # page_content = self.scraping_bee.scrape_url(current_url)
                 
             if page_content and len(page_content) > 1000:
                 logger.info(f"✅ PAGINATION: Got page {page_count} content ({len(page_content)} chars)")
@@ -998,10 +1029,17 @@ class EnhancedCrawlerManager:
         make_lower = make.lower()
         model_lower = model.lower()
         
-        # For Camry Hybrid - split into base model and variant for more flexible search
+        # Smart model parsing for compound models like "GR Corolla Premium"
         model_parts = model_lower.split()
-        base_model = model_parts[0] if model_parts else model_lower  # "camry" from "camry hybrid"
-        variant = model_parts[1] if len(model_parts) > 1 else ""      # "hybrid" from "camry hybrid"
+        
+        # Handle Toyota GR models specially (GR is a sub-brand, not the base model)
+        if len(model_parts) >= 2 and model_parts[0] == "gr":
+            base_model = f"{model_parts[0]} {model_parts[1]}"  # "gr corolla" from "gr corolla premium"
+            variant = " ".join(model_parts[2:]) if len(model_parts) > 2 else ""  # "premium"
+        else:
+            # Standard parsing for regular models like "Camry Hybrid"
+            base_model = model_parts[0] if model_parts else model_lower  # "camry" from "camry hybrid"
+            variant = model_parts[1] if len(model_parts) > 1 else ""      # "hybrid" from "camry hybrid"
         
         # Create COMPREHENSIVE model variations (handle dashes, spaces, years, etc.)
         model_variations = [
@@ -1138,4 +1176,79 @@ class EnhancedCrawlerManager:
                 return title.title()
             return "Unknown Article"
         except:
-            return "Unknown Article" 
+            return "Unknown Article"
+    
+    def _extract_byline_from_content(self, html_content: str, url: str) -> Optional[str]:
+        """Extract author byline from article HTML content"""
+        from bs4 import BeautifulSoup
+        import re
+        
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Common byline selectors used across automotive sites
+            byline_selectors = [
+                '.author',
+                '.byline',
+                '.post-author',
+                '.article-author',
+                '.entry-author',
+                '[class*="author"]',
+                '[class*="byline"]',
+                '.writer',
+                '.journalist',
+                'span[itemprop="author"]',
+                'div[itemprop="author"]',
+                'meta[name="author"]'
+            ]
+            
+            # Try each selector
+            for selector in byline_selectors:
+                try:
+                    if selector.startswith('meta'):
+                        # Handle meta tags differently
+                        element = soup.select_one(selector)
+                        if element:
+                            author = element.get('content', '').strip()
+                            if author and len(author) > 2:
+                                logger.info(f"🔍 BYLINE: Found author via {selector}: {author}")
+                                return author
+                    else:
+                        # Handle regular elements
+                        elements = soup.select(selector)
+                        for element in elements:
+                            text = element.get_text(strip=True)
+                            if text and len(text) > 2 and len(text) < 100:  # Reasonable author name length
+                                # Clean up common prefixes
+                                text = re.sub(r'^(by|author|written by|story by):\s*', '', text, flags=re.IGNORECASE)
+                                text = text.strip()
+                                if text:
+                                    logger.info(f"🔍 BYLINE: Found author via {selector}: {text}")
+                                    return text
+                except Exception as e:
+                    logger.debug(f"Error with byline selector {selector}: {e}")
+                    continue
+            
+            # Fallback: Look for "By [Name]" patterns in text
+            text_content = soup.get_text()
+            by_patterns = [
+                r'By\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'Written by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'Story by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'Author:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
+            ]
+            
+            for pattern in by_patterns:
+                matches = re.findall(pattern, text_content)
+                if matches:
+                    author = matches[0].strip()
+                    if len(author) > 2:
+                        logger.info(f"🔍 BYLINE: Found author via pattern {pattern}: {author}")
+                        return author
+            
+            logger.info(f"❓ BYLINE: Could not extract author from {url}")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"❌ BYLINE: Error extracting byline from {url}: {e}")
+            return None 

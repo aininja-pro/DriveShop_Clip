@@ -75,44 +75,45 @@ def extract_date_from_html(html: str, url: str = "") -> Optional[datetime]:
     """
     soup = BeautifulSoup(html, 'lxml')
     
+    # DISABLED: URL date extraction is too aggressive and returns Jan 1st defaults
     # Method 0: Check URL for year patterns first (fast and reliable)
-    if url:
-        url_date = extract_date_from_url(url)
-        if url_date:
-            logger.debug(f"Found date from URL: {url_date}")
-            return url_date
+    # if url:
+    #     url_date = extract_date_from_url(url)
+    #     if url_date:
+    #         logger.debug(f"Found date from URL: {url_date}")
+    #         return url_date
     
     # Method 1: Structured data (JSON-LD, microdata)
     date = extract_date_from_structured_data(soup)
     if date:
-        logger.debug(f"Found date from structured data: {date}")
+        logger.info(f"📅 Found date from structured data: {date.strftime('%Y-%m-%d')} for {url}")
         return date
     
     # Method 2: Meta tags
     date = extract_date_from_meta_tags(soup)
     if date:
-        logger.debug(f"Found date from meta tags: {date}")
+        logger.info(f"📅 Found date from meta tags: {date.strftime('%Y-%m-%d')} for {url}")
         return date
     
     # Method 3: Common CSS selectors
     date = extract_date_from_selectors(soup)
     if date:
-        logger.debug(f"Found date from CSS selectors: {date}")
+        logger.info(f"📅 Found date from CSS selectors: {date.strftime('%Y-%m-%d')} for {url}")
         return date
     
     # Method 4: Site-specific patterns
     date = extract_date_site_specific(soup, url)
     if date:
-        logger.debug(f"Found date from site-specific patterns: {date}")
+        logger.info(f"📅 Found date from site-specific patterns: {date.strftime('%Y-%m-%d')} for {url}")
         return date
     
     # Method 5: Text pattern matching
     date = extract_date_from_text_patterns(soup)
     if date:
-        logger.debug(f"Found date from text patterns: {date}")
+        logger.info(f"📅 Found date from text patterns: {date.strftime('%Y-%m-%d')} for {url}")
         return date
     
-    logger.warning(f"Could not extract publication date from: {url}")
+    logger.warning(f"⚠️ Could not extract publication date from: {url}")
     return None
 
 def extract_date_from_structured_data(soup: BeautifulSoup) -> Optional[datetime]:
@@ -241,6 +242,55 @@ def extract_date_site_specific(soup: BeautifulSoup, url: str) -> Optional[dateti
                 if date:
                     return date
     
+    elif 'roadandtrack.com' in url:
+        # Road and Track specific patterns with detailed debugging
+        logger.info(f"🔍 ROADANDTRACK DEBUG: Searching for date elements in {url}")
+        
+        selectors = ['.byline-date', '.publish-date', '.timestamp', '.date-published', 'time[datetime]', '.article-date']
+        
+        for selector in selectors:
+            elements = soup.select(selector)  # Use select() to get all matches, not just first
+            logger.info(f"🔍 ROADANDTRACK DEBUG: Selector '{selector}' found {len(elements)} elements")
+            
+            for i, element in enumerate(elements):
+                # Check datetime attribute first
+                datetime_attr = element.get('datetime')
+                if datetime_attr:
+                    logger.info(f"🔍 ROADANDTRACK DEBUG: Element {i+1} datetime='{datetime_attr}'")
+                    date = parse_date_string(datetime_attr)
+                    if date:
+                        logger.info(f"✅ ROADANDTRACK DEBUG: Successfully parsed datetime attribute: {date.strftime('%Y-%m-%d')}")
+                        return date
+                
+                # Check text content
+                text = element.get_text().strip()
+                if text:
+                    logger.info(f"🔍 ROADANDTRACK DEBUG: Element {i+1} text='{text}'")
+                    date = parse_date_string(text)
+                    if date:
+                        logger.info(f"✅ ROADANDTRACK DEBUG: Successfully parsed text content: {date.strftime('%Y-%m-%d')}")
+                        return date
+                    else:
+                        logger.info(f"❌ ROADANDTRACK DEBUG: Failed to parse text '{text}'")
+        
+        # Additional debugging - look for any time elements
+        all_time_elements = soup.find_all('time')
+        logger.info(f"🔍 ROADANDTRACK DEBUG: Found {len(all_time_elements)} total <time> elements")
+        for i, time_elem in enumerate(all_time_elements):
+            datetime_attr = time_elem.get('datetime')
+            text_content = time_elem.get_text().strip()
+            logger.info(f"🔍 ROADANDTRACK DEBUG: <time> element {i+1}: datetime='{datetime_attr}', text='{text_content}'")
+        
+        # Look for any elements with date-related classes
+        date_elements = soup.find_all(class_=lambda x: x and any(keyword in x.lower() for keyword in ['date', 'time', 'publish']))
+        logger.info(f"🔍 ROADANDTRACK DEBUG: Found {len(date_elements)} elements with date-related classes")
+        for i, elem in enumerate(date_elements[:5]):  # Limit to first 5 to avoid spam
+            class_name = elem.get('class')
+            text_content = elem.get_text().strip()[:50]  # First 50 chars
+            logger.info(f"🔍 ROADANDTRACK DEBUG: Date element {i+1}: class='{class_name}', text='{text_content}...'")
+        
+        logger.info(f"❌ ROADANDTRACK DEBUG: No valid date found with site-specific selectors")
+    
     elif 'edmunds.com' in url:
         # Edmunds specific patterns
         for selector in ['.publish-date', '.article-date', '.byline .date']:
@@ -298,6 +348,7 @@ def parse_date_string(date_str: str) -> Optional[datetime]:
     
     try:
         # Clean the string
+        original_date_str = str(date_str)
         date_str = str(date_str).strip()
         
         # Remove common prefixes
@@ -306,22 +357,29 @@ def parse_date_string(date_str: str) -> Optional[datetime]:
             if date_str.startswith(prefix):
                 date_str = date_str[len(prefix):].strip()
         
+        logger.debug(f"🔍 DATE PARSE DEBUG: Original='{original_date_str}' -> Cleaned='{date_str}'")
+        
         # Use dateutil parser which is very flexible
         parsed_date = dateutil.parser.parse(date_str)
+        
+        logger.info(f"📅 DATE PARSE SUCCESS: '{original_date_str}' -> {parsed_date.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Basic sanity check
         current_date = datetime.now()
         if parsed_date > current_date:
             # Date is in the future, probably parsed incorrectly
+            logger.warning(f"⚠️ DATE PARSE WARNING: Future date detected: {parsed_date.strftime('%Y-%m-%d')} > {current_date.strftime('%Y-%m-%d')}")
             return None
         
         if (current_date - parsed_date).days > 3650:
             # Date is more than 10 years old, probably not what we want
+            logger.warning(f"⚠️ DATE PARSE WARNING: Very old date detected: {parsed_date.strftime('%Y-%m-%d')} (>10 years old)")
             return None
         
         return parsed_date
     
-    except (ValueError, TypeError, OverflowError):
+    except (ValueError, TypeError, OverflowError) as e:
+        logger.debug(f"❌ DATE PARSE FAILED: '{original_date_str}' -> Error: {e}")
         return None
 
 def extract_youtube_upload_date(video_metadata: dict) -> Optional[datetime]:

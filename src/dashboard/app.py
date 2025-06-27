@@ -1393,17 +1393,17 @@ with st.sidebar:
     selected_reporter_name = st.selectbox("Filter by Reporter:", reporter_names)
     selected_outlet = st.selectbox("Filter by Media Outlet:", outlets)
     
-    # Add WO # and Activity ID filters
+    # Add WO # and Activity ID filters with multiple value support
     wo_number_filter = st.text_input(
         "Filter by WO # (optional):",
         value="",
-        help="Enter a specific Work Order number to process only that record"
+        help="Enter Work Order number(s). Use commas to separate multiple values (e.g., 1182796,1182884,1182887)"
     )
     
     activity_id_filter = st.text_input(
         "Filter by Activity ID (optional):",
         value="",
-        help="Enter a specific Activity ID to process only that record"
+        help="Enter Activity ID(s). Use commas to separate multiple values (e.g., 1114558,1114646,1114649)"
     )
     
     # Show batch processing info if available
@@ -1452,17 +1452,23 @@ with st.sidebar:
                 filtered_df['Person_ID'] = pd.to_numeric(filtered_df['Person_ID'], errors='coerce').astype('Int64').astype(str)
                 filtered_df = filtered_df[filtered_df['Person_ID'] == person_id]
         
-        # Apply WO # filter if specified
+        # Apply WO # filter if specified (supports multiple comma-separated values)
         if wo_number_filter.strip():
             if 'WO #' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['WO #'].astype(str) == wo_number_filter.strip()]
+                # Parse comma-separated values and clean them
+                wo_numbers = [wo.strip() for wo in wo_number_filter.split(',') if wo.strip()]
+                filtered_df = filtered_df[filtered_df['WO #'].astype(str).isin(wo_numbers)]
+                st.info(f"🎯 Filtering by {len(wo_numbers)} WO #(s): {', '.join(wo_numbers)}")
             else:
                 st.warning("⚠️ WO # column not found in data")
         
-        # Apply Activity ID filter if specified
+        # Apply Activity ID filter if specified (supports multiple comma-separated values)
         if activity_id_filter.strip():
             if 'Activity_ID' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['Activity_ID'].astype(str) == activity_id_filter.strip()]
+                # Parse comma-separated values and clean them
+                activity_ids = [aid.strip() for aid in activity_id_filter.split(',') if aid.strip()]
+                filtered_df = filtered_df[filtered_df['Activity_ID'].astype(str).isin(activity_ids)]
+                st.info(f"🎯 Filtering by {len(activity_ids)} Activity ID(s): {', '.join(activity_ids)}")
             else:
                 st.warning("⚠️ Activity_ID column not found in data")
         
@@ -1980,21 +1986,22 @@ with bulk_review_tab:
                 
 
                 
-                # Add Published Date column - use same logic as JSON (read from approved_clips.csv)
+                # Add Published Date column - read directly from current loan_results.csv data
                 def get_published_date(row):
                     try:
-                        wo_number = str(row.get('WO #', ''))
-                        # Read from approved_clips.csv (same as JSON) to get correct date format
-                        approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                        if os.path.exists(approved_file) and wo_number:
-                            # Use dtype=str to prevent date auto-conversion (same as JSON logic)
-                            approved_df_dates = pd.read_csv(approved_file, dtype=str)
-                            # Find matching WO # in approved clips
-                            matching_rows = approved_df_dates[approved_df_dates['WO #'].astype(str) == wo_number]
-                            if not matching_rows.empty:
-                                raw_date = matching_rows.iloc[0].get('Published Date', '')
-                                if pd.notna(raw_date) and str(raw_date).strip() and str(raw_date).lower() not in ['nan', 'none']:
-                                    return str(raw_date).strip()  # Return raw date string like "1/8/25"
+                        # Get Published Date directly from the current row data
+                        raw_date = row.get('Published Date', '')
+                        if pd.notna(raw_date) and str(raw_date).strip() and str(raw_date).lower() not in ['nan', 'none', '']:
+                            # Parse the ISO date string (2025-03-28T00:00:00) and format for display
+                            try:
+                                # Parse the datetime string
+                                import dateutil.parser
+                                parsed_date = dateutil.parser.parse(str(raw_date))
+                                # Format as readable date (Mar 28, 2025)
+                                return parsed_date.strftime('%b %d, %Y')
+                            except:
+                                # If parsing fails, return the raw string
+                                return str(raw_date).strip()
                         return "—"
                     except:
                         return "—"

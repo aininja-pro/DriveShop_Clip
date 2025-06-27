@@ -295,7 +295,7 @@ class GoogleSearchClient:
         if not self.search_engine_id:
             logger.warning("GOOGLE_SEARCH_ENGINE_ID not found in environment variables")
     
-    def search_for_article_sync(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
+    def search_for_article_sync(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[dict]:
         """
         SYNCHRONOUS version of search_for_article - for use in enhanced crawler.
         Skips async author verification to avoid async/await issues.
@@ -332,17 +332,38 @@ class GoogleSearchClient:
                     score = self._score_url_relevance(url, make, model, author)
                     logger.info(f"Found article URL: {url} (quality score: {score})")
                     
-                    # NOTE: Skipping async author verification in sync version
-                    # The enhanced crawler doesn't need detailed attribution info
+                    # Extract attribution information if author specified
+                    attribution_strength = 'unknown'
+                    actual_byline = None
+                    
+                    if author:
+                        # Sync author verification
+                        author_found = self._verify_author_in_content_sync(url, author)
+                        if author_found:
+                            logger.info(f"✅ Strong attribution: {author} found in content")
+                            attribution_strength = 'strong'
+                        else:
+                            logger.info(f"⚠️ Delegated content: {author} not in byline, but domain-restricted content accepted")
+                            attribution_strength = 'delegated'
+                            # Try to extract actual byline for transparency
+                            actual_byline = self._extract_actual_byline_sync(url)
+                            if actual_byline:
+                                logger.info(f"📝 Actual byline author: {actual_byline}")
                     
                     if score > best_score:
                         best_score = score
                         best_url = url
+                        best_attribution = attribution_strength
+                        best_byline = actual_byline
                     
                     # If we found a high-quality result, use it immediately
                     if score >= 80:  # High confidence threshold
                         logger.info(f"✅ Found high-quality article: {url}")
-                        return url
+                        return {
+                            'url': url,
+                            'attribution_strength': attribution_strength,
+                            'actual_byline': actual_byline
+                        }
                         
                 else:
                     logger.info(f"No results for query: {query}")
@@ -357,7 +378,11 @@ class GoogleSearchClient:
         # Return best result found, if any
         if best_url and best_score >= 50:
             logger.info(f"✅ Found good article: {best_url} (score: {best_score})")
-            return best_url
+            return {
+                'url': best_url,
+                'attribution_strength': best_attribution if 'best_attribution' in locals() else 'unknown',
+                'actual_byline': best_byline if 'best_byline' in locals() else None
+            }
         
         logger.warning(f"❌ No articles found for {make} {model} by {author or 'any author'} on {domain}")
         return None
@@ -890,6 +915,118 @@ class GoogleSearchClient:
             
         except Exception as e:
             logger.error(f"Error extracting actual byline: {e}")
+            return None
+
+    def _verify_author_in_content_sync(self, url: str, author: str) -> bool:
+        """Synchronous version of author verification"""
+        try:
+            from src.utils.enhanced_http import fetch_with_enhanced_http
+            
+            # Quick fetch of article content
+            content = fetch_with_enhanced_http(url)
+            if not content:
+                logger.warning(f"❌ Could not fetch content for author verification: {url}")
+                return False
+            
+            # Check if author name appears in the content
+            author_lower = author.lower()
+            content_lower = content.lower()
+            
+            # Look for author in various forms
+            author_variations = [
+                author_lower,
+                author_lower.replace(' ', ''),
+                author_lower.split()[0] if ' ' in author_lower else author_lower,  # First name
+                author_lower.split()[-1] if ' ' in author_lower else author_lower,  # Last name
+            ]
+            
+            for variation in author_variations:
+                if variation in content_lower:
+                    logger.info(f"✅ Author verification successful: '{variation}' found in content")
+                    return True
+            
+            logger.warning(f"❌ Author verification failed: {author} not found in content")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error verifying author in content: {e}")
+            # If we can't verify, assume it's valid (don't block valid results)
+            return True
+
+    def _extract_actual_byline_sync(self, url: str) -> Optional[str]:
+        """Synchronous version of byline extraction"""
+        try:
+            from src.utils.enhanced_http import fetch_with_enhanced_http
+            from bs4 import BeautifulSoup
+            import re
+            
+            # Quick fetch of article content
+            content = fetch_with_enhanced_http(url)
+            if not content:
+                return None
+            
+            # Parse HTML and extract byline
+            soup = BeautifulSoup(content, 'html.parser')
+            
+            # Common byline selectors
+            byline_selectors = [
+                '.author',
+                '.byline',
+                '.post-author',
+                '.article-author',
+                '.entry-author',
+                '[class*="author"]',
+                '[class*="byline"]',
+                'span[itemprop="author"]',
+                'div[itemprop="author"]',
+                'meta[name="author"]'
+            ]
+            
+            # Try each selector
+            for selector in byline_selectors:
+                try:
+                    if selector.startswith('meta'):
+                        element = soup.select_one(selector)
+                        if element:
+                            author = element.get('content', '').strip()
+                            if author and len(author) > 2:
+                                logger.info(f"📝 Extracted byline via {selector}: {author}")
+                                return author
+                    else:
+                        elements = soup.select(selector)
+                        for element in elements:
+                            text = element.get_text(strip=True)
+                            if text and len(text) > 2 and len(text) < 100:
+                                # Clean up common prefixes
+                                text = re.sub(r'^(by|author|written by|story by):\s*', '', text, flags=re.IGNORECASE)
+                                text = text.strip()
+                                if text:
+                                    logger.info(f"📝 Extracted byline via {selector}: {text}")
+                                    return text
+                except Exception as e:
+                    continue
+            
+            # Fallback: Look for "By [Name]" patterns in text
+            text_content = soup.get_text()
+            by_patterns = [
+                r'By\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'Written by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'Story by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'Author:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
+            ]
+            
+            for pattern in by_patterns:
+                matches = re.findall(pattern, text_content)
+                if matches:
+                    author = matches[0].strip()
+                    if len(author) > 2:
+                        logger.info(f"📝 Extracted byline via pattern {pattern}: {author}")
+                        return author
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting byline: {e}")
             return None
 
 # Convenience function for easy importing
