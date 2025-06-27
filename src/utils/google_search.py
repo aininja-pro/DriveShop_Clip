@@ -54,14 +54,33 @@ class BingSearchClient:
                         score = google_client._score_url_relevance(url, make, current_model, author)
                         logger.info(f"🔍 Bing found article URL: {url} (quality score: {score})")
                         
-                        # Verify author in content if specified
-                        if author and not google_client._verify_author_in_content(url, author):
-                            logger.warning(f"🔍 Bing: Article doesn't contain author {author}, reducing score: {url}")
-                            score = max(10, score - 30)
+                        # Verify author in content if specified - NEW BUSINESS-AWARE LOGIC
+                        attribution_strength = 'strong'
+                        actual_byline = None
+                        
+                        if author:
+                            author_found = self._verify_author_in_content(url, author)
+                            if author_found:
+                                logger.info(f"✅ Strong attribution: {author} found in content")
+                                attribution_strength = 'strong'
+                            else:
+                                logger.info(f"⚠️ Delegated content: {author} not in byline, but domain-restricted content accepted")
+                                attribution_strength = 'delegated'
+                                # Try to extract actual byline for transparency
+                                actual_byline = self._extract_actual_byline(url)
+                                if actual_byline:
+                                    logger.info(f"📝 Actual byline author: {actual_byline}")
+                        
+                        # BUSINESS LOGIC: Don't reject domain-restricted, vehicle-specific content
+                        # This handles delegated writing, staff writers, house bylines
+                        # Manual review will catch any issues
                         
                         if score > best_score:
                             best_score = score
                             best_url = url
+                            # Store attribution info for UI display
+                            best_attribution = attribution_strength
+                            best_byline = actual_byline
                         
                         # If we found a high-quality result, use it
                         if score >= 80:
@@ -196,6 +215,73 @@ class BingSearchClient:
         google_client = GoogleSearchClient()
         return google_client._is_url_too_old(url)
     
+    def _verify_author_in_content(self, url: str, author: str) -> bool:
+        """
+        Verify that the article content actually contains the specified author.
+        This prevents wrong articles from being returned.
+        """
+        try:
+            # Import here to avoid circular imports
+            from src.utils.enhanced_http import fetch_with_enhanced_http
+            
+            # Quick fetch of article content
+            content = fetch_with_enhanced_http(url)
+            if not content:
+                return False
+            
+            content_lower = content.lower()
+            author_lower = author.lower()
+            
+            # Check if author name appears in content
+            author_words = author_lower.split()
+            
+            # Author must appear as full name or individual words
+            if author_lower in content_lower:
+                logger.info(f"✅ Author verification passed: {author} found in content")
+                return True
+            
+            # Check for individual author words (handle "First Last" names)
+            if len(author_words) >= 2:
+                words_found = sum(1 for word in author_words if word in content_lower)
+                if words_found >= len(author_words):
+                    logger.info(f"✅ Author verification passed: All words of {author} found in content")
+                    return True
+            
+            logger.warning(f"❌ Author verification failed: {author} not found in content")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error verifying author in content: {e}")
+            # If we can't verify, assume it's valid (don't block valid results)
+            return True
+
+    def _extract_actual_byline(self, url: str) -> Optional[str]:
+        """Extract actual byline author from the article content"""
+        try:
+            # Import here to avoid circular imports
+            from src.utils.enhanced_http import fetch_with_enhanced_http
+            
+            # Quick fetch of article content
+            content = fetch_with_enhanced_http(url)
+            if not content:
+                return None
+            
+            # Extract byline from content
+            import re
+            byline_pattern = r'^(.*?)(?: - | \| )'
+            match = re.search(byline_pattern, content)
+            
+            if match:
+                byline = match.group(1).strip()
+                logger.info(f"📝 Extracted byline: {byline}")
+                return byline
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting actual byline: {e}")
+            return None
+
 class GoogleSearchClient:
     """Google Custom Search API client with graduated fallback queries"""
     
@@ -209,7 +295,74 @@ class GoogleSearchClient:
         if not self.search_engine_id:
             logger.warning("GOOGLE_SEARCH_ENGINE_ID not found in environment variables")
     
-    def search_for_article(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
+    def search_for_article_sync(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
+        """
+        SYNCHRONOUS version of search_for_article - for use in enhanced crawler.
+        Skips async author verification to avoid async/await issues.
+        
+        Args:
+            domain: Target domain (e.g., "motortrend.com")
+            make: Vehicle make (e.g., "Audi")
+            model: Vehicle model (e.g., "Q6 e-tron Prestige") 
+            year: Vehicle year (e.g., "2024"), optional
+            author: Author/journalist name (e.g., "Alexander Stoklosa"), optional
+            
+        Returns:
+            Best matching article URL or None if not found
+        """
+        logger.info(f"🔍 Google Search (sync) called with: make='{make}', model='{model}', year='{year}', author='{author}', domain='{domain}'")
+        
+        if not self.api_key or not self.search_engine_id:
+            logger.error("Google Search API not configured properly")
+            return None
+        
+        # Generate exactly 3 simple search queries (no model variations)
+        queries = self._generate_search_queries(domain, make, model, year, author)
+        
+        best_url = None
+        best_score = 0
+        
+        for i, query in enumerate(queries, 1):
+            logger.info(f"Google search attempt {i}/{len(queries)}: {query}")
+            
+            try:
+                url = self._execute_search(query)
+                if url:
+                    # Score the result quality
+                    score = self._score_url_relevance(url, make, model, author)
+                    logger.info(f"Found article URL: {url} (quality score: {score})")
+                    
+                    # NOTE: Skipping async author verification in sync version
+                    # The enhanced crawler doesn't need detailed attribution info
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_url = url
+                    
+                    # If we found a high-quality result, use it immediately
+                    if score >= 80:  # High confidence threshold
+                        logger.info(f"✅ Found high-quality article: {url}")
+                        return url
+                        
+                else:
+                    logger.info(f"No results for query: {query}")
+                    
+            except Exception as e:
+                logger.error(f"Error in search attempt {i}: {e}")
+                continue
+                
+            # Rate limit: wait between queries
+            time.sleep(0.5)
+        
+        # Return best result found, if any
+        if best_url and best_score >= 50:
+            logger.info(f"✅ Found good article: {best_url} (score: {best_score})")
+            return best_url
+        
+        logger.warning(f"❌ No articles found for {make} {model} by {author or 'any author'} on {domain}")
+        return None
+    
+    async def search_for_article(self, domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
         """
         Search for a specific vehicle review article using graduated fallback queries.
         Now includes HIERARCHICAL MODEL SEARCH: tries full model name first, then progressively simpler terms.
@@ -246,14 +399,33 @@ class GoogleSearchClient:
                     score = self._score_url_relevance(url, make, model, author)
                     logger.info(f"Found article URL: {url} (quality score: {score})")
                     
-                    # Verify author in content if specified
-                    if author and not self._verify_author_in_content(url, author):
-                        logger.warning(f"Article doesn't contain author {author}, reducing score: {url}")
-                        score = max(10, score - 30)  # Reduce score instead of completely blocking
+                    # Verify author in content if specified - NEW BUSINESS-AWARE LOGIC
+                    attribution_strength = 'strong'
+                    actual_byline = None
+                    
+                    if author:
+                        author_found = await self._verify_author_in_content(url, author)
+                        if author_found:
+                            logger.info(f"✅ Strong attribution: {author} found in content")
+                            attribution_strength = 'strong'
+                        else:
+                            logger.info(f"⚠️ Delegated content: {author} not in byline, but domain-restricted content accepted")
+                            attribution_strength = 'delegated'
+                            # Try to extract actual byline for transparency
+                            actual_byline = await self._extract_actual_byline(url)
+                            if actual_byline:
+                                logger.info(f"📝 Actual byline author: {actual_byline}")
+                        
+                        # BUSINESS LOGIC: Don't reject domain-restricted, vehicle-specific content
+                        # This handles delegated writing, staff writers, house bylines
+                        # Manual review will catch any issues
                     
                     if score > best_score:
                         best_score = score
                         best_url = url
+                        # Store attribution info for UI display
+                        best_attribution = attribution_strength
+                        best_byline = actual_byline
                     
                     # If we found a high-quality result, use it immediately
                     if score >= 80:  # High confidence threshold
@@ -273,7 +445,13 @@ class GoogleSearchClient:
         # Return best result found, if any
         if best_url and best_score >= 50:
             logger.info(f"✅ Found good article: {best_url} (score: {best_score})")
-            return best_url
+            # Return tuple with attribution info for UI display
+            attribution_info = {
+                'url': best_url,
+                'attribution_strength': best_attribution if 'best_attribution' in locals() else 'unknown',
+                'actual_byline': best_byline if 'best_byline' in locals() else None
+            }
+            return attribution_info
         
         logger.warning(f"❌ No articles found for {make} {model} by {author or 'any author'} on {domain}")
         return None
@@ -324,6 +502,26 @@ class GoogleSearchClient:
                 url = item.get('link', '')
                 title = item.get('title', '')
                 snippet = item.get('snippet', '')
+                
+                # DOMAIN RESTRICTION: Only accept URLs from the target domain
+                from urllib.parse import urlparse
+                try:
+                    result_domain = urlparse(url).netloc.lower().replace('www.', '')
+                    query_domain = None
+                    
+                    # Extract domain from site: restriction in query
+                    import re
+                    site_match = re.search(r'site:([^\s]+)', query)
+                    if site_match:
+                        query_domain = site_match.group(1).lower()
+                    
+                    if query_domain and query_domain not in result_domain:
+                        logger.info(f"❌ Skipping off-domain result: {url} (expected {query_domain})")
+                        continue
+                        
+                except Exception as e:
+                    logger.warning(f"Error checking domain restriction for {url}: {e}")
+                    continue
                 
                 if self._is_article_url(url, title):
                     # Check for obvious old dates in URL BEFORE scoring/crawling
@@ -601,19 +799,34 @@ class GoogleSearchClient:
                 
         return max(0, score)
 
-    def _verify_author_in_content(self, url: str, author: str) -> bool:
+    async def _verify_author_in_content(self, url: str, author: str) -> bool:
         """
         Verify that the article content actually contains the specified author.
         This prevents wrong articles from being returned.
+        Uses ESCALATION: Enhanced HTTP → Headless Browser if needed
         """
         try:
             # Import here to avoid circular imports
             from src.utils.enhanced_http import fetch_with_enhanced_http
+            from src.utils.browser_crawler import BrowserCrawler
             
-            # Quick fetch of article content
+            # Try Enhanced HTTP first (faster)
+            logger.info(f"🔍 Verifying author {author} in {url} using Enhanced HTTP")
             content = fetch_with_enhanced_http(url)
+            
+            # If Enhanced HTTP fails, try headless browser
             if not content:
-                return False
+                logger.info(f"🔍 Enhanced HTTP failed, trying headless browser for {url}")
+                browser_crawler = BrowserCrawler(headless=True)
+                try:
+                    content, title, error = await browser_crawler.crawl(url, wait_time=5, scroll=False)
+                    if content:
+                        logger.info(f"✅ Headless browser successfully extracted content from {url}")
+                    else:
+                        logger.warning(f"❌ Headless browser also failed for {url}: {error}")
+                        return False
+                finally:
+                    browser_crawler.close()
             
             content_lower = content.lower()
             author_lower = author.lower()
@@ -641,8 +854,46 @@ class GoogleSearchClient:
             # If we can't verify, assume it's valid (don't block valid results)
             return True
 
+    async def _extract_actual_byline(self, url: str) -> Optional[str]:
+        """Extract actual byline author from the article content with escalation"""
+        try:
+            # Import here to avoid circular imports
+            from src.utils.enhanced_http import fetch_with_enhanced_http
+            from src.utils.browser_crawler import BrowserCrawler
+            
+            # Try Enhanced HTTP first (faster)
+            content = fetch_with_enhanced_http(url)
+            
+            # If Enhanced HTTP fails, try headless browser
+            if not content:
+                logger.info(f"🔍 Enhanced HTTP failed for byline extraction, trying headless browser for {url}")
+                browser_crawler = BrowserCrawler(headless=True)
+                try:
+                    content, title, error = await browser_crawler.crawl(url, wait_time=5, scroll=False)
+                    if not content:
+                        logger.warning(f"❌ Headless browser also failed for byline extraction: {error}")
+                        return None
+                finally:
+                    browser_crawler.close()
+            
+            # Extract byline from content
+            import re
+            byline_pattern = r'^(.*?)(?: - | \| )'
+            match = re.search(byline_pattern, content)
+            
+            if match:
+                byline = match.group(1).strip()
+                logger.info(f"📝 Extracted byline: {byline}")
+                return byline
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting actual byline: {e}")
+            return None
+
 # Convenience function for easy importing
-def google_search_for_article(domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[str]:
+async def google_search_for_article(domain: str, make: str, model: str, year: Optional[str] = None, author: Optional[str] = None) -> Optional[dict]:
     """
     Convenience function to search for a vehicle article.
     Now includes Bing Search as backup if Google Search fails.
@@ -655,12 +906,12 @@ def google_search_for_article(domain: str, make: str, model: str, year: Optional
         author: Author/journalist name (optional)
         
     Returns:
-        Article URL or None
+        Dict with url, attribution_strength, actual_byline or None
     """
     # Try Google Search first
     logger.info(f"🔍 Starting search for {make} {model} by {author or 'any author'} on {domain}")
     google_client = GoogleSearchClient()
-    result = google_client.search_for_article(domain, make, model, year, author)
+    result = await google_client.search_for_article(domain, make, model, year, author)
     
     if result:
         logger.info(f"✅ Google Search found article: {result}")
@@ -672,6 +923,13 @@ def google_search_for_article(domain: str, make: str, model: str, year: Optional
     bing_result = bing_client.search_for_article(domain, make, model, year, author)
     
     if bing_result:
+        # Convert simple URL to dict format for consistency
+        if isinstance(bing_result, str):
+            bing_result = {
+                'url': bing_result,
+                'attribution_strength': 'unknown',
+                'actual_byline': None
+            }
         logger.info(f"✅ Bing Search backup found article: {bing_result}")
         return bing_result
     

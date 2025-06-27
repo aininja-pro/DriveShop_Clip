@@ -58,7 +58,7 @@ class BrowserCrawler:
                 return False
         return False
     
-    def crawl(
+    async def crawl(
         self, 
         url: str, 
         wait_time: int = 5,
@@ -82,11 +82,44 @@ class BrowserCrawler:
         
         if use_real_browser:
             try:
-                # Use real Playwright
+                # Use real Playwright with ENHANCED STEALTH
                 context = self.browser.new_context(
-                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
+                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    viewport={'width': 1920, 'height': 1080},
+                    locale='en-US',
+                    timezone_id='America/New_York',
+                    extra_http_headers={
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+                        'Connection': 'keep-alive',
+                        'Upgrade-Insecure-Requests': '1',
+                        'Sec-Fetch-Dest': 'document',
+                        'Sec-Fetch-Mode': 'navigate',
+                        'Sec-Fetch-Site': 'none',
+                        'Cache-Control': 'max-age=0'
+                    }
                 )
                 page = context.new_page()
+                
+                # STEALTH: Hide automation indicators
+                await page.add_init_script("""
+                    // Hide webdriver property
+                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                    
+                    // Hide automation flags
+                    window.chrome = { runtime: {} };
+                    Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                    Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+                    
+                    // Mock permissions
+                    const originalQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = (parameters) => (
+                        parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                    );
+                """)
                 
                 # Increase timeout for JS-heavy sites (30 seconds instead of 10)
                 timeout_ms = 30000
@@ -95,19 +128,19 @@ class BrowserCrawler:
                 logger.info(f"Navigating to {url} with {timeout_ms/1000}s timeout")
                 try:
                     # First try with 'networkidle' (waits for network to be idle)
-                    response = page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+                    response = await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
                     if not response:
                         logger.warning(f"No response when navigating to {url}")
                 except Exception as nav_error:
                     logger.warning(f"Navigation error with 'networkidle': {nav_error}, trying with 'domcontentloaded' instead")
                     try:
                         # If networkidle fails, try with domcontentloaded (faster but less complete)
-                        response = page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+                        response = await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
                     except Exception as dom_error:
                         logger.warning(f"Navigation error with 'domcontentloaded': {dom_error}, trying with 'load' instead")
                         try:
                             # Last resort - just wait for the load event
-                            response = page.goto(url, wait_until="load", timeout=timeout_ms)
+                            response = await page.goto(url, wait_until="load", timeout=timeout_ms)
                         except Exception as load_error:
                             logger.error(f"All navigation methods failed: {load_error}")
                             # Just wait a bit and try to extract content anyway
@@ -115,15 +148,15 @@ class BrowserCrawler:
                 
                 # Wait additional time for any JavaScript to run
                 logger.info(f"Waiting {wait_time} seconds for JavaScript execution")
-                page.wait_for_timeout(wait_time * 1000)
+                await page.wait_for_timeout(wait_time * 1000)
                 
                 # Scroll if requested
                 if scroll:
-                    self._scroll_page(page)
+                    await self._scroll_page(page)
                 
                 # Extract content and title
-                content = page.content()
-                title = page.title()
+                content = await page.content()
+                title = await page.title()
                 
                 # Check if we got meaningful content
                 if content and len(content) > 1000:
@@ -132,8 +165,8 @@ class BrowserCrawler:
                     logger.warning(f"Content extraction may have failed - page content is too short ({len(content) if content else 0} chars)")
                 
                 # Close page and context to free resources
-                page.close()
-                context.close()
+                await page.close()
+                await context.close()
                 
                 # THREAD SAFETY: Close browser after each crawl to prevent threading issues
                 self._cleanup_browser()
@@ -251,7 +284,7 @@ class BrowserCrawler:
         """
         return content, title
     
-    def _scroll_page(self, page) -> None:
+    async def _scroll_page(self, page) -> None:
         """
         Scroll a page to load lazy content.
         
@@ -260,7 +293,7 @@ class BrowserCrawler:
         """
         try:
             # Get page height
-            height = page.evaluate("() => document.body.scrollHeight")
+            height = await page.evaluate("() => document.body.scrollHeight")
             
             # Scroll in chunks
             scroll_step = 300
@@ -268,11 +301,11 @@ class BrowserCrawler:
             
             while current_position < height:
                 current_position += scroll_step
-                page.evaluate(f"window.scrollTo(0, {current_position})")
-                page.wait_for_timeout(100)  # Small delay between scrolls
+                await page.evaluate(f"window.scrollTo(0, {current_position})")
+                await page.wait_for_timeout(100)  # Small delay between scrolls
                 
             # Scroll back to top
-            page.evaluate("window.scrollTo(0, 0)")
+            await page.evaluate("window.scrollTo(0, 0)")
             logger.info(f"Scrolled page to load content, height: {height}px")
         except Exception as e:
             logger.warning(f"Error during page scrolling: {e}")

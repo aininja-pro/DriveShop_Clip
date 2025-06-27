@@ -181,6 +181,11 @@ class EnhancedCrawlerManager:
         """
         CLEAN 4-tier escalation system with CONTENT QUALITY DETECTION
         
+        Tier 1: Basic HTTP (free & fast)
+        Tier 2: Enhanced HTTP (browser-like headers)
+        Tier 3: ScrapFly (premium with residential proxies - best success rate)
+        Tier 4: ScrapingBee (backup service)
+        
         Returns: {
             'success': bool,
             'content': str,
@@ -192,8 +197,75 @@ class EnhancedCrawlerManager:
         }
         """
         
-        # Check cache first
-        domain = urlparse(url).netloc.lower()
+        # BLOCK SOCIAL MEDIA AND NON-CONTENT DOMAINS
+        blocked_domains = [
+            'instagram.com', 'facebook.com', 'twitter.com', 'x.com', 'tiktok.com',
+            'linkedin.com', 'pinterest.com', 'snapchat.com', 'youtube.com/user/',
+            'youtube.com/channel/', 'youtube.com/c/', 'youtube.com/@'
+        ]
+        
+        for blocked_domain in blocked_domains:
+            if blocked_domain in url.lower():
+                logger.warning(f"🚫 BLOCKED: Skipping social media/profile URL: {url}")
+                return {
+                    'success': False,
+                    'content': '',
+                    'title': '',
+                    'url': url,
+                    'tier_used': 'Blocked Domain',
+                    'cached': False,
+                    'error': f'Social media/profile URLs are not content sources: {blocked_domain}'
+                }
+        
+        # Check cache first - FIX MALFORMED URL PARSING
+        try:
+            parsed_url = urlparse(url)
+            domain = parsed_url.netloc.lower()
+            
+            # Handle malformed URLs like "https:townvibe.com" (missing //)
+            if not domain and url.startswith(('http:', 'https:')):
+                logger.warning(f"⚠️ Malformed URL detected: {url}")
+                # Try to fix by adding missing //
+                if url.startswith('http:') and not url.startswith('http://'):
+                    if '://' not in url:
+                        fixed_url = url.replace('http:', 'http://', 1)
+                    else:
+                        fixed_url = url
+                elif url.startswith('https:') and not url.startswith('https://'):
+                    if '://' not in url:
+                        fixed_url = url.replace('https:', 'https://', 1)
+                    else:
+                        fixed_url = url
+                else:
+                    fixed_url = url
+                
+                logger.info(f"🔧 Fixed malformed URL: {url} → {fixed_url}")
+                url = fixed_url  # Use fixed URL for all subsequent processing
+                parsed_url = urlparse(url)  # Re-parse the fixed URL
+                domain = parsed_url.netloc.lower()
+                
+            if not domain:
+                logger.error(f"❌ Unable to extract domain from URL: {url}")
+                return {
+                    'success': False,
+                    'content': '',
+                    'title': '',
+                    'url': url,
+                    'tier_used': 'URL Parsing Failed',
+                    'cached': False,
+                    'error': f'Invalid URL format: {url}'
+                }
+        except Exception as e:
+            logger.error(f"❌ URL parsing error for {url}: {e}")
+            return {
+                'success': False,
+                'content': '',
+                'title': '',
+                'url': url,
+                'tier_used': 'URL Parsing Error',
+                'cached': False,
+                'error': f'URL parsing failed: {e}'
+            }
         
         cached_result = self.cache_manager.get_cached_result(
             person_id=person_name or "unknown",
@@ -297,8 +369,50 @@ class EnhancedCrawlerManager:
                 extracted_length = len(extracted_content.strip()) if extracted_content else 0
                 logger.info(f"Tier 2: Content extraction FAILED ({extracted_length} chars from {len(http_content)} chars), escalating to ScrapingBee")
 
-        # Tier 3: ScrapingBee (when Enhanced HTTP fails OR returns generic content)
-        logger.info(f"Tier 3: Trying ScrapingBee for {url}")
+        # Tier 3: ScrapFly FIRST (premium service with residential proxies - best success rate)
+        logger.info(f"Tier 3: Trying ScrapFly for {url}")
+        try:
+            from src.utils.scrapfly_client import scrapfly_crawl_with_fallback
+            scrapfly_content, scrapfly_title, scrapfly_error = scrapfly_crawl_with_fallback(url)
+            if scrapfly_content and not scrapfly_error:
+                # EXTRACT CONTENT FIRST to test quality
+                from src.utils.content_extractor import extract_article_content
+                expected_topic = f"{make} {model}"
+                extracted_content = extract_article_content(scrapfly_content, url, expected_topic)
+                
+                # Check if extraction was successful
+                min_content_length = 200
+                extraction_successful = extracted_content and len(extracted_content.strip()) >= min_content_length
+                
+                if extraction_successful and not self.is_generic_content(extracted_content, url, make, model):
+                    logger.info(f"Tier 3 Success: ScrapFly + successful extraction found SPECIFIC content for {url}")
+                    result = {
+                        'success': True,
+                        'content': scrapfly_content,
+                        'title': scrapfly_title or 'ScrapFly Result',
+                        'url': url,
+                        'tier_used': 'Tier 3: ScrapFly',
+                        'cached': False
+                    }
+                    # Cache the result
+                    self.cache_manager.store_result(
+                        person_id=person_name or "unknown",
+                        domain=domain,
+                        make=make,
+                        model=model,
+                        url=url,
+                        content=scrapfly_content
+                    )
+                    return result
+                else:
+                    logger.info(f"Tier 3: ScrapFly content extraction failed or generic, escalating to ScrapingBee")
+            else:
+                logger.warning(f"Tier 3: ScrapFly failed for {url}: {scrapfly_error}")
+        except Exception as e:
+            logger.warning(f"Tier 3: ScrapFly error for {url}: {e}")
+
+        # Tier 4: ScrapingBee (backup service)
+        logger.info(f"Tier 4: Trying ScrapingBee as backup for {url}")
         
         bee_content = self.scraping_bee.scrape_url(url)
         if bee_content:
@@ -314,13 +428,13 @@ class EnhancedCrawlerManager:
             if extraction_successful:
                 # Content extraction succeeded, now check if it's generic
                 if not self.is_generic_content(extracted_content, url, make, model):
-                    logger.info(f"Tier 3 Success: ScrapingBee + successful extraction found SPECIFIC content for {url}")
+                    logger.info(f"Tier 4 Success: ScrapingBee + successful extraction found SPECIFIC content for {url}")
                     result = {
                         'success': True,
                         'content': bee_content,  # Return original HTML for further processing
-                        'title': 'ScrapingBee Result',
+                        'title': 'ScrapingBee Backup Result',
                         'url': url,
-                        'tier_used': 'Tier 3: ScrapingBee',
+                        'tier_used': 'Tier 4: ScrapingBee Backup',
                         'cached': False
                     }
                     # Cache the result
@@ -334,7 +448,7 @@ class EnhancedCrawlerManager:
                     )
                     return result
                 else:
-                    logger.info(f"Tier 3: ScrapingBee content extraction succeeded but content is GENERIC, escalating to Google Search")
+                    logger.info(f"Tier 4: ScrapingBee content extraction succeeded but content is GENERIC, escalating to Google Search")
             else:
                 extracted_length = len(extracted_content.strip()) if extracted_content else 0
                 logger.info(f"Tier 3: ScrapingBee content extraction FAILED ({extracted_length} chars from {len(bee_content)} chars), escalating to Index Page Discovery")
@@ -367,14 +481,32 @@ class EnhancedCrawlerManager:
         parsed_url = urlparse(url)
         domain_clean = parsed_url.netloc.lower().replace('www.', '')
         
-        # Try to find a specific article using Google Search
-        specific_url = self.google_search.search_for_article(
+        # Try to find a specific article using Google Search (synchronous version)
+        search_result = self.google_search.search_for_article_sync(
             domain=domain_clean,
             make=make,
             model=model,
             year=None,
             author=person_name
         )
+        
+        specific_url = None
+        attribution_info = {}
+        
+        if search_result:
+            if isinstance(search_result, dict):
+                specific_url = search_result.get('url')
+                attribution_info = {
+                    'attribution_strength': search_result.get('attribution_strength', 'unknown'),
+                    'actual_byline': search_result.get('actual_byline')
+                }
+            else:
+                # Backward compatibility for string returns
+                specific_url = search_result
+                attribution_info = {
+                    'attribution_strength': 'unknown',
+                    'actual_byline': None
+                }
         
         if specific_url and specific_url != url:
             logger.info(f"Tier 4 Success: Google Search found specific article: {specific_url}")
@@ -386,7 +518,10 @@ class EnhancedCrawlerManager:
                 result = article_result.copy()
                 result.update({
                     'tier_used': 'Tier 4: Google Search + ' + article_result.get('tier_used', 'Unknown'),
-                    'cached': False
+                    'cached': False,
+                    # Add attribution information for UI display
+                    'attribution_strength': attribution_info.get('attribution_strength', 'unknown'),
+                    'actual_byline': attribution_info.get('actual_byline')
                 })
                 # Cache the result
                 self.cache_manager.store_result(
@@ -475,26 +610,66 @@ class EnhancedCrawlerManager:
                 extracted_length = len(extracted_content.strip()) if extracted_content else 0
                 logger.info(f"Enhanced HTTP: content extraction FAILED ({extracted_length} chars from {len(http_content)} chars) for {url}, escalating to ScrapingBee")
             
-        # Tier 2: Try ScrapingBee when Enhanced HTTP fails OR returns generic content
-        logger.info(f"Trying ScrapingBee for specific URL: {url}")
+        # Tier 2: Try ScrapFly FIRST (premium service with residential proxies - best success rate)
+        logger.info(f"Tier 2: Trying ScrapFly for specific URL: {url}")
+        try:
+            from src.utils.scrapfly_client import scrapfly_crawl_with_fallback
+            content, title, error = scrapfly_crawl_with_fallback(url)
+            if content and not error and len(content) > 1000:
+                logger.info(f"✅ ScrapFly successfully extracted specific article content")
+                return {
+                    'success': True,
+                    'content': content,
+                    'title': title or 'ScrapFly Result',
+                    'url': url,
+                    'tier_used': 'ScrapFly'
+                }
+            else:
+                logger.warning(f"❌ ScrapFly failed for specific URL: {error}")
+        except Exception as e:
+            logger.warning(f"❌ ScrapFly error: {e}")
+            
+        # Tier 3: Try ScrapingBee as backup (fallback service)
+        logger.info(f"Tier 3: Trying ScrapingBee as backup for specific URL: {url}")
         bee_content = self.scraping_bee.scrape_url(url)
         if bee_content:
-            logger.info(f"ScrapingBee success for specific URL: {url}")
+            logger.info(f"ScrapingBee backup success for specific URL: {url}")
             return {
                 'success': True,
                 'content': bee_content,
-                'title': 'ScrapingBee Result',
+                'title': 'ScrapingBee Backup Result',
                 'url': url,
-                'tier_used': 'ScrapingBee'
+                'tier_used': 'ScrapingBee Backup'
             }
         else:
-            logger.warning(f"ScrapingBee failed for specific URL: {url}, falling back to original crawler")
+            logger.warning(f"ScrapingBee backup failed for specific URL: {url}")
+        
+        # Tier 4: Use headless browser directly (skip RSS for specific URLs)
+        logger.info(f"Tier 4: Using headless browser directly for specific URL: {url}")
+        from src.utils.browser_crawler import BrowserCrawler
+        
+        browser_crawler = BrowserCrawler(headless=True)
+        try:
+            content, title, error = browser_crawler.crawl(url, wait_time=10, scroll=True)
+            if content and not error:
+                logger.info(f"✅ Headless browser successfully extracted specific article content")
+                return {
+                    'success': True,
+                    'content': content,
+                    'title': title or 'Headless Browser Result',
+                    'url': url,
+                    'tier_used': 'Headless Browser Direct'
+                }
+            else:
+                logger.warning(f"❌ Headless browser failed for specific URL: {error}")
+        finally:
+            browser_crawler.close()
             
-        # Tier 3: Use original crawler as last resort
-        logger.info(f"Using original crawler for specific URL: {url}")
+        # Final fallback: Use original crawler with RSS disabled for specific URLs
+        logger.info(f"Final fallback: original crawler for specific URL: {url}")
         content, title, error, actual_url = self.original_crawler.crawl(
             url, 
-            allow_escalation=True, 
+            allow_escalation=False,  # DISABLE escalation to prevent RSS override
             wait_time=10,
             vehicle_make=make,
             vehicle_model=model

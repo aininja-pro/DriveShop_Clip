@@ -4,6 +4,7 @@ aiosignal==1.3.2
 altair==5.5.0
 attrs==25.3.0
 Automat==25.4.16
+backoff==2.2.1
 beautifulsoup4==4.13.4
 blinker==1.9.0
 cachetools==5.5.2
@@ -14,11 +15,14 @@ click==8.2.1
 constantly==23.10.4
 cryptography==45.0.3
 cssselect==1.3.0
+decorator==5.2.1
 defusedxml==0.7.1
+et_xmlfile==2.0.0
 filelock==3.18.0
 frozenlist==1.6.0
 gitdb==4.0.12
 GitPython==3.1.44
+greenlet==3.2.3
 hyperlink==21.0.0
 idna==3.10
 incremental==24.7.2
@@ -28,18 +32,19 @@ Jinja2==3.1.6
 jmespath==1.0.1
 jsonschema==4.23.0
 jsonschema-specifications==2025.4.1
+loguru==0.7.3
 lxml==5.4.0
 MarkupSafe==3.0.2
 multidict==6.4.4
 narwhals==1.40.0
 numpy==2.2.6
 openai==0.27.0
-openpyxl==3.1.2
+openpyxl==3.1.5
 packaging==24.2
 pandas==2.2.3
 parsel==1.10.0
 pillow==11.2.1
-playwright==1.50.0
+playwright==1.52.0
 propcache==0.3.1
 Protego==0.4.0
 protobuf==6.31.0
@@ -49,6 +54,7 @@ pyasn1_modules==0.4.2
 pycparser==2.22
 pydeck==0.9.1
 PyDispatcher==2.0.7
+pyee==13.0.0
 pyOpenSSL==25.1.0
 python-dateutil==2.9.0.post0
 python-decouple==3.8
@@ -59,6 +65,7 @@ referencing==0.36.2
 requests==2.32.3
 requests-file==2.1.0
 rpds-py==0.25.1
+scrapfly-sdk==0.8.23
 Scrapy==2.13.1
 service-identity==24.2.0
 setuptools==80.9.0
@@ -80,4 +87,3 @@ w3lib==2.3.1
 yarl==1.20.0
 youtube-transcript-api==1.0.3
 zope.interface==7.2
-google-api-python-client==2.108.0

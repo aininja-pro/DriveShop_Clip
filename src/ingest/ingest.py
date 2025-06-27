@@ -829,7 +829,10 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             'title': result.get('title', url),
             'tier_used': tier_used,
             'cached': cached,
-            'published_date': published_date  # Add the extracted publication date
+            'published_date': published_date,  # Add the extracted publication date
+            # Add attribution information for UI display
+            'attribution_strength': result.get('attribution_strength', 'unknown'),
+            'actual_byline': result.get('actual_byline')
         }
         
     except Exception as e:
@@ -929,6 +932,9 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 'Make': make,
                 'Model': model,
                 'Clip URL': actual_url,  # Use the actual URL where content was found (could be from RSS feed)
+                # Add attribution information for transparency
+                'Attribution_Strength': clip_data.get('attribution_strength', 'unknown'),
+                'Actual_Byline': clip_data.get('actual_byline', ''),
                 'Links': url,  # Original link from the input file
                 'Relevance Score': relevance,
                 'Sentiment': analysis.get('sentiment', 'neutral'),

@@ -1393,6 +1393,19 @@ with st.sidebar:
     selected_reporter_name = st.selectbox("Filter by Reporter:", reporter_names)
     selected_outlet = st.selectbox("Filter by Media Outlet:", outlets)
     
+    # Add WO # and Activity ID filters
+    wo_number_filter = st.text_input(
+        "Filter by WO # (optional):",
+        value="",
+        help="Enter a specific Work Order number to process only that record"
+    )
+    
+    activity_id_filter = st.text_input(
+        "Filter by Activity ID (optional):",
+        value="",
+        help="Enter a specific Activity ID to process only that record"
+    )
+    
     # Show batch processing info if available
     suggested_value = ""
     if 'batch_info' in st.session_state:
@@ -1438,6 +1451,20 @@ with st.sidebar:
                 # This includes the fix for the Person_ID data type issue
                 filtered_df['Person_ID'] = pd.to_numeric(filtered_df['Person_ID'], errors='coerce').astype('Int64').astype(str)
                 filtered_df = filtered_df[filtered_df['Person_ID'] == person_id]
+        
+        # Apply WO # filter if specified
+        if wo_number_filter.strip():
+            if 'WO #' in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df['WO #'].astype(str) == wo_number_filter.strip()]
+            else:
+                st.warning("⚠️ WO # column not found in data")
+        
+        # Apply Activity ID filter if specified
+        if activity_id_filter.strip():
+            if 'Activity_ID' in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df['Activity_ID'].astype(str) == activity_id_filter.strip()]
+            else:
+                st.warning("⚠️ Activity_ID column not found in data")
         
         # Apply position-based filtering (skip first X records)
         if skip_records > 0:
@@ -1578,10 +1605,10 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_review_tab, analysis_tab, rejected_tab, creatoriq_tab, history_tab = st.tabs([
+bulk_review_tab, rejected_tab, analysis_tab, creatoriq_tab, history_tab = st.tabs([
     "📋 Bulk Review", 
-    "📊 Detailed Analysis", 
     "⚠️ Rejected/Issues", 
+    "📊 Detailed Analysis", 
     "🎬 CreatorIQ Export",
     "📚 File History"
 ])
@@ -1973,6 +2000,27 @@ with bulk_review_tab:
                         return "—"
                 
                 clean_df['📅 Published Date'] = display_df.apply(get_published_date, axis=1)
+                
+                # ===== NEW: Add Attribution Information columns =====
+                def format_attribution_strength(row):
+                    """Format attribution strength for display"""
+                    attribution = row.get('Attribution_Strength', 'unknown')
+                    if attribution == 'strong':
+                        return '✅ Direct'
+                    elif attribution == 'delegated':
+                        return '⚠️ Delegated'
+                    else:
+                        return '❓ Unknown'
+                
+                def get_actual_byline(row):
+                    """Get actual byline author if available"""
+                    byline = row.get('Actual_Byline', '')
+                    if byline and str(byline).strip() and str(byline).lower() not in ['nan', 'none', '']:
+                        return str(byline).strip()
+                    return '—'
+                
+                clean_df['✍️ Attribution'] = display_df.apply(format_attribution_strength, axis=1)
+                clean_df['📝 Byline Author'] = display_df.apply(get_actual_byline, axis=1)
                 
                 # Store the full URL tracking data for popup (hidden column)
                 clean_df['URL_Tracking_Data'] = display_df.apply(lambda row: json.dumps(parse_url_tracking(row)), axis=1)
@@ -3237,13 +3285,28 @@ with analysis_tab:
                     # Header with model info
                     st.markdown(f"#### {selected_row.get('Model', 'Unknown Model')} - WO #{selected_wo}")
                     
-                    # Rebalanced info in 3 columns for better distribution
-                    info_col1, info_col2, info_col3 = st.columns(3)
+                    # Rebalanced info in 4 columns for better distribution (added attribution column)
+                    info_col1, info_col2, info_col3, info_col4 = st.columns(4)
                     with info_col1:
                         st.markdown(f"**👤 Contact**  \n{selected_row.get('To', 'N/A')}")
                     with info_col2:
                         st.markdown(f"**📰 Publication**  \n{selected_row.get('Affiliation', 'N/A')}")
                     with info_col3:
+                        # NEW: Attribution Information
+                        attribution_strength = selected_row.get('Attribution_Strength', 'unknown')
+                        actual_byline = selected_row.get('Actual_Byline', '')
+                        
+                        if attribution_strength == 'strong':
+                            attribution_text = "✅ **Direct Attribution**"
+                        elif attribution_strength == 'delegated':
+                            attribution_text = "⚠️ **Delegated Content**"
+                            if actual_byline:
+                                attribution_text += f"  \n*By: {actual_byline}*"
+                        else:
+                            attribution_text = "❓ **Attribution Unknown**"
+                        
+                        st.markdown(f"**✍️ Attribution**  \n{attribution_text}")
+                    with info_col4:
                         link_html = ""
                         if 'Clip URL' in selected_row and selected_row['Clip URL']:
                             link_html += f"**[📄 Review Link]({selected_row['Clip URL']})**  \n"
