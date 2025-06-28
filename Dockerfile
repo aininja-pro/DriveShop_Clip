@@ -1,32 +1,6 @@
-FROM python:3.11-slim
+FROM python:3.11
 
 WORKDIR /app
-
-# Install system dependencies for Playwright
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    libgconf-2-4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libnss3 \
-    libnspr4 \
-    libx11-6 \
-    libxcb1 \
-    libxtst6 \
-    libgtk-3-0 \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
 COPY requirements.txt ./
@@ -34,10 +8,10 @@ COPY requirements.txt ./
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers after dependencies
-RUN playwright install chromium --with-deps
+# Install Playwright chromium (without --with-deps to avoid system package issues)
+RUN playwright install chromium
 
-# Copy source code
+# Copy source code and assets
 COPY . .
 
 # Create directories

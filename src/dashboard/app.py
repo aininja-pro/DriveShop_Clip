@@ -199,20 +199,20 @@ def parse_url_tracking(df_row):
         }]
 
 
-# Custom CSS for dark charcoal sidebar with logo
+# Custom CSS for black sidebar with logo
 def apply_custom_sidebar_styling():
-    """Apply custom CSS styling for dark charcoal sidebar with white logo"""
+    """Apply custom CSS styling for black sidebar with white logo"""
     st.markdown("""
     <style>
-    /* Dark charcoal sidebar styling */
+    /* Black sidebar styling */
     .css-1d391kg, .css-1lcbmhc, .css-17lntkn, .css-1y4p8pa, 
     .stSidebar > div:first-child, .css-12oz5g7, .css-1cypcdb {
-        background-color: #2C3E50 !important;
+        background-color: #000000 !important;
     }
     
     /* Sidebar content styling */
     .stSidebar {
-        background-color: #2C3E50 !important;
+        background-color: #000000 !important;
     }
     
     /* All text in sidebar to white */
@@ -248,48 +248,48 @@ def apply_custom_sidebar_styling():
     
     /* Selectbox dropdown styling */
     .stSidebar .stSelectbox > div > div {
-        background-color: #34495e !important;
-        border: 1px solid #5a6c7d !important;
+        background-color: #1a1a1a !important;
+        border: 1px solid #333333 !important;
         color: white !important;
     }
     
     /* Fix input text colors - make text dark in input fields */
     .stSidebar .stTextInput > div > div > input {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         background-color: white !important;
     }
     
     .stSidebar .stNumberInput > div > div > input {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         background-color: white !important;
     }
     
     .stSidebar .stSelectbox > div > div > div {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         background-color: white !important;
     }
     
     /* Dropdown options styling */
     .stSidebar .stSelectbox option {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         background-color: white !important;
     }
     
     /* Fix all input elements in sidebar */
     .stSidebar input {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         background-color: white !important;
     }
     
     /* Simple fix for number input buttons */
     .stSidebar button {
-        color: #0058A3 !important;
+        color: #000000 !important;
         font-weight: bold !important;
     }
     
     /* Fix multiselect and other input types */
     .stSidebar .stMultiSelect > div > div > div {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         background-color: white !important;
     }
     
@@ -316,53 +316,53 @@ def apply_custom_sidebar_styling():
     
     .stSidebar .stFileUploader > div {
         background-color: white !important;
-        border: 2px dashed #0058A3 !important;
+        border: 2px dashed #000000 !important;
         border-radius: 6px !important;
     }
     
     .stSidebar .stFileUploader > div > div {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         font-weight: 600 !important;
     }
     
     .stSidebar .stFileUploader button {
         color: white !important;
-        background-color: #0058A3 !important;
-        border: 1px solid #0058A3 !important;
+        background-color: #000000 !important;
+        border: 1px solid #000000 !important;
         font-weight: 600 !important;
         padding: 8px 16px !important;
         border-radius: 4px !important;
     }
     
     .stSidebar .stFileUploader button:hover {
-        background-color: #004080 !important;
-        border-color: #004080 !important;
+        background-color: #333333 !important;
+        border-color: #333333 !important;
     }
     
     /* Fix file uploader text and button visibility - make text darker */
     .stSidebar .stFileUploader span,
     .stSidebar .stFileUploader p,
     .stSidebar .stFileUploader div[data-testid="stFileUploaderDropzone"] {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         font-weight: 600 !important;
         font-size: 14px !important;
     }
     
     .stSidebar .stFileUploader div[data-testid="stFileUploaderDropzone"] span {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         font-weight: 500 !important;
     }
     
     /* Make drag and drop text more visible */
     .stSidebar .stFileUploader div[data-testid="stFileUploaderDropzone"] p {
-        color: #2c3e50 !important;
+        color: #000000 !important;
         font-weight: 600 !important;
         margin: 0 !important;
     }
     
     /* Button styling in sidebar */
     .stSidebar .stButton > button {
-        background-color: #0058A3 !important;
+        background-color: #000000 !important;
         color: white !important;
         border: none !important;
         border-radius: 6px !important;
@@ -371,7 +371,7 @@ def apply_custom_sidebar_styling():
     }
     
     .stSidebar .stButton > button:hover {
-        background-color: #004080 !important;
+        background-color: #333333 !important;
         color: white !important;
     }
     
@@ -382,7 +382,7 @@ def apply_custom_sidebar_styling():
         align-items: center;
         padding: 1rem 0 2rem 0;
         margin-bottom: 1rem;
-        border-bottom: 1px solid #5a6c7d;
+        border-bottom: 1px solid #333333;
     }
     
     .sidebar-logo img {
@@ -397,7 +397,7 @@ def apply_custom_sidebar_styling():
         justify-content: center;
         padding: 1rem 0 2rem 0;
         margin-bottom: 1rem;
-        border-bottom: 1px solid #5a6c7d;
+        border-bottom: 1px solid #333333;
     }
     
     .stSidebar .stImage img {
@@ -407,11 +407,11 @@ def apply_custom_sidebar_styling():
     
     /* Sidebar metrics styling */
     .stSidebar .metric-container {
-        background-color: #34495e !important;
+        background-color: #1a1a1a !important;
         padding: 0.5rem;
         border-radius: 6px;
         margin: 0.5rem 0;
-        border: 1px solid #5a6c7d;
+        border: 1px solid #333333;
     }
     
     /* Fix for any remaining black text */
@@ -419,7 +419,7 @@ def apply_custom_sidebar_styling():
         color: white !important;
     }
     
-    /* Tab styling adjustments for better contrast with dark sidebar */
+    /* Tab styling adjustments for better contrast with black sidebar */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px;
     }
@@ -432,7 +432,7 @@ def apply_custom_sidebar_styling():
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: #0058A3;
+        background-color: #000000;
         color: white;
     }
     
@@ -452,7 +452,7 @@ def apply_custom_sidebar_styling():
     /* 3) Add a visible border around inputs so they don't vanish on white */
     .stSidebar .stTextInput > div > div > input,
     .stSidebar .stNumberInput > div > div > input {
-        border: 1px solid #5A6C7D !important;
+        border: 1px solid #333333 !important;
         border-radius: 4px !important;
         padding: 4px 8px !important;
     }
@@ -490,7 +490,7 @@ def apply_custom_sidebar_styling():
 
     /* Tidy up the outline and border so you can see the control region */
     .stSidebar .stNumberInput > div > div > input {
-      border: 1px solid #5a6c7d !important;
+      border: 1px solid #333333 !important;
       padding-right: 1.6em !important;  /* leave room for the spinner */
       border-radius: 4px !important;
       background-clip: padding-box !important;
@@ -610,7 +610,7 @@ def create_client_excel_report(df, approved_df=None):
     
     # Map our data columns to Bulk Review column names
     column_mapping = {
-        'Activity_ID': 'Activity_ID',  # Include Activity_ID for approval workflow
+        'Activity_ID': 'Activity_ID',  # Activity_ID column exists but may be empty
         'Office': 'Office',
         'WO #': 'WO #',
         'Make': 'Make',
@@ -621,6 +621,29 @@ def create_client_excel_report(df, approved_df=None):
         'Relevance Score': 'Relevance',
         'Overall Sentiment': 'Sentiment',  # Fix: Use the correct sentiment column
     }
+    
+    # FIX: Fetch Activity_ID values from external source if they're blank in the data
+    activity_id_mapping = {}
+    try:
+        import requests
+        response = requests.get("https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv", timeout=30)
+        if response.status_code == 200:
+            source_lines = response.text.strip().split('\n')
+            for line in source_lines:
+                if line.strip() and not line.startswith('"Activity_ID"'):  # Skip header
+                    # Parse CSV line properly (handle quoted fields)
+                    import csv
+                    from io import StringIO
+                    reader = csv.reader(StringIO(line))
+                    parts = next(reader)
+                    if len(parts) >= 5:
+                        # Position mapping: Activity_ID(1st), Person_ID(2nd), Make(3rd), Model(4th), WO#(5th), ...
+                        activity_id = parts[0].strip()  # Activity_ID is in 1st position
+                        wo_number = parts[4].strip()    # WO# is in 5th position
+                        activity_id_mapping[wo_number] = activity_id
+        print(f"✅ Fetched Activity_ID mapping for {len(activity_id_mapping)} WO# records")
+    except Exception as e:
+        print(f"Warning: Could not fetch Activity_ID mapping: {e}")
     
     # Create export dataframe with Bulk Review column structure
     export_df = pd.DataFrame()
@@ -634,7 +657,11 @@ def create_client_excel_report(df, approved_df=None):
                 break
         
         if source_col:
-            export_df[bulk_col] = df[source_col]
+            if bulk_col == 'Activity_ID' and activity_id_mapping:
+                # FIX: Populate Activity_ID from external mapping using WO#
+                export_df[bulk_col] = df['WO #'].astype(str).map(activity_id_mapping).fillna(df[source_col])
+            else:
+                export_df[bulk_col] = df[source_col]
         else:
             # Fill with empty if column doesn't exist
             export_df[bulk_col] = ''
@@ -808,8 +835,9 @@ def create_client_excel_report(df, approved_df=None):
         current_approved_df = approved_df[approved_df['WO #'].astype(str).isin(current_wo_numbers)].copy()
         
         if not current_approved_df.empty:
-            # FIX: Get actual loan end dates from source data for Excel
+            # FIX: Get actual loan end dates AND Activity_IDs from source data for Excel
             source_mapping = {}
+            activity_id_mapping = {}
             try:
                 import requests
                 response = requests.get("https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv", timeout=30)
@@ -824,16 +852,24 @@ def create_client_excel_report(df, approved_df=None):
                             parts = next(reader)
                             if len(parts) >= 10:
                                 # Position mapping: Activity_ID(1st), Person_ID(2nd), Make(3rd), Model(4th), WO#(5th), ..., Stop_Date(10th)
-                                wo_number = parts[4].strip()  # WO# is in 5th position
-                                stop_date = parts[9].strip()  # Stop Date is in 10th position
+                                activity_id = parts[0].strip()  # Activity_ID is in 1st position
+                                wo_number = parts[4].strip()    # WO# is in 5th position
+                                stop_date = parts[9].strip()    # Stop Date is in 10th position
                                 source_mapping[wo_number] = stop_date
+                                activity_id_mapping[wo_number] = activity_id
+                print(f"✅ Fetched source data mapping for {len(source_mapping)} WO# records")
             except Exception as e:
-                print(f"Warning: Could not fetch source data for loan end dates: {e}")
+                print(f"Warning: Could not fetch source data for loan end dates and Activity_IDs: {e}")
             
-            # FIX: Rename Activity_ID to Activity_ID for consistency
-            if 'Article_ID' in current_approved_df.columns and 'Activity_ID' not in current_approved_df.columns:
+            # FIX: Populate Activity_ID from external source data using WO# mapping
+            if activity_id_mapping:
+                current_approved_df['Activity_ID'] = current_approved_df['WO #'].astype(str).map(activity_id_mapping)
+            elif 'Article_ID' in current_approved_df.columns:
                 current_approved_df['Activity_ID'] = current_approved_df['Article_ID']
                 current_approved_df.drop('Article_ID', axis=1, inplace=True)
+            elif 'Activity_ID' not in current_approved_df.columns:
+                # If neither exists, create empty Activity_ID column
+                current_approved_df['Activity_ID'] = ''
             
             # FIX: Clean up date columns - keep only ONE published date and add loan end date
             # Remove the confusing 'published_date' column (it's not the loan end date)
@@ -2545,8 +2581,9 @@ with bulk_review_tab:
                                 else:
                                     selected_approved_rows = pd.DataFrame()
                                 
-                                # FIXED: Get actual loan end dates from source data
+                                # FIXED: Get actual loan end dates AND Activity_IDs from source data
                                 source_mapping = {}
+                                activity_id_mapping = {}
                                 try:
                                     import requests
                                     response = requests.get("https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv", timeout=30)
@@ -2561,11 +2598,14 @@ with bulk_review_tab:
                                                 parts = next(reader)
                                                 if len(parts) >= 10:
                                                     # Position mapping: Activity_ID(1st), Person_ID(2nd), Make(3rd), Model(4th), WO#(5th), ..., Stop_Date(10th)
-                                                    wo_number = parts[4].strip()  # WO# is in 5th position
-                                                    stop_date = parts[9].strip()  # Stop Date is in 10th position
+                                                    activity_id = parts[0].strip()  # Activity_ID is in 1st position
+                                                    wo_number = parts[4].strip()    # WO# is in 5th position
+                                                    stop_date = parts[9].strip()    # Stop Date is in 10th position
                                                     source_mapping[wo_number] = stop_date
+                                                    activity_id_mapping[wo_number] = activity_id
+                                    print(f"✅ Fetched Activity_ID mapping for JSON export: {len(activity_id_mapping)} WO# records")
                                 except Exception as e:
-                                    print(f"Warning: Could not fetch source data for loan end dates: {e}")
+                                    print(f"Warning: Could not fetch source data for loan end dates and Activity_IDs: {e}")
                                 
                                 for _, row in selected_approved_rows.iterrows():
                                     # Get the work order number for this row
@@ -2582,10 +2622,13 @@ with bulk_review_tab:
                                     # Get the loan end date from source data mapping (this is the real loan end date)
                                     loan_end_date = source_mapping.get(wo_number, '')
                                     
+                                    # FIX: Get Activity_ID from external mapping using WO#
+                                    activity_id = activity_id_mapping.get(wo_number, '') if activity_id_mapping else str(row.get('Activity_ID', ''))
+                                    
                                     json_data.append({
                                         # Basic Information
                                         "work_order": str(row.get('WO #', '')),
-                                        "activity_id": str(int(float(row.get('Activity_ID', 0)))) if row.get('Activity_ID') and str(row.get('Activity_ID')).replace('.', '').isdigit() else str(row.get('Activity_ID', '')),
+                                        "activity_id": activity_id,
                                         "make": str(row.get('Make', '')),
                                         "vehicle_model": str(row.get('Model', '')),
                                         "contact": str(row.get('To', '')),
