@@ -514,6 +514,258 @@ def apply_custom_sidebar_styling():
     .stSidebar input[type="number"] {
       -moz-appearance: textfield !important;
     }
+    
+    /* Compact table area */
+    .ag-theme-alpine {
+        font-size: 0.8rem !important;
+    }
+    
+    /* Sticky Action Bar for Bulk Review */
+    .sticky-action-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #000000 0%, #2c3e50 100%);
+        padding: 0.8rem 1rem;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        border-top: 2px solid #333;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .sticky-action-bar .stButton > button {
+        background: linear-gradient(135deg, #000000 0%, #333333 100%) !important;
+        color: white !important;
+        border: 2px solid #444 !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+        min-width: 140px !important;
+    }
+    
+    .sticky-action-bar .stButton > button:hover {
+        background: linear-gradient(135deg, #333333 0%, #555555 100%) !important;
+        border-color: #666 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+    }
+    
+    /* Add bottom padding to main content to prevent overlap */
+    .main .block-container {
+        padding-bottom: 5rem !important;
+    }
+    
+    /* Target ALL metric text elements but keep READABLE */
+    div[data-testid="metric-container"] > div,
+    div[data-testid="metric-container"] span,
+    div[data-testid="metric-container"] p,
+    [data-testid="metric-container"] * {
+        font-size: 0.9rem !important;
+        line-height: 1.2 !important;
+        margin: 0.1rem 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Force label text to be small but readable */
+    div[data-testid="metric-container"] > div:first-child,
+    [data-testid="metric-container"] [data-testid="metric-label"],
+    .metric-label {
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        color: #6c757d !important;
+        margin-bottom: 0.15rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.3px !important;
+        line-height: 1.1 !important;
+    }
+    
+    /* Force value text to be bigger and VISIBLE */
+    div[data-testid="metric-container"] > div:last-child,
+    [data-testid="metric-container"] [data-testid="metric-value"],
+    .metric-value {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* Override Streamlit's default metric styling */
+    .stMetric {
+        padding: 0.15rem !important;
+        margin: 0.15rem !important;
+        height: auto !important;
+        min-height: 2.5rem !important;
+    }
+    
+    .stMetric > div {
+        font-size: 0.9rem !important;
+        line-height: 1.2 !important;
+    }
+    
+    /* Nuclear option - target by text content if needed */
+    div:contains("Total Clips"),
+    div:contains("Avg Score"), 
+    div:contains("High Quality"),
+    div:contains("Approved") {
+        font-size: 0.1rem !important;
+    }
+    
+    /* Table row styling */
+    .table-row {
+        padding: 6px 4px;
+        min-height: 1.8rem;
+        display: flex;
+        align-items: center;
+        text-align: center;
+        font-size: 0.7rem;
+        line-height: 1.2;
+    }
+    
+    /* URL popup styling */
+    .url-popup {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin: 0.5rem 0;
+    }
+    
+    .url-item {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    
+    .url-item:last-child {
+        border-bottom: none;
+    }
+    
+    /* Better button targeting - all buttons in action columns */
+    div[data-testid="column"]:last-child div[data-testid="stButton"]:nth-child(1) button {
+        background: #28a745 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 3px 12px !important;
+        height: 1.8rem !important;
+    }
+    
+    div[data-testid="column"]:last-child div[data-testid="stButton"]:nth-child(3) button {
+        background: #dc3545 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 4px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 3px 12px !important;
+        height: 1.8rem !important;
+    }
+    
+    /* More aggressive targeting for all checkmark buttons */
+    button:contains("✓") {
+        background-color: #28a745 !important;
+        color: white !important;
+    }
+    
+    /* More aggressive targeting for all X buttons */
+    button:contains("✗") {
+        background-color: #dc3545 !important;
+        color: white !important;
+    }
+    
+    /* Universal button override */
+    .stButton button {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 3px 12px !important;
+        border: none !important;
+        border-radius: 4px !important;
+        height: 1.8rem !important;
+    }
+    
+    /* Score color styling */
+    .score-high { color: #28a745; font-weight: 600; }
+    .score-med { color: #007bff; font-weight: 600; }
+    .score-low { color: #ffc107; font-weight: 600; }
+    
+    /* Scrollable table styling */
+    .scrollable-table {
+        max-height: 450px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background: white;
+    }
+    
+    .fixed-header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: white;
+        border-bottom: 2px solid #adb5bd;
+        padding: 0.2rem 0;
+    }
+    
+    /* Smooth scrolling */
+    .scrollable-table::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .scrollable-table::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    .scrollable-table::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+    }
+    
+    .scrollable-table::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+    
+    /* Compact sidebar styling */
+    .css-1d391kg {
+        width: 250px !important;
+        min-width: 250px !important;
+    }
+    
+    /* Make sidebar content more compact */
+    .css-1d391kg .stMarkdown p {
+        margin: 0.2rem 0 !important;
+        font-size: 0.9rem !important;
+    }
+    
+    .css-1d391kg .stButton button {
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.8rem !important;
+        margin: 0.1rem 0 !important;
+    }
+    
+    .css-1d391kg .stFileUploader {
+        margin: 0.2rem 0 !important;
+    }
+    
+    .css-1d391kg .stFileUploader > div {
+        padding: 0.3rem !important;
+        font-size: 0.8rem !important;
+    }
+    
+    /* Compact success/error messages in sidebar */
+    .css-1d391kg .stAlert {
+        padding: 0.3rem !important;
+        font-size: 0.8rem !important;
+        margin: 0.2rem 0 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -1092,6 +1344,48 @@ st.markdown("""
     /* Compact table area */
     .ag-theme-alpine {
         font-size: 0.8rem !important;
+    }
+    
+    /* Sticky Action Bar for Bulk Review */
+    .sticky-action-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #000000 0%, #2c3e50 100%);
+        padding: 0.8rem 1rem;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        border-top: 2px solid #333;
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .sticky-action-bar .stButton > button {
+        background: linear-gradient(135deg, #000000 0%, #333333 100%) !important;
+        color: white !important;
+        border: 2px solid #444 !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+        min-width: 140px !important;
+    }
+    
+    .sticky-action-bar .stButton > button:hover {
+        background: linear-gradient(135deg, #333333 0%, #555555 100%) !important;
+        border-color: #666 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+    }
+    
+    /* Add bottom padding to main content to prevent overlap */
+    .main .block-container {
+        padding-bottom: 5rem !important;
     }
     
     /* Target ALL metric text elements but keep READABLE */
@@ -2367,7 +2661,7 @@ with bulk_review_tab:
                     gridOptions=grid_options,
                     allow_unsafe_jscode=True,
                     update_mode=GridUpdateMode.MODEL_CHANGED,  # Capture checkbox changes automatically
-                    height=650,  # Increased height for better viewing
+                    height=400,  # Reduced height so action buttons are visible without scrolling
                     fit_columns_on_grid_load=True,
                     theme="alpine",
                     enable_enterprise_modules=True,  # REQUIRED for Set Filters with checkboxes
@@ -2480,6 +2774,10 @@ with bulk_review_tab:
                 
                 # Action buttons below table
                 st.markdown("---")
+                
+                # Create sticky action bar container
+                st.markdown('<div class="sticky-action-bar">', unsafe_allow_html=True)
+                
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
@@ -2540,6 +2838,8 @@ with bulk_review_tab:
                         except Exception as e:
                             st.error(f"Error creating Excel report: {e}")
                 
+                # Close sticky action bar container
+                st.markdown('</div>', unsafe_allow_html=True)
 
                 
                 # Approval confirmation dialog
@@ -2699,19 +2999,9 @@ with bulk_review_tab:
                                     # Excel download - GENERATE ON DEMAND (slower but includes all data)
                                     def generate_excel():
                                         try:
-                                            # Load the most current approved data with proper data cleaning
+                                            # Load the most current approved data
                                             if os.path.exists(approved_file):
-                                                current_approved_df = pd.read_csv(approved_file, dtype=str)
-                                                
-                                                # Clean problematic data that might cause Excel conversion errors
-                                                for col in current_approved_df.columns:
-                                                    # Convert any extremely long strings to truncated versions
-                                                    if current_approved_df[col].dtype == 'object':
-                                                        current_approved_df[col] = current_approved_df[col].astype(str).apply(
-                                                            lambda x: x[:500] + '...' if len(str(x)) > 500 else str(x)
-                                                        )
-                                                    # Handle any NaN or None values
-                                                    current_approved_df[col] = current_approved_df[col].fillna('')
+                                                current_approved_df = pd.read_csv(approved_file)
                                             else:
                                                 current_approved_df = pd.DataFrame()
                                             
@@ -2835,81 +3125,42 @@ with bulk_review_tab:
     else:
         st.info("No results file found. Upload and process loans to begin.")
 
-    # ========== PERSISTENT DOWNLOAD SECTION ==========
+    # ========== COMPACT DOWNLOAD SECTION ==========
     # Show download buttons for the latest approved clips (if any exist)
     if hasattr(st.session_state, 'latest_json_data') and st.session_state.latest_json_data:
-        st.markdown("---")
-        st.markdown("### 📁 Download Latest Approved Clips")
-        st.markdown("*Your most recent approval session files are ready for download*")
-        
-        col_excel_persist, col_json_persist = st.columns(2)
-        
-        with col_excel_persist:
-            # Excel download
-            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-            if os.path.exists(approved_file):
-                wb = create_client_excel_report(df if 'df' in locals() else pd.DataFrame(), pd.read_csv(approved_file))
-                excel_buffer = io.BytesIO()
-                wb.save(excel_buffer)
-                excel_buffer.seek(0)
+        with st.expander("📁 Download Latest Approved Clips", expanded=False):
+            st.markdown("*Your most recent approval session files are ready for download*")
+            
+            col_excel_persist, col_json_persist = st.columns(2)
+            
+            with col_excel_persist:
+                # Excel download
+                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                if os.path.exists(approved_file):
+                    wb = create_client_excel_report(df if 'df' in locals() else pd.DataFrame(), pd.read_csv(approved_file))
+                    excel_buffer = io.BytesIO()
+                    wb.save(excel_buffer)
+                    excel_buffer.seek(0)
+                    st.download_button(
+                        label="📊 Download Excel Report",
+                        data=excel_buffer.getvalue(),
+                        file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="excel_download_persistent",
+                        help="Download Excel file with multiple tabs including Approved Clips details"
+                    )
+            
+            with col_json_persist:
+                # JSON download
                 st.download_button(
-                    label="📊 Download Excel Report",
-                    data=excel_buffer.getvalue(),
-                    file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="excel_download_persistent",
-                    help="Download Excel file with multiple tabs including Approved Clips details"
+                    label="📋 Download JSON Report",
+                    data=json.dumps(st.session_state.latest_json_data, indent=2),
+                    file_name=st.session_state.latest_json_filename,
+                    mime="application/json",
+                    key="json_download_persistent",
+                    help="Download comprehensive JSON with all clip data including scores, recommendations, pros/cons"
                 )
-        
-        with col_json_persist:
-            # JSON download
-            st.download_button(
-                label="📋 Download JSON Report",
-                data=json.dumps(st.session_state.latest_json_data, indent=2),
-                file_name=st.session_state.latest_json_filename,
-                mime="application/json",
-                key="json_download_persistent",
-                help="Download comprehensive JSON with all clip data including scores, recommendations, pros/cons"
-            )
-        
-        # Show a preview of what's in the JSON
-        with st.expander("🔍 Preview JSON Structure"):
-            if st.session_state.latest_json_data:
-                sample_clip = st.session_state.latest_json_data[0]
-                st.markdown("**JSON contains these fields for each approved clip:**")
-                fields = list(sample_clip.keys())
-                
-                # Group fields by category for better display
-                basic_fields = [f for f in fields if f in ['work_order', 'activity_id', 'make', 'vehicle_model', 'contact', 'media_outlet', 'office']]
-                analysis_fields = [f for f in fields if 'score' in f or f in ['sentiment', 'summary', 'recommendation', 'key_mentions', 'brand_alignment']]
-                detail_fields = [f for f in fields if 'note' in f or f in ['pros', 'cons']]
-                date_fields = [f for f in fields if 'date' in f]  # All date-related fields
-                tech_fields = [f for f in fields if f in ['clip_url', 'original_links', 'url_tracking', 'urls_processed', 'urls_successful', 'approval_timestamp']]
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("**Basic Info:**")
-                    for field in basic_fields:
-                        st.markdown(f"• `{field}`")
-                    
-                    st.markdown("**Analysis Results:**")
-                    for field in analysis_fields:
-                        st.markdown(f"• `{field}`")
-                    
-                    st.markdown("**Date Information:**")
-                    for field in date_fields:
-                        st.markdown(f"• `{field}`")
-                
-                with col2:
-                    st.markdown("**Detailed Notes:**")
-                    for field in detail_fields:
-                        st.markdown(f"• `{field}`")
-                    
-                    st.markdown("**Technical Data:**")
-                    for field in tech_fields:
-                        st.markdown(f"• `{field}`")
-                
-                st.markdown(f"**Total approved clips in JSON:** {len(st.session_state.latest_json_data)}")
+
 
 
 
