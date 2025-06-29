@@ -2183,6 +2183,12 @@ with bulk_review_tab:
     if 'total_records_count' not in st.session_state:
         st.session_state.total_records_count = 0
     
+    # Initialize session state for approve/reject tracking (persist across refreshes)
+    if 'approved_records' not in st.session_state:
+        st.session_state.approved_records = set()
+    if 'rejected_records' not in st.session_state:
+        st.session_state.rejected_records = set()
+    
     # Try to load results file
     results_file = os.path.join(project_root, "data", "loan_results.csv")
     if os.path.exists(results_file):
@@ -2375,9 +2381,9 @@ with bulk_review_tab:
                 # Add mark viewed column
                 clean_df['👁️ Mark Viewed'] = False
                 
-                # Add action columns
-                clean_df['✅ Approve'] = False
-                clean_df['❌ Reject'] = False
+                # Add action columns with session state persistence
+                clean_df['✅ Approve'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.approved_records)
+                clean_df['❌ Reject'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.rejected_records)
                 
                 # Create simpler view renderer with better visual feedback
                 cellRenderer_view = JsCode("""
@@ -2450,6 +2456,7 @@ with bulk_review_tab:
                         rowNode.setDataValue('❌ Reject', false);
                       }
                       params.setValue(this.checkbox.checked);
+                      
                       params.api.refreshCells({
                         force: true,
                         columns: ['✅ Approve', '❌ Reject'],
@@ -2495,6 +2502,7 @@ with bulk_review_tab:
                         rowNode.setDataValue('✅ Approve', false);
                       }
                       params.setValue(this.checkbox.checked);
+                      
                       params.api.refreshCells({
                         force: true,
                         columns: ['✅ Approve', '❌ Reject'],
@@ -2779,32 +2787,49 @@ with bulk_review_tab:
                     clean_df,
                     gridOptions=grid_options,
                     allow_unsafe_jscode=True,
-                    update_mode=GridUpdateMode.MODEL_CHANGED,  # Capture checkbox changes automatically
+                    update_mode=GridUpdateMode.MODEL_CHANGED,  # Capture changes but process them carefully
                     height=400,  # Reduced height so action buttons are visible without scrolling
                     fit_columns_on_grid_load=True,
                     theme="alpine",
                     enable_enterprise_modules=True,  # REQUIRED for Set Filters with checkboxes
                     reload_data=False,  # Prevent automatic data reloading
-                    key=f"bulk_review_grid_{len(st.session_state.viewed_records)}"  # Key changes when viewed records change
+                    key="bulk_review_grid_stable"  # Stable key to prevent unnecessary reruns
                 )
                 
-                # Process Mark Viewed button changes to update session state
+                                                # Process grid changes to update session state (debounced to prevent flashing)
                 if selected_rows["data"] is not None and not selected_rows["data"].empty:
                     grid_df = selected_rows["data"]
                     
                     # Update session state based on Mark Viewed button states
                     new_viewed_records = set()
-                    for idx, row in grid_df.iterrows():
-                        if row.get('Viewed', False):
-                            wo_num = str(row.get('WO #', ''))
-                            if wo_num:
-                                new_viewed_records.add(wo_num)
+                    new_approved_records = set()
+                    new_rejected_records = set()
                     
-                    # Only update if there are changes to avoid unnecessary reruns
-                    if new_viewed_records != st.session_state.viewed_records:
-                        st.session_state.viewed_records = new_viewed_records
-                        # Note: We don't rerun here to avoid infinite loops
-                        # The visual changes happen in the grid itself
+                    for idx, row in grid_df.iterrows():
+                        wo_num = str(row.get('WO #', ''))
+                        if not wo_num:
+                            continue
+                            
+                        # Track viewed records
+                        if row.get('Viewed', False):
+                            new_viewed_records.add(wo_num)
+                        
+                        # Track approved records
+                        if row.get('✅ Approve', False):
+                            new_approved_records.add(wo_num)
+                        
+                        # Track rejected records
+                        if row.get('❌ Reject', False):
+                            new_rejected_records.add(wo_num)
+                    
+                    # Silently update session state (avoid reruns that cause flashing)
+                    st.session_state.viewed_records = new_viewed_records
+                    st.session_state.approved_records = new_approved_records
+                    st.session_state.rejected_records = new_rejected_records
+                    
+                    # Also update legacy session state for compatibility
+                    st.session_state.selected_for_approval = new_approved_records.copy()
+                    st.session_state.selected_for_rejection = new_rejected_records.copy()
                 
                 # Initialize session state tracking
                 if 'last_saved_outlets' not in st.session_state:
@@ -2879,6 +2904,10 @@ with bulk_review_tab:
                     st.session_state.selected_for_approval = current_approved_wos.copy()
                     st.session_state.selected_for_rejection = current_rejected_wos.copy()
                     
+                    # Also sync with persistent session state
+                    st.session_state.approved_records = current_approved_wos.copy()
+                    st.session_state.rejected_records = current_rejected_wos.copy()
+                    
                     # Debug: Print session state updates
                     if current_approved_wos or current_rejected_wos:
                         print(f"📊 Session state updated: {len(current_approved_wos)} approved, {len(current_rejected_wos)} rejected")
@@ -2887,6 +2916,7 @@ with bulk_review_tab:
                     # Ensure mutual exclusivity (approve overrides reject)
                     if current_approved_wos:
                         st.session_state.selected_for_rejection -= current_approved_wos
+                        st.session_state.rejected_records -= current_approved_wos
                 
                 # Display persistent messages
                 if hasattr(st.session_state, 'outlet_save_message') and st.session_state.outlet_save_message:
