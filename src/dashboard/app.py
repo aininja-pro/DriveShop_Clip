@@ -2332,22 +2332,54 @@ with bulk_review_tab:
                 # Add viewed status column for styling
                 clean_df['Viewed'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.viewed_records)
                 
-                # Add Published Date column - read directly from current loan_results.csv data
+                # Add Published Date column - improved extraction with multiple fallbacks
                 def get_published_date(row):
+                    """Extract published date with multiple fallback methods"""
                     try:
-                        # Get Published Date directly from the current row data
+                        # Method 1: Try Published Date field first
                         raw_date = row.get('Published Date', '')
                         if pd.notna(raw_date) and str(raw_date).strip() and str(raw_date).lower() not in ['nan', 'none', '']:
-                            # Parse the ISO date string (2025-03-28T00:00:00) and format for display
                             try:
-                                # Parse the datetime string
                                 import dateutil.parser
                                 parsed_date = dateutil.parser.parse(str(raw_date))
-                                # Format as readable date (Mar 28, 2025)
                                 return parsed_date.strftime('%b %d, %Y')
                             except:
-                                # If parsing fails, return the raw string
-                                return str(raw_date).strip()
+                                pass
+                        
+                        # Method 2: Try to extract from URL if it contains date patterns
+                        url = row.get('Clip URL', '')
+                        if url:
+                            import re
+                            # Look for year/month/day patterns in URL
+                            date_patterns = [
+                                r'/(\d{4})/(\d{1,2})/(\d{1,2})/',  # /2024/12/25/
+                                r'/(\d{4})-(\d{1,2})-(\d{1,2})',    # /2024-12-25
+                                r'_(\d{4})(\d{2})(\d{2})',          # _20241225
+                            ]
+                            for pattern in date_patterns:
+                                match = re.search(pattern, url)
+                                if match:
+                                    try:
+                                        year, month, day = match.groups()
+                                        from datetime import datetime
+                                        date_obj = datetime(int(year), int(month), int(day))
+                                        return date_obj.strftime('%b %d, %Y')
+                                    except:
+                                        continue
+                        
+                        # Method 3: Use processed date as fallback if recent
+                        processed_date = row.get('Processed Date', '')
+                        if processed_date:
+                            try:
+                                import dateutil.parser
+                                from datetime import datetime, timedelta
+                                parsed_date = dateutil.parser.parse(str(processed_date))
+                                # Only use if within last 30 days (likely recent article)
+                                if (datetime.now() - parsed_date).days <= 30:
+                                    return parsed_date.strftime('%b %d, %Y')
+                            except:
+                                pass
+                        
                         return "—"
                     except:
                         return "—"
@@ -2355,23 +2387,85 @@ with bulk_review_tab:
                 clean_df['📅 Published Date'] = display_df.apply(get_published_date, axis=1)
                 
                 # ===== NEW: Add Attribution Information columns =====
+                def smart_attribution_analysis(row):
+                    """Determine attribution strength using smart comparison logic"""
+                    try:
+                        contact_person = str(row.get('To', '')).strip()
+                        actual_byline = str(row.get('Actual_Byline', '')).strip()
+                        affiliation = str(row.get('Affiliation', '')).strip()
+                        
+                        # Clean up names for comparison (remove titles, normalize spaces)
+                        import re
+                        def normalize_name(name):
+                            if not name or name.lower() in ['nan', 'none', '']:
+                                return ''
+                            # Remove common titles and normalize
+                            name = re.sub(r'\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr)\.?\b', '', name, flags=re.IGNORECASE)
+                            name = re.sub(r'\s+', ' ', name).strip()
+                            return name.lower()
+                        
+                        contact_normalized = normalize_name(contact_person)
+                        byline_normalized = normalize_name(actual_byline)
+                        
+                        # Strong attribution: Contact person matches article byline
+                        if contact_normalized and byline_normalized:
+                            # Check for exact match or partial match (handle middle names, etc.)
+                            if contact_normalized == byline_normalized:
+                                return 'strong', actual_byline
+                            # Check if one name is contained in the other (e.g., "John Smith" vs "John A. Smith")
+                            elif contact_normalized in byline_normalized or byline_normalized in contact_normalized:
+                                return 'strong', actual_byline
+                        
+                        # Delegated: We have a contact person but different/no byline author
+                        if contact_normalized and (not byline_normalized or byline_normalized != contact_normalized):
+                            # Use the actual byline if available, otherwise mark as delegated content
+                            return 'delegated', actual_byline if actual_byline else 'Staff/Contributor'
+                        
+                        # Unknown: No clear attribution info
+                        return 'unknown', actual_byline if actual_byline else '—'
+                    
+                    except Exception as e:
+                        print(f"Attribution analysis error: {e}")
+                        return 'unknown', '—'
+
                 def format_attribution_strength(row):
-                    """Format attribution strength for display"""
-                    attribution = row.get('Attribution_Strength', 'unknown')
-                    if attribution == 'strong':
+                    """Format attribution strength for display with smart logic"""
+                    attribution_strength, _ = smart_attribution_analysis(row)
+                    
+                    if attribution_strength == 'strong':
                         return '✅ Direct'
-                    elif attribution == 'delegated':
+                    elif attribution_strength == 'delegated':
                         return '⚠️ Delegated'
                     else:
                         return '❓ Unknown'
-                
+
                 def get_actual_byline(row):
-                    """Get actual byline author if available"""
-                    byline = row.get('Actual_Byline', '')
-                    if byline and str(byline).strip() and str(byline).lower() not in ['nan', 'none', '']:
-                        return str(byline).strip()
-                    return '—'
-                
+                    """Get actual byline author with smart fallbacks"""
+                    try:
+                        _, byline_author = smart_attribution_analysis(row)
+                        
+                        # If we still don't have a byline, try additional fallbacks
+                        if not byline_author or byline_author in ['—', 'Staff/Contributor']:
+                            # Fallback 1: Use contact person if available
+                            contact_person = str(row.get('To', '')).strip()
+                            if contact_person and contact_person.lower() not in ['nan', 'none', '']:
+                                return f"{contact_person} (Contact)"
+                            
+                            # Fallback 2: Try to extract from summary or content if available
+                            summary = str(row.get('Summary', ''))
+                            if 'by ' in summary.lower():
+                                import re
+                                author_match = re.search(r'by\s+([A-Za-z\s\.]+)', summary, re.IGNORECASE)
+                                if author_match:
+                                    potential_author = author_match.group(1).strip()
+                                    if len(potential_author) > 2 and len(potential_author) < 50:  # Reasonable author name length
+                                        return potential_author
+                    
+                        return byline_author if byline_author else '—'
+                    
+                    except:
+                        return '—'
+
                 clean_df['✍️ Attribution'] = display_df.apply(format_attribution_strength, axis=1)
                 clean_df['📝 Byline Author'] = display_df.apply(get_actual_byline, axis=1)
                 
@@ -3003,7 +3097,6 @@ with bulk_review_tab:
                 
                 # Close sticky action bar container
                 st.markdown('</div>', unsafe_allow_html=True)
-
                 
                 # Approval confirmation dialog
                 if st.session_state.get('show_approval_dialog', False):
@@ -3222,59 +3315,72 @@ with bulk_review_tab:
                             # Process the rejections
                             selected_rejected_wos = st.session_state.selected_for_rejection
                             if selected_rejected_wos:
-                                rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
-                                selected_rejected_rows = df[df['WO #'].astype(str).isin(selected_rejected_wos)]
-                                
-                                # Prepare rejected records with proper format
-                                rejected_records = []
-                                for _, row in selected_rejected_rows.iterrows():
-                                    rejected_record = {
-                                        'WO #': str(row.get('WO #', '')),
-                                        'Activity_ID': str(row.get('Activity_ID', '')),
-                                        'Make': str(row.get('Make', '')),
-                                        'Model': str(row.get('Model', '')),
-                                        'To': str(row.get('To', '')),
-                                        'Affiliation': str(row.get('Affiliation', '')),
-                                        'Office': str(row.get('Office', '')),
-                                        'Links': str(row.get('Links', '')),
-                                        'URLs_Processed': row.get('URLs_Processed', 0),
-                                        'URLs_Successful': row.get('URLs_Successful', 0),
-                                        'Rejection_Reason': 'Manual rejection by reviewer',
-                                        'URL_Details': str(row.get('URL_Tracking', '')),
-                                        'Processed_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                        'Loan_Start_Date': str(row.get('Start Date', ''))
-                                    }
-                                    rejected_records.append(rejected_record)
-                                
-                                # Save to rejected clips CSV
-                                if os.path.exists(rejected_file):
-                                    # Load existing rejected records and append
-                                    existing_rejected_df = pd.read_csv(rejected_file)
-                                    if 'WO #' in existing_rejected_df.columns:
-                                        existing_rejected_df['WO #'] = existing_rejected_df['WO #'].astype(str)
-                                    # Only add rows that aren't already rejected
-                                    new_rejected_df = pd.DataFrame(rejected_records)
-                                    new_rejected_df['WO #'] = new_rejected_df['WO #'].astype(str)
-                                    new_rows = new_rejected_df[~new_rejected_df['WO #'].isin(existing_rejected_df['WO #'])]
-                                    if not new_rows.empty:
-                                        combined_rejected_df = pd.concat([existing_rejected_df, new_rows], ignore_index=True)
-                                        combined_rejected_df.to_csv(rejected_file, index=False)
-                                else:
-                                    # Create new rejected file
-                                    pd.DataFrame(rejected_records).to_csv(rejected_file, index=False)
-                                
-                                # Remove rejected records from the main results file
-                                # This makes them disappear from Bulk Review table
-                                remaining_df = df[~df['WO #'].astype(str).isin(selected_rejected_wos)]
-                                remaining_df.to_csv(results_file, index=False)
-                                
-                                st.success(f"❌ Successfully rejected {len(selected_rejected_wos)} clips!")
-                                st.info("📁 **Rejected clips moved to Rejected/Issues tab**")
-                                
-                                # Clear selections and dialog
-                                st.session_state.selected_for_rejection = set()
-                                st.session_state.show_rejection_dialog = False
-                                st.rerun()
+                                try:
+                                    rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
+                                    selected_rejected_rows = df[df['WO #'].astype(str).isin(selected_rejected_wos)]
+                                    
+                                    # Prepare rejected records with proper format
+                                    rejected_records = []
+                                    for _, row in selected_rejected_rows.iterrows():
+                                        rejected_record = {
+                                            'WO #': str(row.get('WO #', '')),
+                                            'Activity_ID': str(row.get('Activity_ID', '')),
+                                            'Make': str(row.get('Make', '')),
+                                            'Model': str(row.get('Model', '')),
+                                            'To': str(row.get('To', '')),
+                                            'Affiliation': str(row.get('Affiliation', '')),
+                                            'Office': str(row.get('Office', '')),
+                                            'Links': str(row.get('Links', '')),
+                                            'URLs_Processed': row.get('URLs_Processed', 0),
+                                            'URLs_Successful': row.get('URLs_Successful', 0),
+                                            'Rejection_Reason': 'Manual rejection by reviewer',
+                                            'URL_Details': str(row.get('URL_Tracking', '')),
+                                            'Processed_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                            'Loan_Start_Date': str(row.get('Start Date', ''))
+                                        }
+                                        rejected_records.append(rejected_record)
+                                    
+                                    # Save to rejected clips CSV
+                                    if os.path.exists(rejected_file):
+                                        # Load existing rejected records and append
+                                        existing_rejected_df = pd.read_csv(rejected_file)
+                                        if 'WO #' in existing_rejected_df.columns:
+                                            existing_rejected_df['WO #'] = existing_rejected_df['WO #'].astype(str)
+                                        # Only add rows that aren't already rejected
+                                        new_rejected_df = pd.DataFrame(rejected_records)
+                                        new_rejected_df['WO #'] = new_rejected_df['WO #'].astype(str)
+                                        new_rows = new_rejected_df[~new_rejected_df['WO #'].isin(existing_rejected_df['WO #'])]
+                                        if not new_rows.empty:
+                                            combined_rejected_df = pd.concat([existing_rejected_df, new_rows], ignore_index=True)
+                                            combined_rejected_df.to_csv(rejected_file, index=False)
+                                    else:
+                                        # Create new rejected file
+                                        pd.DataFrame(rejected_records).to_csv(rejected_file, index=False)
+                                    
+                                    # Remove rejected records from the main results file
+                                    # This makes them disappear from Bulk Review table
+                                    remaining_df = df[~df['WO #'].astype(str).isin(selected_rejected_wos)]
+                                    remaining_df.to_csv(results_file, index=False)
+                                    
+                                    st.success(f"❌ Successfully rejected {len(selected_rejected_wos)} clips!")
+                                    st.info("📁 **Rejected clips moved to Rejected/Issues tab**")
+                                    
+                                    # Clear selections and dialog (both new and legacy tracking)
+                                    st.session_state.selected_for_rejection = set()
+                                    st.session_state.rejected_records = set()  # Clear new tracking too
+                                    st.session_state.show_rejection_dialog = False
+                                    
+                                    # Also clear any approved selections for the rejected items
+                                    st.session_state.approved_records -= selected_rejected_wos
+                                    st.session_state.selected_for_approval -= selected_rejected_wos
+                                    
+                                    st.rerun()
+                                    
+                                except Exception as e:
+                                    st.error(f"Error processing rejection: {e}")
+                                    print(f"Rejection error: {e}")
+                                    # Clear dialog even on error
+                                    st.session_state.show_rejection_dialog = False
                     
                     with col_cancel:
                         if st.button("❌ Cancel Rejection", key="cancel_rejection_btn"):
@@ -3323,6 +3429,9 @@ with bulk_review_tab:
                     key="json_download_persistent",
                     help="Download comprehensive JSON with all clip data including scores, recommendations, pros/cons"
                 )
+    
+    # Add bottom padding to prevent UI elements from touching the bottom (CORRECTLY PLACED)
+    st.markdown('<div style="height: 100px;"></div>', unsafe_allow_html=True)
 
 
 
