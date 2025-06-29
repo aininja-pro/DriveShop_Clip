@@ -2177,6 +2177,12 @@ with creatoriq_tab:
 # ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_review_tab:
     
+    # Initialize session state for viewed records tracking
+    if 'viewed_records' not in st.session_state:
+        st.session_state.viewed_records = set()
+    if 'total_records_count' not in st.session_state:
+        st.session_state.total_records_count = 0
+    
     # Try to load results file
     results_file = os.path.join(project_root, "data", "loan_results.csv")
     if os.path.exists(results_file):
@@ -2188,6 +2194,10 @@ with bulk_review_tab:
                 df['WO #'] = df['WO #'].astype(str)
             
             if not df.empty:
+                # Update total records count for progress tracking
+                st.session_state.total_records_count = len(df)
+                
+
                 # Quick stats overview 
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
@@ -2312,9 +2322,9 @@ with bulk_review_tab:
                     clean_df['📄 View'] = 'No URL found'
                 
                 # ===== NEW: Add URL tracking columns =====
-
                 
-
+                # Add viewed status column for styling
+                clean_df['Viewed'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.viewed_records)
                 
                 # Add Published Date column - read directly from current loan_results.csv data
                 def get_published_date(row):
@@ -2362,21 +2372,45 @@ with bulk_review_tab:
                 # Store the full URL tracking data for popup (hidden column)
                 clean_df['URL_Tracking_Data'] = display_df.apply(lambda row: json.dumps(parse_url_tracking(row)), axis=1)
                 
+                # Add mark viewed column
+                clean_df['👁️ Mark Viewed'] = False
+                
                 # Add action columns
                 clean_df['✅ Approve'] = False
                 clean_df['❌ Reject'] = False
                 
-                # Create the cellRenderer with proper JavaScript
+                # Create simpler view renderer with better visual feedback
                 cellRenderer_view = JsCode("""
                 class UrlCellRenderer {
                   init(params) {
-                    this.eGui = document.createElement('a');
-                    this.eGui.innerText = '📄 View';
-                    this.eGui.href = params.data['Clip URL'];
-                    this.eGui.target = '_blank';
-                    this.eGui.style.color = '#1f77b4';
-                    this.eGui.style.textDecoration = 'underline';
-                    this.eGui.style.cursor = 'pointer';
+                    const isViewed = params.data['Viewed'];
+                    
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.display = 'flex';
+                    this.eGui.style.alignItems = 'center';
+                    this.eGui.style.gap = '5px';
+                    
+                    // Add checkmark for viewed records
+                    if (isViewed) {
+                      const checkmark = document.createElement('span');
+                      checkmark.innerHTML = '✓ ';
+                      checkmark.style.color = '#28a745';
+                      checkmark.style.fontWeight = 'bold';
+                      checkmark.style.fontSize = '12px';
+                      this.eGui.appendChild(checkmark);
+                    }
+                    
+                    // Create the link
+                    this.link = document.createElement('a');
+                    this.link.innerText = '📄 View';
+                    this.link.href = params.data['Clip URL'];
+                    this.link.target = '_blank';
+                    this.link.style.color = isViewed ? '#6c757d' : '#1f77b4';
+                    this.link.style.textDecoration = 'underline';
+                    this.link.style.cursor = 'pointer';
+                    this.link.style.opacity = isViewed ? '0.7' : '1';
+                    
+                    this.eGui.appendChild(this.link);
                   }
 
                   getGui() {
@@ -2384,7 +2418,10 @@ with bulk_review_tab:
                   }
 
                   refresh(params) {
-                    return false;
+                    const isViewed = params.data['Viewed'];
+                    this.link.style.color = isViewed ? '#6c757d' : '#1f77b4';
+                    this.link.style.opacity = isViewed ? '0.7' : '1';
+                    return true;
                   }
                 }
                 """)
@@ -2479,8 +2516,66 @@ with bulk_review_tab:
                 }
                 """)
                 
+                # Create Mark Viewed button renderer
+                cellRenderer_mark_viewed = JsCode("""
+                class MarkViewedRenderer {
+                  init(params) {
+                    const isViewed = params.data['Viewed'];
+                    
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.display = 'flex';
+                    this.eGui.style.justifyContent = 'center';
+                    this.eGui.style.alignItems = 'center';
+                    this.eGui.style.height = '100%';
+                    
+                    this.button = document.createElement('button');
+                    this.button.innerHTML = isViewed ? '✓ Viewed' : '👁️ Mark';
+                    this.button.style.padding = '4px 8px';
+                    this.button.style.fontSize = '11px';
+                    this.button.style.border = '1px solid #ccc';
+                    this.button.style.borderRadius = '4px';
+                    this.button.style.cursor = 'pointer';
+                    this.button.style.backgroundColor = isViewed ? '#d4edda' : '#f8f9fa';
+                    this.button.style.color = isViewed ? '#155724' : '#495057';
+                    
+                    this.button.addEventListener('click', () => {
+                      const newValue = !params.data['Viewed'];
+                      params.setValue(newValue);
+                      
+                      // Update the row data
+                      params.node.setDataValue('Viewed', newValue);
+                      
+                      // Update button appearance
+                      this.button.innerHTML = newValue ? '✓ Viewed' : '👁️ Mark';
+                      this.button.style.backgroundColor = newValue ? '#d4edda' : '#f8f9fa';
+                      this.button.style.color = newValue ? '#155724' : '#495057';
+                      
+                      // Refresh the entire row to update styling
+                      params.api.refreshCells({
+                        force: true,
+                        rowNodes: [params.node]
+                      });
+                    });
+                    
+                    this.eGui.appendChild(this.button);
+                  }
 
+                  getGui() {
+                    return this.eGui;
+                  }
+
+                  refresh(params) {
+                    const isViewed = params.data['Viewed'];
+                    this.button.innerHTML = isViewed ? '✓ Viewed' : '👁️ Mark';
+                    this.button.style.backgroundColor = isViewed ? '#d4edda' : '#f8f9fa';
+                    this.button.style.color = isViewed ? '#155724' : '#495057';
+                    return true;
+                  }
+                }
+                """)
                 
+
+
                 # Configure the grid
                 gb = GridOptionsBuilder.from_dataframe(clean_df)
                 
@@ -2506,6 +2601,7 @@ with bulk_review_tab:
                 # Hide the original URL column and tracking data
                 gb.configure_column("Clip URL", hide=True)
                 gb.configure_column("URL_Tracking_Data", hide=True)
+                gb.configure_column("Viewed", hide=True)  # Hide the viewed status column
                 
                 # Configure the View column with the custom renderer
                 gb.configure_column(
@@ -2516,10 +2612,22 @@ with bulk_review_tab:
                     filter=False
                 )
                 
+                # Add row styling for viewed records with better visibility
+                gb.configure_grid_options(
+                    getRowStyle=JsCode("""
+                    function(params) {
+                        if (params.data.Viewed === true) {
+                            return {
+                                'background-color': '#e8f5e8',
+                                'border-left': '4px solid #28a745',
+                                'opacity': '0.85'
+                            };
+                        }
+                        return {};
+                    }
+                    """)
+                )
 
-                
-
-                
                 # Configure selection
                 gb.configure_selection(selection_mode="multiple", use_checkbox=False)
                 
@@ -2634,6 +2742,17 @@ with bulk_review_tab:
                     # Apply outlet options to each row
                     clean_df = clean_df.apply(add_outlet_options, axis=1)
                 
+                # Configure Mark Viewed button column
+                gb.configure_column(
+                    "👁️ Mark Viewed",
+                    cellRenderer=cellRenderer_mark_viewed,
+                    width=110,
+                    editable=True,
+                    sortable=False,
+                    filter=False,
+                    pinned='left'  # Keep it visible when scrolling
+                )
+                
                 # Configure Approve and Reject columns with checkbox renderers
                 gb.configure_column(
                     "✅ Approve", 
@@ -2665,15 +2784,29 @@ with bulk_review_tab:
                     fit_columns_on_grid_load=True,
                     theme="alpine",
                     enable_enterprise_modules=True,  # REQUIRED for Set Filters with checkboxes
-                    reload_data=False  # Prevent automatic data reloading
+                    reload_data=False,  # Prevent automatic data reloading
+                    key=f"bulk_review_grid_{len(st.session_state.viewed_records)}"  # Key changes when viewed records change
                 )
                 
-
+                # Process Mark Viewed button changes to update session state
+                if selected_rows["data"] is not None and not selected_rows["data"].empty:
+                    grid_df = selected_rows["data"]
+                    
+                    # Update session state based on Mark Viewed button states
+                    new_viewed_records = set()
+                    for idx, row in grid_df.iterrows():
+                        if row.get('Viewed', False):
+                            wo_num = str(row.get('WO #', ''))
+                            if wo_num:
+                                new_viewed_records.add(wo_num)
+                    
+                    # Only update if there are changes to avoid unnecessary reruns
+                    if new_viewed_records != st.session_state.viewed_records:
+                        st.session_state.viewed_records = new_viewed_records
+                        # Note: We don't rerun here to avoid infinite loops
+                        # The visual changes happen in the grid itself
                 
-                # Process AgGrid changes
-                changed_df = selected_rows["data"]
-                
-                # Initialize session state for tracking
+                # Initialize session state tracking
                 if 'last_saved_outlets' not in st.session_state:
                     st.session_state.last_saved_outlets = {}
                 if 'selected_for_approval' not in st.session_state:
@@ -2684,10 +2817,10 @@ with bulk_review_tab:
                     st.session_state.show_rejection_dialog = False
                 
                 # Process changes from AgGrid WITHOUT triggering reruns
-                if not changed_df.empty:
+                if not selected_rows["data"].empty:
                     # Debug: Print current checkbox states
-                    approved_rows = changed_df[changed_df['✅ Approve'] == True]
-                    rejected_rows = changed_df[changed_df['❌ Reject'] == True]
+                    approved_rows = selected_rows["data"][selected_rows["data"]["✅ Approve"] == True]
+                    rejected_rows = selected_rows["data"][selected_rows["data"]["❌ Reject"] == True]
                     if not approved_rows.empty or not rejected_rows.empty:
                         print(f"🔍 Checkbox changes detected: {len(approved_rows)} approved, {len(rejected_rows)} rejected")
                     
@@ -2696,7 +2829,7 @@ with bulk_review_tab:
                     changed_count = 0
                     changed_wos = []
                     
-                    for idx, row in changed_df.iterrows():
+                    for idx, row in selected_rows["data"].iterrows():
                         wo_num = str(row.get('WO #', ''))
                         new_outlet = row.get('Media Outlet', '')
                         
@@ -2734,8 +2867,8 @@ with bulk_review_tab:
                             print(f"❌ Error saving changes: {e}")
                     
                     # 2. Then handle approval/rejection checkboxes (stable tracking)
-                    approved_rows = changed_df[changed_df['✅ Approve'] == True]
-                    rejected_rows = changed_df[changed_df['❌ Reject'] == True]
+                    approved_rows = selected_rows["data"][selected_rows["data"]["✅ Approve"] == True]
+                    rejected_rows = selected_rows["data"][selected_rows["data"]["❌ Reject"] == True]
                     
                     # Get current checkbox states
                     current_approved_wos = set(approved_rows['WO #'].astype(str))
