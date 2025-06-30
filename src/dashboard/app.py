@@ -3541,6 +3541,8 @@ with rejected_tab:
 
                 # Configure AgGrid for rejected records (no pagination for full transparency)
                 gb = GridOptionsBuilder.from_dataframe(clean_df[display_columns])
+                # Enable row selection for moving records back to Bulk Review
+                gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
                 # Removed pagination to show all rejected records at once
                 gb.configure_side_bar()
                 gb.configure_default_column(
@@ -3602,6 +3604,108 @@ with rejected_tab:
                     enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
                 )
                 
+                # NEW: Move Back to Review functionality
+                try:
+                    # Get selected rows from AgGrid
+                    selected_rows = selected_rejected.get('selected_rows')
+                    
+                    # Check if DataFrame has any selected rows
+                    if selected_rows is not None and not selected_rows.empty:
+                        # Extract WO numbers from selected rows (DataFrame)
+                        selected_wo_numbers = []
+                        for _, row in selected_rows.iterrows():
+                            if 'WO #' in row:
+                                selected_wo_numbers.append(str(row['WO #']))
+                        
+                        if selected_wo_numbers:
+                            st.markdown("---")
+                            col_info, col_action = st.columns([2, 1])
+                            
+                            with col_info:
+                                st.info(f"📝 **{len(selected_wo_numbers)} rejected records selected for review:**\n" + 
+                                       ", ".join([f"WO#{wo}" for wo in selected_wo_numbers[:5]]) + 
+                                       (f" and {len(selected_wo_numbers)-5} more..." if len(selected_wo_numbers) > 5 else ""))
+                            
+                            with col_action:
+                                if st.button("🔄 Move Back to Bulk Review", type="primary", key="move_back_to_review"):
+                                    try:
+                                        # Get the corresponding rows from rejected_df (original data with all columns)
+                                        rows_to_move = rejected_df[rejected_df['WO #'].astype(str).isin(selected_wo_numbers)]
+                                        
+                                        if not rows_to_move.empty:
+                                            # Prepare the data for loan_results.csv (convert rejected format back to loan format)
+                                            restored_loans = []
+                                            for _, row in rows_to_move.iterrows():
+                                                # Convert rejected record back to loan record format
+                                                # This removes rejection-specific fields and restores original loan data
+                                                loan_record = {
+                                                    'WO #': str(row.get('WO #', '')),
+                                                    'Activity_ID': str(row.get('Activity_ID', '')),
+                                                    'Make': str(row.get('Make', '')),
+                                                    'Model': str(row.get('Model', '')),
+                                                    'To': str(row.get('To', '')),
+                                                    'Affiliation': str(row.get('Affiliation', '')),
+                                                    'Office': str(row.get('Office', '')),
+                                                    'Links': str(row.get('Links', '')),
+                                                    'URLs_Processed': row.get('URLs_Processed', 0),
+                                                    'URLs_Successful': row.get('URLs_Successful', 0),
+                                                    # Add default values for fields that would exist in loan_results.csv
+                                                    'Relevance Score': 0,  # Will need re-processing
+                                                    'Overall Score': 0,
+                                                    'Sentiment': 'neutral',
+                                                    'Overall Sentiment': 'neutral',
+                                                    'Summary': 'Restored from rejected - needs re-review',
+                                                    'Brand Alignment': False,
+                                                    'Recommendation': 'Needs manual review after restoration',
+                                                    'Processed Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                                    'URL_Tracking': str(row.get('URL_Details', '')),
+                                                    'Clip URL': '',  # Will be empty until re-processed
+                                                    'Published Date': '',
+                                                    'Attribution_Strength': 'unknown',
+                                                    'Actual_Byline': ''
+                                                }
+                                                restored_loans.append(loan_record)
+                                            
+                                            # Add back to loan_results.csv
+                                            results_file = os.path.join(project_root, "data", "loan_results.csv")
+                                            if os.path.exists(results_file):
+                                                # Load existing results and append
+                                                existing_results_df = pd.read_csv(results_file)
+                                                if 'WO #' in existing_results_df.columns:
+                                                    existing_results_df['WO #'] = existing_results_df['WO #'].astype(str)
+                                                
+                                                # Only add rows that aren't already in loan_results
+                                                new_loans_df = pd.DataFrame(restored_loans)
+                                                new_loans_df['WO #'] = new_loans_df['WO #'].astype(str)
+                                                new_rows = new_loans_df[~new_loans_df['WO #'].isin(existing_results_df['WO #'])]
+                                                
+                                                if not new_rows.empty:
+                                                    combined_results_df = pd.concat([existing_results_df, new_rows], ignore_index=True)
+                                                    combined_results_df.to_csv(results_file, index=False)
+                                            else:
+                                                # Create new results file with restored loans
+                                                pd.DataFrame(restored_loans).to_csv(results_file, index=False)
+                                            
+                                            # Remove from rejected_clips.csv
+                                            remaining_rejected_df = rejected_df[~rejected_df['WO #'].astype(str).isin(selected_wo_numbers)]
+                                            remaining_rejected_df.to_csv(rejected_file, index=False)
+                                            
+                                            # Clear any related session state
+                                            if hasattr(st.session_state, 'rejected_records'):
+                                                st.session_state.rejected_records -= set(selected_wo_numbers)
+                                            
+                                            st.success(f"✅ Successfully moved {len(selected_wo_numbers)} records back to Bulk Review!")
+                                            st.info("📁 **These records are now available in the Bulk Review tab for re-evaluation**")
+                                            st.rerun()
+                                            
+                                    except Exception as e:
+                                        st.error(f"Error moving records back to review: {e}")
+                                        print(f"Move back error: {e}")
+                
+                except Exception as e:
+                    st.error(f"Error processing selection: {e}")
+                    print(f"Selection error: {e}")
+                
                 # Export rejected records option
                 st.markdown("---")
                 col1, col2, col3 = st.columns(3)
@@ -3658,6 +3762,9 @@ with rejected_tab:
             st.error(f"Error loading rejected records: {e}")
     else:
         st.info("No rejected records file found. Process loans to see transparency data.")
+    
+    # Add bottom padding to prevent error messages from touching the bottom (CORRECTLY PLACED)
+    st.markdown('<div style="height: 100px;"></div>', unsafe_allow_html=True)
 
 # ========== DETAILED ANALYSIS TAB (Existing 40/60 Interface) ==========
 with analysis_tab:
