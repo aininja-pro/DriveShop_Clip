@@ -2203,6 +2203,10 @@ with bulk_review_tab:
                 # Update total records count for progress tracking
                 st.session_state.total_records_count = len(df)
                 
+                # Show rejection success message if flagged
+                if st.session_state.get('rejection_success', False):
+                    st.success("✅ Record successfully rejected and moved to Rejected/Issues tab!")
+                    st.session_state.rejection_success = False  # Clear the flag
 
                 # Quick stats overview 
                 col1, col2, col3, col4 = st.columns(4)
@@ -3316,12 +3320,20 @@ with bulk_review_tab:
                             selected_rejected_wos = st.session_state.selected_for_rejection
                             if selected_rejected_wos:
                                 try:
+                                    # Reload the DataFrame to ensure it's in scope
+                                    results_file = os.path.join(project_root, "data", "loan_results.csv")
+                                    df = pd.read_csv(results_file)
+                                    df['WO #'] = df['WO #'].astype(str)
+                                    
                                     rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
                                     selected_rejected_rows = df[df['WO #'].astype(str).isin(selected_rejected_wos)]
                                     
                                     # Prepare rejected records with proper format
                                     rejected_records = []
                                     for _, row in selected_rejected_rows.iterrows():
+                                        # Get office value for rejection record
+                                        office_value = row.get('Office', '')
+                                        
                                         rejected_record = {
                                             'WO #': str(row.get('WO #', '')),
                                             'Activity_ID': str(row.get('Activity_ID', '')),
@@ -3329,14 +3341,17 @@ with bulk_review_tab:
                                             'Model': str(row.get('Model', '')),
                                             'To': str(row.get('To', '')),
                                             'Affiliation': str(row.get('Affiliation', '')),
-                                            'Office': str(row.get('Office', '')),
+                                            'Office': str(office_value),  # Use the debug variable
                                             'Links': str(row.get('Links', '')),
                                             'URLs_Processed': row.get('URLs_Processed', 0),
                                             'URLs_Successful': row.get('URLs_Successful', 0),
                                             'Rejection_Reason': 'Manual rejection by reviewer',
                                             'URL_Details': str(row.get('URL_Tracking', '')),
                                             'Processed_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                            'Loan_Start_Date': str(row.get('Start Date', ''))
+                                            'Loan_Start_Date': str(row.get('Start Date', '')),
+                                            # PRESERVE the original working Clip URL and relevance score for move-back
+                                            'Original_Clip_URL': str(row.get('Clip URL', '')),
+                                            'Original_Relevance_Score': row.get('Relevance Score', 5)
                                         }
                                         rejected_records.append(rejected_record)
                                     
@@ -3362,9 +3377,6 @@ with bulk_review_tab:
                                     remaining_df = df[~df['WO #'].astype(str).isin(selected_rejected_wos)]
                                     remaining_df.to_csv(results_file, index=False)
                                     
-                                    st.success(f"❌ Successfully rejected {len(selected_rejected_wos)} clips!")
-                                    st.info("📁 **Rejected clips moved to Rejected/Issues tab**")
-                                    
                                     # Clear selections and dialog (both new and legacy tracking)
                                     st.session_state.selected_for_rejection = set()
                                     st.session_state.rejected_records = set()  # Clear new tracking too
@@ -3374,13 +3386,24 @@ with bulk_review_tab:
                                     st.session_state.approved_records -= selected_rejected_wos
                                     st.session_state.selected_for_approval -= selected_rejected_wos
                                     
+                                    # Force a cache clear and state refresh to ensure AgGrid updates
+                                    if hasattr(st, 'cache_data'):
+                                        st.cache_data.clear()
+                                    
+                                    # Set a flag to indicate successful rejection for next page load
+                                    st.session_state.rejection_success = True
+                                    
+                                    # Immediate rerun without messages to update the UI
                                     st.rerun()
                                     
                                 except Exception as e:
                                     st.error(f"Error processing rejection: {e}")
                                     print(f"Rejection error: {e}")
+                                    import traceback
+                                    print(f"Full traceback: {traceback.format_exc()}")
                                     # Clear dialog even on error
                                     st.session_state.show_rejection_dialog = False
+                                    st.rerun()  # Force rerun even on error
                     
                     with col_cancel:
                         if st.button("❌ Cancel Rejection", key="cancel_rejection_btn"):
@@ -3480,15 +3503,60 @@ with rejected_tab:
                 if 'Office' in rejected_df.columns:
                     pass  # Keep original name
                 
-                # Extract the searched URL from URL_Details for the View column
+                # Extract the searched URL from URL_Details for the View column  
                 def extract_searched_url(url_details):
-                    """Extract the main URL that was searched from URL_Details"""
+                    """Extract the original source URL from URL_Details (handles both JSON and old string format)"""
                     if pd.isna(url_details) or not url_details:
                         return ""
                     
-                    # Split by colon and take the first part (the URL)
-                    url_part = str(url_details).split(':')[0].strip()
-                    return url_part
+                    url_details_str = str(url_details).strip()
+                    print(f"DEBUG: Rejected View Link - Processing URL_Details: {url_details_str[:100]}...")
+                    
+                    # First try JSON parsing (new format)
+                    try:
+                        import json
+                        url_data = json.loads(url_details_str)
+                        
+                        if isinstance(url_data, list) and len(url_data) > 0:
+                            # For rejected records, we want the ORIGINAL source URL (not the found clip)
+                            first_entry = url_data[0]
+                            if isinstance(first_entry, dict) and 'original_url' in first_entry:
+                                original_url = first_entry['original_url']
+                                print(f"DEBUG: Successfully extracted original_url from JSON: {original_url}")
+                                return original_url
+                    except (json.JSONDecodeError, KeyError, TypeError):
+                        # Not JSON format, continue to old string parsing
+                        pass
+                    
+                    # Handle OLD string format used by rejected records
+                    # Format: "https://example.com: status; https://example2.com: status"
+                    print(f"DEBUG: Using old string format parsing for: {url_details_str}")
+                    
+                    # Split by semicolon to get individual URL entries
+                    url_entries = url_details_str.split(';')
+                    
+                    for entry in url_entries:
+                        entry = entry.strip()
+                        if entry:
+                            # Split by first colon to separate URL from status
+                            if ':' in entry:
+                                # Find the URL part (everything before " :")
+                                colon_pos = entry.find(': ')
+                                if colon_pos > 0:
+                                    url_part = entry[:colon_pos].strip()
+                                    # Validate it looks like a URL
+                                    if url_part.startswith(('http://', 'https://')):
+                                        print(f"DEBUG: Successfully extracted URL from old format: {url_part}")
+                                        return url_part
+                            else:
+                                # No colon, treat entire entry as URL
+                                if entry.startswith(('http://', 'https://')):
+                                    print(f"DEBUG: Successfully extracted URL (no status): {entry}")
+                                    return entry
+                    
+                    # Final fallback - return the original string if no parsing worked
+                    print(f"DEBUG: No valid URL found, returning original string: {url_details_str}")
+                    return url_details_str
                 
                 # Add the View column with the searched URL
                 clean_df['Searched URL'] = clean_df['URL_Details'].apply(extract_searched_url) if 'URL_Details' in clean_df.columns else ""
@@ -3633,11 +3701,85 @@ with rejected_tab:
                                         rows_to_move = rejected_df[rejected_df['WO #'].astype(str).isin(selected_wo_numbers)]
                                         
                                         if not rows_to_move.empty:
-                                            # Prepare the data for loan_results.csv (convert rejected format back to loan format)
+                                            # Extract the original working URL from URL_Details for the View link
+                                            # URL_Details contains the original URL that was successfully crawled
                                             restored_loans = []
                                             for _, row in rows_to_move.iterrows():
+                                                # Debug: Print URL_Details to understand the format
+                                                url_details = str(row.get('URL_Details', ''))
+                                                print(f"DEBUG: Moving back WO#{row.get('WO #', 'Unknown')}, URL_Details: '{url_details[:200]}...'")
+                                                
+                                                # Parse structure to extract found clip URL and original relevance
+                                                original_clip_url = ""
+                                                original_relevance_score = 7  # Better default for moved-back items
+                                                
+                                                # FIRST: Try to use preserved fields (for records rejected from Bulk Review)
+                                                if 'Original_Clip_URL' in row and row.get('Original_Clip_URL'):
+                                                    original_clip_url = str(row.get('Original_Clip_URL', ''))
+                                                    original_relevance_score = row.get('Original_Relevance_Score', 7)
+                                                    print(f"DEBUG: Using preserved fields - URL: '{original_clip_url}', Relevance: {original_relevance_score}")
+                                                else:
+                                                    # FALLBACK: Try to parse from URL_Details (for older rejected records)
+                                                    print(f"DEBUG: No preserved fields, trying to parse URL_Details")
+                                                    
+                                                    # First try JSON parsing (new format)
+                                                    try:
+                                                        import json
+                                                        url_data = json.loads(url_details)
+                                                        
+                                                        if isinstance(url_data, list):
+                                                            # Find the first successful entry (the one that was actually found)
+                                                            for entry in url_data:
+                                                                if isinstance(entry, dict) and entry.get('success') == True:
+                                                                    # This is the successful clip that was found
+                                                                    original_clip_url = entry.get('actual_url', '')
+                                                                    original_relevance_score = entry.get('relevance_score', 7)
+                                                                    print(f"DEBUG: Found successful JSON entry - URL: '{original_clip_url}', Relevance: {original_relevance_score}")
+                                                                    break
+                                                            
+                                                            # If no successful entry found, use the first original_url as fallback
+                                                            if not original_clip_url and len(url_data) > 0:
+                                                                first_entry = url_data[0]
+                                                                if isinstance(first_entry, dict):
+                                                                    original_clip_url = first_entry.get('original_url', '')
+                                                                    print(f"DEBUG: No successful entry found, using original_url: '{original_clip_url}'")
+                                                    
+                                                    except (json.JSONDecodeError, KeyError, TypeError):
+                                                        # Not JSON format, handle old string format used by rejected records
+                                                        print(f"DEBUG: Using old string format parsing for move-back")
+                                                        
+                                                        # For rejected records, we need to find the ORIGINAL source URL that they came from
+                                                        # and try to reconstruct the working clip URL if possible
+                                                        
+                                                        # Parse old format: "https://example.com: status; https://example2.com: status"
+                                                        url_entries = url_details.split(';')
+                                                        for entry in url_entries:
+                                                            entry = entry.strip()
+                                                            if entry and ':' in entry:
+                                                                # Extract URL (everything before " :")
+                                                                colon_pos = entry.find(': ')
+                                                                if colon_pos > 0:
+                                                                    url_part = entry[:colon_pos].strip()
+                                                                    if url_part.startswith(('http://', 'https://')):
+                                                                        # Use the first valid URL we find
+                                                                        original_clip_url = url_part
+                                                                        # Try to preserve original score if it was high-quality before rejection
+                                                                        original_relevance_score = 8  # Assume it was good since it made it to approval
+                                                                        print(f"DEBUG: Extracted URL from old format: '{original_clip_url}'")
+                                                                        break
+                                                    
+                                                    # Final fallback: use Links field from original loan
+                                                    if not original_clip_url:
+                                                        links = str(row.get('Links', ''))
+                                                        if links:
+                                                            first_url = links.split(';')[0].strip() if ';' in links else links.strip()
+                                                            original_clip_url = first_url
+                                                            print(f"DEBUG: Using Links field as fallback: '{original_clip_url}'")
+                                                
+                                                print(f"DEBUG: Final extracted clip URL: '{original_clip_url}', Relevance: {original_relevance_score}")
+                                                
                                                 # Convert rejected record back to loan record format
-                                                # This removes rejection-specific fields and restores original loan data
+                                                # Preserve as much original data as possible
                                                 loan_record = {
                                                     'WO #': str(row.get('WO #', '')),
                                                     'Activity_ID': str(row.get('Activity_ID', '')),
@@ -3649,19 +3791,19 @@ with rejected_tab:
                                                     'Links': str(row.get('Links', '')),
                                                     'URLs_Processed': row.get('URLs_Processed', 0),
                                                     'URLs_Successful': row.get('URLs_Successful', 0),
-                                                    # Add default values for fields that would exist in loan_results.csv
-                                                    'Relevance Score': 0,  # Will need re-processing
-                                                    'Overall Score': 0,
+                                                    # Preserve original relevance score from successful entry
+                                                    'Relevance Score': original_relevance_score,  # Use extracted score
+                                                    'Overall Score': original_relevance_score,
                                                     'Sentiment': 'neutral',
                                                     'Overall Sentiment': 'neutral',
-                                                    'Summary': 'Restored from rejected - needs re-review',
+                                                    'Summary': f'🔄 Moved back from rejected for re-review. Original relevance: {original_relevance_score}/10. Rejection reason: {row.get("Rejection_Reason", "Manual rejection")}',
                                                     'Brand Alignment': False,
-                                                    'Recommendation': 'Needs manual review after restoration',
+                                                    'Recommendation': '⚠️ NEEDS RE-REVIEW: Moved back from rejected tab',
                                                     'Processed Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                                     'URL_Tracking': str(row.get('URL_Details', '')),
-                                                    'Clip URL': '',  # Will be empty until re-processed
+                                                    'Clip URL': original_clip_url,  # This is the key field for the View link!
                                                     'Published Date': '',
-                                                    'Attribution_Strength': 'unknown',
+                                                    'Attribution_Strength': 'needs-review',
                                                     'Actual_Byline': ''
                                                 }
                                                 restored_loans.append(loan_record)

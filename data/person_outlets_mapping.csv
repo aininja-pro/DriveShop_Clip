@@ -1620,7 +1620,6 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 8449,Frank Ledwell,3095,Instagram,https://www.instagram.com/outdoorx4/,54000
 8449,Frank Ledwell,2371,Facebook.com,https://www.facebook.com/OutdoorX4/,14000
 8450,Brittney Walker,2265,EURweb.com,https://eurweb.com/author/brittney-m-walker/,97415
-8450,Brittney Walker,3007,Simply Rides,https:/www.simplyrides.com,16000
 8455,Alexander George,50,Popular Mechanics,https://www.popularmechanics.com/cars/,15000000
 8471,Ciara Anderson,6192,instagram.com/ayeciara/,https://www.instagram.com/ayeciara/,157000
 8473,Ginger Harper,6288,instagram.com/gingermarieblog/,https://www.instagram.com/gingermarieblog/,13800
@@ -3043,7 +3042,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 15721,Najm Loyd,6237,instagram.com/steelojeem/?hl=en,https://www.instagram.com/steelojeem/?hl=en,25800
 15724,Maria Mejia,3095,Instagram,https://www.instagram.com/styleandamor/,1100
 15726,Christine Yun,3095,Instagram,https://www.instagram.com/trendenvy/,17000
-15737,"Steven ""Jordan"" Obrien",3095,Instagram,https://www.instagram.com/thejobrien/,113000
+15737,Steven 'Jordan' O'Brien,3095,Instagram,https://www.instagram.com/thejobrien/,113000
 15738,Laila Romero,3095,Instagram,https://www.instagram.com/imwhatsfordinner/?hl=en,13100
 15740,"LaTasha ""Tash"" Haynes",6285,instagram.com/itstashhaynes/,https://www.instagram.com/itstashhaynes/,24200
 15742,Daniele Gori,5446,Automundohoy.com,http://www.automundohoy.com/,13959
@@ -3534,6 +3533,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 18262,Jon Monroe,1833,Youtube.com,https://www.youtube.com/@MakingMonroe,3080
 18278,Austin Lott,1833,Youtube.com,https://www.youtube.com/@CapitalOneAutoNavigator/videos,84000
 18286,Kristen Brown,5247,AGirlsGuideToCars.com,https://agirlsguidetocars.com/category/reviews/,194000
+18286,Kristen Brown,1349,AutoBlog,https://www.autoblog.com/author/kristen-brown,2795520
 18292,David 'Drex Lee' Ma ,3095,Instagram,https://www.instagram.com/drexlee/,3800000
 18301,Kian Mahroumi,1833,Youtube.com,https://www.youtube.com/@seizethespeed/videos,6600
 18319,Kilton Janvier,3095,Instagram,https://www.instagram.com/kiltonkess_/,33100

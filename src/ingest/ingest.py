@@ -72,11 +72,15 @@ def add_rejected_record(loan: Dict[str, Any], rejection_reason: str, url_details
     """
     global REJECTED_RECORDS
     
+    # Use exact same structure as manual rejection in dashboard
     rejected_record = {
         'WO #': loan.get('work_order', ''),
+        'Activity_ID': loan.get('activity_id', ''),
+        'Make': loan.get('make', ''),
         'Model': loan.get('model', ''),
         'To': loan.get('to', ''),
         'Affiliation': loan.get('affiliation', ''),
+        'Office': loan.get('office', ''),
         'Links': loan.get('links', ''),
         'URLs_Processed': len(loan.get('links', '').split(';')) if loan.get('links') else 0,
         'URLs_Successful': 0,  # If rejected, none were successful

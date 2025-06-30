@@ -13127,12 +13127,6 @@
         "outlet_url": "https://eurweb.com/author/brittney-m-walker/",
         "outlet_id": "2265",
         "impressions": 97415
-      },
-      {
-        "outlet_name": "Simply Rides",
-        "outlet_url": "https:/www.simplyrides.com",
-        "outlet_id": "3007",
-        "impressions": 16000
       }
     ]
   },
@@ -26359,7 +26353,7 @@
     ]
   },
   "15737": {
-    "reporter_name": "Steven \"Jordan\" Obrien",
+    "reporter_name": "Steven 'Jordan' O'Brien",
     "outlets": [
       {
         "outlet_name": "Instagram",
@@ -31206,6 +31200,12 @@
         "outlet_url": "https://agirlsguidetocars.com/category/reviews/",
         "outlet_id": "5247",
         "impressions": 194000
+      },
+      {
+        "outlet_name": "AutoBlog",
+        "outlet_url": "https://www.autoblog.com/author/kristen-brown",
+        "outlet_id": "1349",
+        "impressions": 2795520
       }
     ]
   },
