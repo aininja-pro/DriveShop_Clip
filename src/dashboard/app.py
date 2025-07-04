@@ -49,14 +49,14 @@ sys.path.append(str(project_root))
 
 # Import local modules
 try:
-    from src.ingest.ingest import run_ingest_concurrent, run_ingest_concurrent_with_filters
+    from src.ingest.ingest_database import run_ingest_database, run_ingest_database_with_filters
 except ImportError:
     # Define a stub for when the module is not yet implemented
-    def run_ingest_concurrent(file_path):
-        st.error("Concurrent ingest module not implemented yet")
+    def run_ingest_database(file_path):
+        st.error("Database ingest module not implemented yet")
         return False
-    def run_ingest_concurrent_with_filters(url, filters):
-        st.error("Concurrent ingest with filters module not implemented yet")
+    def run_ingest_database_with_filters(url, filters):
+        st.error("Database ingest with filters module not implemented yet")
         return False
 
 def load_person_outlets_mapping():
@@ -1834,7 +1834,7 @@ with st.sidebar:
             # Only proceed if data has been loaded and filtered
             if 'filtered_df' in locals() and not filtered_df.empty:
                 with st.spinner(f"Processing filtered records... This may take a while."):
-                    from src.ingest.ingest import run_ingest_concurrent_with_filters
+                    from src.ingest.ingest_database import run_ingest_database_with_filters
                     
                     # Convert filtered dataframe to list of records
                     records_to_process = filtered_df.to_dict('records')
@@ -1865,7 +1865,7 @@ with st.sidebar:
                         st.json(remapped_records)
 
                     # Call the backend with the pre-filtered and correctly mapped data
-                    success = run_ingest_concurrent_with_filters(
+                    success = run_ingest_database_with_filters(
                         filtered_loans=remapped_records, 
                         limit=limit_records
                     )
@@ -1921,7 +1921,7 @@ with st.sidebar:
         
         if st.button("Process Uploaded File", use_container_width=True):
             with st.spinner("Processing..."):
-                success = run_ingest_concurrent(input_file=temp_file_path)
+                success = run_ingest_database(input_file=temp_file_path)
                 if success:
                     st.success("✅ Done!")
                     st.rerun() # Refresh the page
@@ -1933,7 +1933,7 @@ with st.sidebar:
     if st.button("🔄 Process Default File (for testing)", use_container_width=True):
         with st.spinner("Processing default file..."):
             default_file = os.path.join(project_root, "data", "fixtures", "Loans_without_Clips.csv")
-            success = run_ingest_concurrent(input_file=default_file)
+            success = run_ingest_database(input_file=default_file)
             if success:
                 st.success("✅ Done!")
                 st.rerun() # Refresh the page
@@ -2189,11 +2189,44 @@ with bulk_review_tab:
     if 'rejected_records' not in st.session_state:
         st.session_state.rejected_records = set()
     
-    # Try to load results file
-    results_file = os.path.join(project_root, "data", "loan_results.csv")
-    if os.path.exists(results_file):
+    # Try to load results from database
+    try:
+        from src.utils.database import get_database
+        db = get_database()
+        clips_data = db.get_pending_clips()
+        
+        if clips_data:
+            # Convert database results to DataFrame
+            df = pd.DataFrame(clips_data)
+            
+            # Map database fields to expected CSV format
+            df = df.rename(columns={
+                'wo_number': 'WO #',
+                'make': 'Make',
+                'model': 'Model',
+                'contact': 'To',
+                'office': 'Office',
+                'clip_url': 'Clip URL',
+                'relevance_score': 'Relevance Score',
+                'status': 'Status',
+                'tier_used': 'Processing Method',
+                'published_date': 'Published Date'
+            })
+            
+            # Set default values for missing columns
+            if 'Overall Sentiment' not in df.columns:
+                df['Overall Sentiment'] = 'N/A'
+            if 'Affiliation' not in df.columns:
+                df['Affiliation'] = df.get('Media Outlet', 'N/A')
+        else:
+            df = pd.DataFrame()  # Empty DataFrame if no clips
+    except Exception as e:
+        st.error(f"❌ Error loading clips from database: {e}")
+        df = pd.DataFrame()  # Empty DataFrame on error
+    
+    # Process database results
+    if len(df) > 0:
         try:
-            df = pd.read_csv(results_file)
             
             # Ensure WO # is treated as string
             if 'WO #' in df.columns:
@@ -2219,14 +2252,13 @@ with bulk_review_tab:
                     high_quality = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns and not df.empty else 0
                     st.metric("High Quality", high_quality)
                 with col4:
-                    # Check approved count
-                    approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                    approved_count = 0
-                    if os.path.exists(approved_file):
-                        # Read approved clips CSV - PREVENT DATE AUTO-CONVERSION
-                        # Use dtype=str to keep date values as raw strings like "1/8/25" instead of datetime objects
-                        approved_df = pd.read_csv(approved_file, dtype=str)
-                        approved_count = len(approved_df)
+                    # Check approved count from database
+                    try:
+                        approved_clips = db.get_approved_clips()
+                        approved_count = len(approved_clips)
+                    except Exception as e:
+                        logger.error(f"Error getting approved clips count: {e}")
+                        approved_count = 0
                     st.metric("Approved", approved_count)
                 
                 # Display filtered results with AgGrid
@@ -3461,14 +3493,63 @@ with bulk_review_tab:
 
 # ========== REJECTED/ISSUES TAB (Transparency Dashboard) ==========
 with rejected_tab:
-    # Try to load rejected records file
-    rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
-    if os.path.exists(rejected_file):
-        try:
-            rejected_df = pd.read_csv(rejected_file)
+    # Load rejected clips and failed processing attempts from database
+    try:
+        # Get rejected clips from database
+        rejected_clips = db.get_rejected_clips()
+        failed_attempts = db.get_failed_processing_attempts()
+        
+        # Convert to DataFrames
+        rejected_df = pd.DataFrame(rejected_clips) if rejected_clips else pd.DataFrame()
+        failed_df = pd.DataFrame(failed_attempts) if failed_attempts else pd.DataFrame()
+        
+        # Combine rejected clips and failed attempts for display
+        combined_issues = []
+        
+        # Add rejected clips
+        for clip in rejected_clips:
+            combined_issues.append({
+                'WO #': clip['wo_number'],
+                'Office': clip.get('office', ''),
+                'Make': clip.get('make', ''),
+                'Model': clip.get('model', ''),
+                'To': clip.get('contact', ''),
+                'Affiliation': clip.get('office', ''),  # Use office as affiliation fallback
+                'Rejection_Reason': 'User Rejected Clip',
+                'URL_Details': clip.get('clip_url', ''),
+                'Processed_Date': clip.get('processed_date', ''),
+                'Type': 'Rejected Clip'
+            })
+        
+        # Add failed processing attempts
+        for attempt in failed_attempts:
+            combined_issues.append({
+                'WO #': attempt['wo_number'],
+                'Office': '',  # wo_tracking doesn't have office info
+                'Make': '',
+                'Model': '',
+                'To': '',
+                'Affiliation': '',
+                'Rejection_Reason': f"No Content Found (Smart Retry: {attempt.get('retry_after_date', 'N/A')})",
+                'URL_Details': f"Last attempted: {attempt.get('last_attempt_date', 'Unknown')}",
+                'Processed_Date': attempt.get('last_attempt_date', ''),
+                'Type': 'Processing Failed'
+            })
+        
+        if combined_issues:
+            # Create DataFrame from combined issues
+            rejected_df = pd.DataFrame(combined_issues)
+        else:
+            rejected_df = pd.DataFrame()  # Empty DataFrame if no issues
             
-            # Ensure WO # is treated as string for consistency
-            if 'WO #' in rejected_df.columns:
+    except Exception as e:
+        st.error(f"❌ Error loading rejected clips from database: {e}")
+        rejected_df = pd.DataFrame()  # Empty DataFrame on error
+    
+    # Process results
+    if len(rejected_df) > 0:
+        # Ensure WO # is treated as string for consistency
+        if 'WO #' in rejected_df.columns:
                 rejected_df['WO #'] = rejected_df['WO #'].astype(str)
             
             if not rejected_df.empty:

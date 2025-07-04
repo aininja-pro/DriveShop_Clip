@@ -1444,6 +1444,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 7773,Mia Voss,3095,Instagram,https://www.instagram.com/miavossonthego/,4500
 7778,Roger Rivero,3329,USA Hispanic Press, ,1000
 7778,Roger Rivero,5427,AutomotrizTV,https://www.youtube.com/user/AutomotrizTV/videos,160000
+7778,Roger Rivero,2924,QueensLatino.com,https://queenslatino.com/,48000
 7789,Sherri Tilley,3282,TheFlashList.com,https://www.theflashlist.com/,3418
 7804,Rob Neustadt,5690,mycardoeswhat.org,https://mycardoeswhat.org/,2000
 7808,Laurie Bogart Wiles,4058,Yonkerstribune.com,https://www.yonkerstribune.com/section/automotive,49203
@@ -2490,6 +2491,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 13679,Matt Dixon,5517,youtube.com/downshiftmke,https://www.youtube.com/@dwnshft/videos,83400
 13679,Matt Dixon,6396,youtube.com/@downshiftreviews,https://www.youtube.com/@theshiftlist/videos,5960
 13696,Rory Carroll,1525,Jalopnik,https://www.jalopnik.com/category/reviews/,2652559
+13706,Matthew Noszka,3095,Instagram,https://www.instagram.com/noszkasgarage/,16500
 13711,Marco Morello,1833,Youtube.com,https://www.youtube.com/@CarGuy11/videos,8830
 13714,Dan Barbera,5218,macrumors.com,https://www.macrumors.com/review/,20000000
 13718,Jennifer Gilmore,3095,Instagram,https://www.instagram.com/sassyteacherchic/,10700
@@ -2727,9 +2729,9 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 14644,Alexander Atkins,6046,instagram.com/mressentialist/,https://www.instagram.com/mressentialist/,72800
 14645,Robert  Edwards,1833,Youtube.com,https://www.youtube.com/@TwoGuysandaRide/videos,50400
 14646,Kurt Hilfer,1833,Youtube.com,https://www.youtube.com/eatsleepdrive/videos,104000
-14653,Bryan Raupe,1833,Youtube.com,https://www.youtube.com/@ttc_cars/videos,26400
-14653,Bryan Raupe,1833,Youtube.com,https://www.youtube.com/@ttc_cars/videos,3000
-14653,Bryan Raupe,6129,TikTok,https://www.tiktok.com/@texastruckchannel,7600
+14653,Bryan Raupe,1833,Youtube.com,https://www.youtube.com/@ttc_cars/videos,5000
+14653,Bryan Raupe,6129,TikTok,https://www.tiktok.com/@texastruckchannel,7500
+14653,Bryan Raupe,1833,Youtube.com,https://www.youtube.com/@TexasTruckChannel/videos,39000
 14658,Kristin Measom,3095,Instagram,https://www.instagram.com/xomrsmeasom/,29700
 14663,Grace Houghton,3583,Hagerty.com,https://www.hagerty.com/media/category/new-car-reviews/,10300
 14665,Marisa Brown,3095,Instagram,,97200
@@ -3021,7 +3023,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 15667,Qiang Han,1833,Youtube.com,https://www.youtube.com/@hanscarreviews/videos,35500
 15676,Carlos Juarez,3095,Instagram,https://www.instagram.com/bycarlosroberto/,103000
 15677,Shila Zand,3095,Instagram,https://www.instagram.com/foodieonfleek/,172000
-15680,Cory Fourniquet,1833,Youtube.com,https://www.youtube.com/@GTGarageTalk/videos,34300
+15680,Cory Fourniquet,1833,Youtube.com,https://www.youtube.com/@GTGarageTalk/videos,36800
 15680,Cory Fourniquet,3095,Instagram,https://www.instagram.com/gtgaragetalk/reels/,2300
 15680,Cory Fourniquet,2371,Facebook.com,https://www.facebook.com/GTGarageTalk,52000
 15680,Cory Fourniquet,5247,AGirlsGuideToCars.com,https://agirlsguidetocars.com/category/reviews/,133000
@@ -3129,8 +3131,8 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 16054,Ammad Quraishi,4384,drivetribe.com,https://www.youtube.com/@Drivetribe/videos,200
 16054,Ammad Quraishi,3095,Instagram,https://www.instagram.com,7000
 16064,Karina  Bik,3095,Instagram,https://www.instagram.com/karinabnyc/,550000
-16080,Ahmed  Ibraheem,1833,Youtube.com,https://www.youtube.com/@TheCarCareNut/videos,1470000
-16080,Ahmed  Ibraheem,1833,Youtube.com,https://www.youtube.com/@TheCarCareNut/videos,295000
+16080,Ahmed  Ibraheem,1833,Youtube.com,https://www.youtube.com/@TheCarCareNut/videos,1480000
+16080,Ahmed  Ibraheem,1833,Youtube.com,https://www.youtube.com/@TheCarCareNutReviews,299000
 16083,Kristina Horner,3095,Instagram,https://www.instagram.com/kristinahorner/,13700
 16089,Jose Rodriguez Jr.,1525,Jalopnik,https://www.jalopnik.com/category/reviews/,10270000
 16096,Tori Gonzales Bradburry,3095,Instagram,https://www.instagram.com/allthewire/,58500
@@ -3355,6 +3357,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 16965,Alyssa  Francois,6436,taggermedia.com,https://app.taggermedia.com,5000
 16999,Chase Bueker,6419,On4Wheels,,1200000
 17023,Michael  Fasano,3095,Instagram,https://www.instagram.com/,240000
+17023,Michael  Fasano,1833,Youtube.com,https://www.youtube.com/@Golficity,122000
 17029,Dan  Bova,5708,Entrepreneur Magazine,https://www.entrepreneur.com,5427412
 17034,Marouane Bembli,1833,Youtube.com,https://www.youtube.com/@Thesketchmonkey/videos,354000
 17040,Shannon Nolan,6353,Instagram,https://www.instagram.com/anywherebutarizona/,35000
@@ -3428,6 +3431,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 17485,LaToi  McGinnis-Storr,4411,Facebook.com,https://www.facebook.com/,1300
 17485,LaToi  McGinnis-Storr,5802,LinkedIn,https://www.linkedin.com/in/latoistorr/,697
 17485,LaToi  McGinnis-Storr,3264,Blogspot,https://www.toitime.org/,1000
+17485,LaToi  McGinnis-Storr,3095,Instagram,https://www.instagram.com/abbaswahab_/?hl=en,125000
 17500,Cori Latousek,3095,Instagram,https://www.instagram.com/corilatousek/,211000
 17517,Marissa  Strang,3095,Instagram,https://www.instagram.com/marissa.daily,41400
 17518,Nick Cappetto,1833,Youtube.com,https://www.youtube.com/user/TTACVideo/videos,334000
@@ -3535,7 +3539,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 18286,Kristen Brown,5247,AGirlsGuideToCars.com,https://agirlsguidetocars.com/category/reviews/,194000
 18286,Kristen Brown,1349,AutoBlog,https://www.autoblog.com/author/kristen-brown,2795520
 18292,David 'Drex Lee' Ma ,3095,Instagram,https://www.instagram.com/drexlee/,3800000
-18301,Kian Mahroumi,1833,Youtube.com,https://www.youtube.com/@seizethespeed/videos,6600
+18301,Kian Mahroumi,1833,Youtube.com,https://www.youtube.com/@seizethespeed/videos,8500
 18319,Kilton Janvier,3095,Instagram,https://www.instagram.com/kiltonkess_/,33100
 18320,kiki Carr,1833,Youtube.com,https://www.youtube.com/@KiKiCarr/videos,128000
 18327,Gabriel Sanchez,3095,Instagram,https://www.instagram.com/gabe_media/,63100
@@ -3567,3 +3571,4 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 18677,Samantha 'Elly' Wong,3095,Instagram,https://www.instagram.com/f1elly/,179000
 18740,Christopher  Dodds,6532,Surfer Magazine,http://surfermag.com/,874143
 18762,Jackson Kessler,6534,CaptainCrankshaft.com,https://www.youtube.com/@captaincrankshaft/videos,851000
+18799,Hannah Swan,3095,Instagram,mailto:hannahswanstyle@gmail.com,4365

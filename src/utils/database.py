@@ -257,6 +257,58 @@ class DatabaseManager:
             logger.error(f"❌ Failed to get pending clips: {e}")
             return []
     
+    def get_approved_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get clips that have been approved"""
+        try:
+            query = self.supabase.table('clips').select('*').eq('status', 'approved')
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} approved clips")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get approved clips: {e}")
+            return []
+    
+    def get_rejected_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get clips that have been rejected"""
+        try:
+            query = self.supabase.table('clips').select('*').eq('status', 'rejected')
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} rejected clips")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get rejected clips: {e}")
+            return []
+    
+    def get_failed_processing_attempts(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get WO numbers that failed to find any content (for Rejected/Issues tab)"""
+        try:
+            query = self.supabase.table('wo_tracking')\
+                .select('*')\
+                .eq('status', 'searching')\
+                .order('last_attempt_date', desc=True)\
+                .limit(limit)
+            
+            result = query.execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} failed processing attempts")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get failed processing attempts: {e}")
+            return []
+    
     def get_clips_needing_sentiment(self, run_ids: List[str] = None) -> List[Dict[str, Any]]:
         """Get approved clips that need sentiment analysis"""
         try:

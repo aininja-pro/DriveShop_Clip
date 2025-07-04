@@ -11686,6 +11686,12 @@
         "outlet_url": "https://www.youtube.com/user/AutomotrizTV/videos",
         "outlet_id": "5427",
         "impressions": 160000
+      },
+      {
+        "outlet_name": "QueensLatino.com",
+        "outlet_url": "https://queenslatino.com/",
+        "outlet_id": "2924",
+        "impressions": 48000
       }
     ]
   },
@@ -21100,6 +21106,17 @@
       }
     ]
   },
+  "13706": {
+    "reporter_name": "Matthew Noszka",
+    "outlets": [
+      {
+        "outlet_name": "Instagram",
+        "outlet_url": "https://www.instagram.com/noszkasgarage/",
+        "outlet_id": "3095",
+        "impressions": 16500
+      }
+    ]
+  },
   "13711": {
     "reporter_name": "Marco Morello",
     "outlets": [
@@ -23364,19 +23381,19 @@
         "outlet_name": "Youtube.com",
         "outlet_url": "https://www.youtube.com/@ttc_cars/videos",
         "outlet_id": "1833",
-        "impressions": 26400
-      },
-      {
-        "outlet_name": "Youtube.com",
-        "outlet_url": "https://www.youtube.com/@ttc_cars/videos",
-        "outlet_id": "1833",
-        "impressions": 3000
+        "impressions": 5000
       },
       {
         "outlet_name": "TikTok",
         "outlet_url": "https://www.tiktok.com/@texastruckchannel",
         "outlet_id": "6129",
-        "impressions": 7600
+        "impressions": 7500
+      },
+      {
+        "outlet_name": "Youtube.com",
+        "outlet_url": "https://www.youtube.com/@TexasTruckChannel/videos",
+        "outlet_id": "1833",
+        "impressions": 39000
       }
     ]
   },
@@ -26168,7 +26185,7 @@
         "outlet_name": "Youtube.com",
         "outlet_url": "https://www.youtube.com/@GTGarageTalk/videos",
         "outlet_id": "1833",
-        "impressions": 34300
+        "impressions": 36800
       },
       {
         "outlet_name": "Instagram",
@@ -27191,13 +27208,13 @@
         "outlet_name": "Youtube.com",
         "outlet_url": "https://www.youtube.com/@TheCarCareNut/videos",
         "outlet_id": "1833",
-        "impressions": 1470000
+        "impressions": 1480000
       },
       {
         "outlet_name": "Youtube.com",
-        "outlet_url": "https://www.youtube.com/@TheCarCareNut/videos",
+        "outlet_url": "https://www.youtube.com/@TheCarCareNutReviews",
         "outlet_id": "1833",
-        "impressions": 295000
+        "impressions": 299000
       }
     ]
   },
@@ -29402,6 +29419,12 @@
         "outlet_url": "https://www.instagram.com/",
         "outlet_id": "3095",
         "impressions": 240000
+      },
+      {
+        "outlet_name": "Youtube.com",
+        "outlet_url": "https://www.youtube.com/@Golficity",
+        "outlet_id": "1833",
+        "impressions": 122000
       }
     ]
   },
@@ -30105,6 +30128,12 @@
         "outlet_url": "https://www.toitime.org/",
         "outlet_id": "3264",
         "impressions": 1000
+      },
+      {
+        "outlet_name": "Instagram",
+        "outlet_url": "https://www.instagram.com/abbaswahab_/?hl=en",
+        "outlet_id": "3095",
+        "impressions": 125000
       }
     ]
   },
@@ -31227,7 +31256,7 @@
         "outlet_name": "Youtube.com",
         "outlet_url": "https://www.youtube.com/@seizethespeed/videos",
         "outlet_id": "1833",
-        "impressions": 6600
+        "impressions": 8500
       }
     ]
   },
@@ -31539,6 +31568,17 @@
         "outlet_url": "https://www.youtube.com/@captaincrankshaft/videos",
         "outlet_id": "6534",
         "impressions": 851000
+      }
+    ]
+  },
+  "18799": {
+    "reporter_name": "Hannah Swan",
+    "outlets": [
+      {
+        "outlet_name": "Instagram",
+        "outlet_url": "mailto:hannahswanstyle@gmail.com",
+        "outlet_id": "3095",
+        "impressions": 4365
       }
     ]
   }
