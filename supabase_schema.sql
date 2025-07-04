@@ -42,7 +42,8 @@ CREATE TABLE clips (
     -- Processing metadata
     processed_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     tier_used TEXT,
-    status TEXT DEFAULT 'pending_review' CHECK (status IN ('pending_review', 'approved', 'rejected')),
+    status TEXT DEFAULT 'pending_review' CHECK (status IN ('pending_review', 'approved', 'rejected', 'no_content_found', 'processing_failed')),
+    workflow_stage TEXT DEFAULT 'found' CHECK (workflow_stage IN ('found', 'sentiment_analyzed', 'exported')),
     
     -- Smart retry logic
     last_attempt_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -79,6 +80,8 @@ CREATE INDEX idx_processing_runs_status ON processing_runs(run_status);
 CREATE INDEX idx_clips_wo_number ON clips(wo_number);
 CREATE INDEX idx_clips_processing_run_id ON clips(processing_run_id);
 CREATE INDEX idx_clips_status ON clips(status);
+CREATE INDEX idx_clips_workflow_stage ON clips(workflow_stage);
+CREATE INDEX idx_clips_status_workflow ON clips(status, workflow_stage);
 CREATE INDEX idx_clips_processed_date ON clips(processed_date DESC);
 CREATE INDEX idx_clips_sentiment_analysis ON clips(status, sentiment_analysis_date) WHERE status = 'approved';
 
@@ -126,6 +129,7 @@ SELECT
     c.attribution_strength,
     c.byline_author,
     c.status,
+    c.workflow_stage,
     c.relevance_score,
     c.overall_sentiment,
     c.brand_alignment,

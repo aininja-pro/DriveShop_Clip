@@ -220,6 +220,7 @@ class DatabaseManager:
                 "byline_author": clip_data.get('byline_author'),
                 "tier_used": clip_data.get('tier_used'),
                 "status": clip_data.get('status', 'pending_review'),
+                "workflow_stage": clip_data.get('workflow_stage', 'found'),
                 "last_attempt_result": 'success'
             }
             
@@ -238,6 +239,62 @@ class DatabaseManager:
                 
         except Exception as e:
             logger.error(f"❌ Failed to store clip: {e}")
+            return False
+    
+    def store_failed_attempt(self, loan_data: Dict[str, Any], reason: str = "no_content_found") -> bool:
+        """
+        Store a failed processing attempt (no content found or processing failed)
+        
+        Args:
+            loan_data: Dictionary containing loan information
+            reason: Reason for failure ('no_content_found' or 'processing_failed')
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Ensure required fields are present
+            required_fields = ['wo_number', 'processing_run_id']
+            for field in required_fields:
+                if field not in loan_data:
+                    raise ValueError(f"Required field '{field}' missing from loan_data")
+            
+            # Prepare data for insertion
+            db_data = {
+                "wo_number": str(loan_data['wo_number']),
+                "processing_run_id": loan_data['processing_run_id'],
+                "office": loan_data.get('office'),
+                "make": loan_data.get('make'),
+                "model": loan_data.get('model'),
+                "contact": loan_data.get('contact'),
+                "person_id": loan_data.get('person_id'),
+                "activity_id": loan_data.get('activity_id'),
+                "clip_url": None,  # No clip found
+                "extracted_content": None,  # No content found
+                "published_date": None,
+                "attribution_strength": None,
+                "byline_author": None,
+                "tier_used": loan_data.get('tier_used', 'Unknown'),
+                "status": reason,  # 'no_content_found' or 'processing_failed'
+                "workflow_stage": 'found',  # Default workflow stage
+                "last_attempt_result": reason
+            }
+            
+            result = self.supabase.table('clips').insert(db_data).execute()
+            
+            if result.data:
+                clip_id = result.data[0]['id']
+                logger.info(f"✅ Stored failed attempt for WO# {loan_data['wo_number']} (ID: {clip_id}, reason: {reason})")
+                
+                # Update WO tracking
+                self.mark_wo_attempt(loan_data['wo_number'], reason)
+                
+                return True
+            else:
+                raise Exception("No data returned from insert")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to store failed attempt: {e}")
             return False
     
     def get_pending_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
@@ -540,6 +597,80 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"❌ Failed to get run statistics: {e}")
             return {}
+
+    def get_clips_by_status_and_stage(self, status: str, workflow_stage: str = None, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get clips by status and optionally by workflow stage"""
+        try:
+            query = self.supabase.table('clips').select('*').eq('status', status)
+            
+            if workflow_stage:
+                query = query.eq('workflow_stage', workflow_stage)
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} clips with status='{status}', workflow_stage='{workflow_stage}'")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get clips by status and stage: {e}")
+            return []
+
+    def get_no_content_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get clips where no content was found"""
+        try:
+            query = self.supabase.table('clips').select('*').eq('status', 'no_content_found')
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} no content clips")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get no content clips: {e}")
+            return []
+
+    def get_processing_failed_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get clips where processing failed"""
+        try:
+            query = self.supabase.table('clips').select('*').eq('status', 'processing_failed')
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} processing failed clips")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get processing failed clips: {e}")
+            return []
+
+    def get_approved_clips_by_stage(self, workflow_stage: str = None, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get approved clips by workflow stage"""
+        try:
+            query = self.supabase.table('clips').select('*').eq('status', 'approved')
+            
+            if workflow_stage:
+                query = query.eq('workflow_stage', workflow_stage)
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} approved clips with workflow_stage='{workflow_stage}'")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get approved clips by stage: {e}")
+            return []
 
 # Global database instance
 _db_instance = None

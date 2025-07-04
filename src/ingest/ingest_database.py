@@ -210,6 +210,7 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str) -> Dict[str, An
 async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[str, Any], db, run_id: str) -> bool:
     """
     Async wrapper for database-integrated loan processing with smart retry logic.
+    STORES ALL LOAN ATTEMPTS (successful and failed) to database.
     
     Args:
         semaphore: Async semaphore to control concurrency
@@ -251,26 +252,58 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                     'byline_author': clip_result.get('byline_author'),
                     'tier_used': clip_result.get('processing_method', 'Unknown'),
                     'relevance_score': clip_result.get('relevance_score', 0.0),
-                    'status': 'pending_review'  # No GPT analysis yet
+                    'status': 'pending_review',  # No GPT analysis yet
+                    'workflow_stage': 'found'
                 }
                 
                 try:
-                    clip_id = db.store_clip(clip_data)
-                    db.mark_wo_as_successful(result['wo_number'])
-                    db.mark_wo_attempt(result['wo_number'], 'success', None)
-                    logger.info(f"✅ Stored clip for {result['wo_number']} in database")
-                    stored_clips += 1
+                    success = db.store_clip(clip_data)
+                    if success:
+                        db.mark_wo_success(result['wo_number'], clip_result.get('clip_url'))
+                        logger.info(f"✅ Stored clip for {result['wo_number']} in database")
+                        stored_clips += 1
+                    else:
+                        logger.error(f"❌ Failed to store clip for {result['wo_number']}")
+                        db.mark_wo_attempt(result['wo_number'], 'store_failed', 'Database storage failed')
                 except Exception as e:
                     logger.error(f"❌ Failed to store clip: {e}")
                     db.mark_wo_attempt(result['wo_number'], 'store_failed', str(e))
             
             return stored_clips > 0
         else:
-            # FAILURE: No clips found, record for smart retry
+            # FAILURE: No clips found - STORE to database with failed status
             wo_number = result.get('wo_number') if result else loan.get('work_order', 'unknown')
-            db.mark_wo_attempt(wo_number, 'no_content', 'No valid clips found after filtering')
-            logger.info(f"🚫 No clips found for {wo_number} - recorded for smart retry")
-            return False
+            
+            # Store the failed attempt as a record with no_content_found status
+            failed_loan_data = {
+                'wo_number': wo_number,
+                'processing_run_id': run_id,
+                'office': loan.get('office'),
+                'make': loan.get('make'),
+                'model': loan.get('model'),
+                'contact': loan.get('to'),
+                'person_id': loan.get('person_id'),
+                'activity_id': loan.get('activity_id'),
+                'tier_used': result.get('tier_used', 'Unknown') if result else 'Unknown',
+                'workflow_stage': 'found'
+            }
+            
+            try:
+                # Store as no_content_found status
+                success = db.store_failed_attempt(failed_loan_data, 'no_content_found')
+                if success:
+                    logger.info(f"✅ Stored failed attempt for {wo_number} in database")
+                else:
+                    logger.error(f"❌ Failed to store failed attempt for {wo_number}")
+            except Exception as e:
+                logger.error(f"❌ Exception storing failed attempt: {e}")
+                # Store as processing_failed if we can't even store the no_content_found
+                try:
+                    db.store_failed_attempt(failed_loan_data, 'processing_failed')
+                except:
+                    pass  # Last resort - don't let this break the pipeline
+            
+            return True  # Return True because we DID process it (even if no clips found)
 
 async def process_loans_database_concurrent(loans: List[Dict[str, Any]], db, run_id: str) -> Dict[str, int]:
     """
