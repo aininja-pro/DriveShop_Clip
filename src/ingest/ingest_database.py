@@ -222,7 +222,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
         True if processed (success or failure), False if skipped
     """
     async with semaphore:
-        wo_number = loan.get('WO #', '')
+        wo_number = loan.get('work_order', '')
         
         # SMART RETRY LOGIC: Check if we should process this WO#
         if not db.should_retry_wo(wo_number):
@@ -274,6 +274,10 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
             # FAILURE: No clips found - STORE to database with failed status
             wo_number = result.get('wo_number') if result else loan.get('work_order', 'unknown')
             
+            # ENHANCEMENT: Store original source URLs for transparency in View link
+            original_urls = loan.get('urls', [])
+            original_urls_text = '; '.join(original_urls) if original_urls else 'No URLs provided'
+            
             # Store the failed attempt as a record with no_content_found status
             failed_loan_data = {
                 'wo_number': wo_number,
@@ -285,7 +289,11 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                 'person_id': loan.get('person_id'),
                 'activity_id': loan.get('activity_id'),
                 'tier_used': result.get('tier_used', 'Unknown') if result else 'Unknown',
-                'workflow_stage': 'found'
+                'workflow_stage': 'found',
+                # NEW: Store original source URLs for View link
+                'original_urls': original_urls_text,
+                'urls_attempted': len(original_urls),
+                'failure_reason': f"No content found from {len(original_urls)} URLs: {original_urls_text[:100]}..."
             }
             
             try:

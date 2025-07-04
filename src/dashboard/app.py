@@ -3532,7 +3532,11 @@ with rejected_tab:
                 'Rejection_Reason': 'No Content Found',
                 'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
                 'Processed_Date': clip.get('processed_date', ''),
-                'Type': 'No Content Found'
+                'Type': 'No Content Found',
+                # NEW: Include original URLs from database
+                'original_urls': clip.get('original_urls', ''),
+                'urls_attempted': clip.get('urls_attempted', 0),
+                'failure_reason': clip.get('failure_reason', '')
             })
         
         # Add clips where processing failed
@@ -3548,7 +3552,11 @@ with rejected_tab:
                 'Rejection_Reason': 'Processing Failed',
                 'URL_Details': f"Error: {clip.get('last_attempt_result', 'Technical error')}",
                 'Processed_Date': clip.get('processed_date', ''),
-                'Type': 'Processing Failed'
+                'Type': 'Processing Failed',
+                # NEW: Include original URLs from database
+                'original_urls': clip.get('original_urls', ''),
+                'urls_attempted': clip.get('urls_attempted', 0),
+                'failure_reason': clip.get('failure_reason', '')
             })
         
         # NOTE: No longer adding from wo_tracking table to avoid duplicates
@@ -3603,14 +3611,33 @@ with rejected_tab:
             if 'Office' in rejected_df.columns:
                 pass  # Keep original name
             
-            # Extract the searched URL from URL_Details for the View column  
-            def extract_searched_url(url_details):
-                """Extract the original source URL from URL_Details (handles both JSON and old string format)"""
+            # Extract the searched URL from database fields for the View column  
+            def extract_searched_url(row):
+                """
+                Extract the original source URL(s) from database fields for the View link.
+                Handles both single and multiple URLs per WO# intelligently.
+                """
+                # NEW: Try the database original_urls field first
+                original_urls = row.get('original_urls', '')
+                if original_urls and not pd.isna(original_urls):
+                    original_urls = str(original_urls).strip()
+                    if original_urls:
+                        # Handle multiple URLs separated by semicolon
+                        urls = [url.strip() for url in original_urls.split(';') if url.strip()]
+                        if urls:
+                            # If multiple URLs, return the first one (most common case)
+                            # We'll show a count indicator if there are multiple
+                            first_url = urls[0]
+                            print(f"DEBUG: Found {len(urls)} original URLs for WO#, using first: {first_url}")
+                            return first_url
+                
+                # FALLBACK: Try the old URL_Details field for backward compatibility
+                url_details = row.get('URL_Details', '')
                 if pd.isna(url_details) or not url_details:
                     return ""
                 
                 url_details_str = str(url_details).strip()
-                print(f"DEBUG: Rejected View Link - Processing URL_Details: {url_details_str[:100]}...")
+                print(f"DEBUG: Fallback to URL_Details parsing: {url_details_str[:100]}...")
                 
                 # First try JSON parsing (new format)
                 try:
@@ -3654,12 +3681,12 @@ with rejected_tab:
                                 print(f"DEBUG: Successfully extracted URL (no status): {entry}")
                                 return entry
                 
-                # Final fallback - return the original string if no parsing worked
-                print(f"DEBUG: No valid URL found, returning original string: {url_details_str}")
-                return url_details_str
+                # Final fallback - return empty string if no parsing worked
+                print(f"DEBUG: No valid URL found, returning empty string")
+                return ""
             
-            # Add the View column with the searched URL
-            clean_df['Searched URL'] = clean_df['URL_Details'].apply(extract_searched_url) if 'URL_Details' in clean_df.columns else ""
+            # Add the View column with the searched URL (using row-based function)
+            clean_df['Searched URL'] = clean_df.apply(extract_searched_url, axis=1)
             clean_df['📄 View'] = clean_df['Searched URL']  # Create View column for cellRenderer
             
             # Rename columns for better display
@@ -3672,28 +3699,55 @@ with rejected_tab:
                 '📄 View': '📄 View',  # Add View column
                 'Rejection_Reason': '⚠️ Rejection Reason',
                 'URL_Details': '📋 Details',
-                'Processed_Date': '📅 Processed'
+                'Processed_Date': '📅 Processed',
+                # Include new fields but don't display them (for JavaScript access)
+                'urls_attempted': 'urls_attempted',
+                'failure_reason': 'failure_reason'
             }
             
-            # Only keep columns that exist
+            # Only keep columns that exist and separate display vs hidden columns
             display_columns = []
+            hidden_columns = ['urls_attempted', 'failure_reason']  # Keep these for JavaScript but don't display
+            
             for old_col, new_col in column_mapping.items():
                 if old_col in clean_df.columns:
                     if old_col != new_col:
                         clean_df = clean_df.rename(columns={old_col: new_col})
-                    display_columns.append(new_col)
+                    if new_col not in hidden_columns:
+                        display_columns.append(new_col)
             
-            # Create cellRenderer for View column (clickable URL - same as bulk review)
+            # Create cellRenderer for View column with multiple URL indicator
             cellRenderer_view = JsCode("""
             class UrlCellRenderer {
               init(params) {
-                this.eGui = document.createElement('a');
-                this.eGui.innerText = '📄 View';
-                this.eGui.href = params.value;
-                this.eGui.target = '_blank';
-                this.eGui.style.color = '#1f77b4';
-                this.eGui.style.textDecoration = 'underline';
-                this.eGui.style.cursor = 'pointer';
+                const urls_attempted = params.data['urls_attempted'] || 0;
+                
+                this.eGui = document.createElement('div');
+                this.eGui.style.display = 'flex';
+                this.eGui.style.alignItems = 'center';
+                this.eGui.style.gap = '5px';
+                
+                // Create the link
+                this.link = document.createElement('a');
+                this.link.innerText = '📄 View';
+                this.link.href = params.value;
+                this.link.target = '_blank';
+                this.link.style.color = '#1f77b4';
+                this.link.style.textDecoration = 'underline';
+                this.link.style.cursor = 'pointer';
+                
+                this.eGui.appendChild(this.link);
+                
+                // Add multiple URL indicator if more than 1 URL was attempted
+                if (urls_attempted > 1) {
+                  const indicator = document.createElement('span');
+                  indicator.innerText = `(+${urls_attempted - 1})`;
+                  indicator.style.fontSize = '11px';
+                  indicator.style.color = '#6c757d';
+                  indicator.style.fontStyle = 'italic';
+                  indicator.title = `${urls_attempted} URLs were searched for this WO#`;
+                  this.eGui.appendChild(indicator);
+                }
               }
 
               getGui() {
@@ -3708,7 +3762,12 @@ with rejected_tab:
             
 
             # Configure AgGrid for rejected records (no pagination for full transparency)
-            gb = GridOptionsBuilder.from_dataframe(clean_df[display_columns])
+            gb = GridOptionsBuilder.from_dataframe(clean_df)
+            
+            # Hide columns that shouldn't be displayed
+            for hidden_col in hidden_columns:
+                if hidden_col in clean_df.columns:
+                    gb.configure_column(hidden_col, hide=True)
             # Enable row selection for moving records back to Bulk Review
             gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
             # Removed pagination to show all rejected records at once
@@ -3762,7 +3821,7 @@ with rejected_tab:
             st.markdown("### 📋 Rejected Records Table")
             st.markdown(f"*Showing all {len(clean_df)} rejected records*")
             selected_rejected = AgGrid(
-                clean_df[display_columns],
+                clean_df,  # Pass full dataframe so JavaScript can access hidden columns
                 gridOptions=grid_options,
                 height=400,
                 width='100%',

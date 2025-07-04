@@ -277,7 +277,11 @@ class DatabaseManager:
                 "tier_used": loan_data.get('tier_used', 'Unknown'),
                 "status": reason,  # 'no_content_found' or 'processing_failed'
                 "workflow_stage": 'found',  # Default workflow stage
-                "last_attempt_result": reason
+                "last_attempt_result": reason,
+                # NEW: Store original source URLs for View link transparency
+                "original_urls": loan_data.get('original_urls', ''),
+                "urls_attempted": loan_data.get('urls_attempted', 0),
+                "failure_reason": loan_data.get('failure_reason', reason)
             }
             
             result = self.supabase.table('clips').insert(db_data).execute()

@@ -47,4 +47,50 @@ LEFT JOIN processing_runs pr ON c.processing_run_id = pr.id
 ORDER BY c.processed_date DESC;
 
 -- Set workflow_stage for existing records
-UPDATE clips SET workflow_stage = 'found' WHERE workflow_stage IS NULL; 
+UPDATE clips SET workflow_stage = 'found' WHERE workflow_stage IS NULL;
+
+-- Add original_urls column if it doesn't exist (for View link in Rejected/Issues tab)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clips' AND column_name = 'original_urls') THEN
+        ALTER TABLE clips ADD COLUMN original_urls TEXT;
+        
+        RAISE NOTICE 'Added original_urls column to clips table';
+    ELSE
+        RAISE NOTICE 'original_urls column already exists in clips table';
+    END IF;
+END
+$$;
+
+-- Add urls_attempted column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clips' AND column_name = 'urls_attempted') THEN
+        ALTER TABLE clips ADD COLUMN urls_attempted INTEGER DEFAULT 0;
+        
+        RAISE NOTICE 'Added urls_attempted column to clips table';
+    ELSE
+        RAISE NOTICE 'urls_attempted column already exists in clips table';
+    END IF;
+END
+$$;
+
+-- Add failure_reason column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clips' AND column_name = 'failure_reason') THEN
+        ALTER TABLE clips ADD COLUMN failure_reason TEXT;
+        
+        RAISE NOTICE 'Added failure_reason column to clips table';
+    ELSE
+        RAISE NOTICE 'failure_reason column already exists in clips table';
+    END IF;
+END
+$$;
+
+-- Verify the changes
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_name = 'clips'
+AND column_name IN ('workflow_stage', 'original_urls', 'urls_attempted', 'failure_reason')
+ORDER BY column_name; 
