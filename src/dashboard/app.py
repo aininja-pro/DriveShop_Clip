@@ -3847,30 +3847,45 @@ with rejected_tab:
                 }
             )
             
-            # Configure specific columns with extra wide widths to make rows skinnier
+            # Configure columns with auto-sizing (no fixed widths) for balanced layout
             if "Office" in display_columns:
-                gb.configure_column("Office", width=200, pinned='left')  # Extra wide for office names
-            gb.configure_column("WO #", width=160, pinned='left')  # Extra wide for work order numbers
-            gb.configure_column("Model", width=380)  # Extra wide for long model names
-            gb.configure_column("Media Contact", width=260)  # Extra wide for contact names
-            gb.configure_column("Publication", width=260)  # Extra wide for publication names
+                gb.configure_column("Office", pinned='left')  # Keep pinned but auto-size
+            gb.configure_column("WO #", pinned='left')  # Keep pinned but auto-size
             
-            # Configure the View column with the custom renderer (same as bulk review)
+            # Configure the View column with the custom renderer (same as bulk review) 
             if "📄 View" in display_columns:
                 gb.configure_column(
                     "📄 View", 
                     cellRenderer=cellRenderer_view,
-                    width=120,
+                    width=100,  # Small fixed width for View column
                     sortable=False,
                     filter=False
                 )
                 # Hide the Searched URL column since it's only used for the cellRenderer
                 gb.configure_column("Searched URL", hide=True)
             
-
-            gb.configure_column("⚠️ Rejection Reason", width=280, wrapText=True, autoHeight=True)  # Extra wide for rejection reasons
-            gb.configure_column("📋 Details", width=1600, wrapText=True, autoHeight=True)  # Maximum wide for detailed information
-            gb.configure_column("📅 Processed", width=200)  # Extra wide for date/time stamps
+            # Configure text columns with wrapping but no fixed width
+            gb.configure_column("⚠️ Rejection Reason", wrapText=True, autoHeight=True)
+            gb.configure_column("📋 Details", wrapText=True, autoHeight=True)
+            
+            # Enable auto-sizing for all columns
+            gb.configure_grid_options(
+                autoSizeStrategy={
+                    'type': 'fitGridWidth',
+                    'defaultMinWidth': 100,
+                    'columnLimits': [
+                        {'key': 'Office', 'minWidth': 80},
+                        {'key': 'WO #', 'minWidth': 80},
+                        {'key': 'Model', 'minWidth': 120},
+                        {'key': 'Media Contact', 'minWidth': 120},
+                        {'key': 'Publication', 'minWidth': 120},
+                        {'key': '📄 View', 'minWidth': 80, 'maxWidth': 100},
+                        {'key': '⚠️ Rejection Reason', 'minWidth': 150},
+                        {'key': '📋 Details', 'minWidth': 200},
+                        {'key': '📅 Processed', 'minWidth': 100}
+                    ]
+                }
+            )
             
             # Build grid options
             grid_options = gb.build()
@@ -3884,11 +3899,12 @@ with rejected_tab:
                 width='100%',
                 data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                fit_columns_on_grid_load=True,
+                fit_columns_on_grid_load=False,  # Disable to allow auto-sizing
                 theme='streamlit',
                 enable_enterprise_modules=True,
                 allow_unsafe_jscode=True,
-                reload_data=True
+                reload_data=True,
+                columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW'  # Enable auto-sizing
             )
             
             # Optional: Add functionality to move selected rejected records back to Bulk Review
