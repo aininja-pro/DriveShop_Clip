@@ -676,6 +676,109 @@ class DatabaseManager:
             logger.error(f"❌ Failed to get approved clips by stage: {e}")
             return []
 
+    # ========== ENHANCED FILTERING METHODS ==========
+    
+    def get_latest_processing_run_id(self) -> Optional[str]:
+        """Get the ID of the most recent processing run"""
+        try:
+            result = self.supabase.table('processing_runs')\
+                .select('id')\
+                .order('start_time', desc=True)\
+                .limit(1)\
+                .execute()
+            
+            if result.data:
+                latest_run_id = result.data[0]['id']
+                logger.info(f"✅ Retrieved latest processing run ID: {latest_run_id}")
+                return latest_run_id
+            else:
+                logger.warning("⚠️ No processing runs found")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get latest processing run ID: {e}")
+            return None
+    
+    def get_all_failed_clips(self, run_id: str = None, start_date: str = None, end_date: str = None) -> List[Dict[str, Any]]:
+        """
+        Get all failed clips (no_content_found + processing_failed) with optional filtering
+        
+        Args:
+            run_id: Filter by specific processing run ID
+            start_date: Filter by start date (YYYY-MM-DD format)
+            end_date: Filter by end date (YYYY-MM-DD format)
+            
+        Returns:
+            List of failed clip records
+        """
+        try:
+            # Get both types of failed clips
+            query = self.supabase.table('clips').select('*').in_('status', ['no_content_found', 'processing_failed'])
+            
+            # Apply filters
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            if start_date:
+                query = query.gte('processed_date', start_date)
+            
+            if end_date:
+                # Add one day to include the end date
+                from datetime import datetime, timedelta
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+                end_date_inclusive = (end_date_obj + timedelta(days=1)).strftime('%Y-%m-%d')
+                query = query.lt('processed_date', end_date_inclusive)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            filter_desc = []
+            if run_id:
+                filter_desc.append(f"run_id={run_id}")
+            if start_date:
+                filter_desc.append(f"start_date={start_date}")
+            if end_date:
+                filter_desc.append(f"end_date={end_date}")
+            
+            filter_str = f" with filters: {', '.join(filter_desc)}" if filter_desc else ""
+            logger.info(f"✅ Retrieved {len(result.data)} failed clips{filter_str}")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get all failed clips: {e}")
+            return []
+    
+    def get_current_run_failed_clips(self) -> List[Dict[str, Any]]:
+        """Get failed clips from the most recent processing run only"""
+        try:
+            latest_run_id = self.get_latest_processing_run_id()
+            
+            if latest_run_id:
+                return self.get_all_failed_clips(run_id=latest_run_id)
+            else:
+                logger.warning("⚠️ No processing runs found, returning empty list")
+                return []
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get current run failed clips: {e}")
+            return []
+    
+    def get_processing_run_info(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Get information about a specific processing run"""
+        try:
+            result = self.supabase.table('processing_runs').select('*').eq('id', run_id).execute()
+            
+            if result.data:
+                run_info = result.data[0]
+                logger.info(f"✅ Retrieved info for processing run: {run_info['run_name']}")
+                return run_info
+            else:
+                logger.warning(f"⚠️ No processing run found with ID {run_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to get processing run info: {e}")
+            return None
+
 # Global database instance
 _db_instance = None
 

@@ -3491,20 +3491,128 @@ with bulk_review_tab:
 
 
 
-# ========== REJECTED/ISSUES TAB (Transparency Dashboard) ==========
+# ========== REJECTED/ISSUES TAB (Enhanced with Current Run + Historical + Date Range) ==========
 with rejected_tab:
+    # Initialize session state for filtering mode
+    if 'rejected_view_mode' not in st.session_state:
+        st.session_state.rejected_view_mode = 'current_run'  # Default to current run
+    
+    # Compact Filtering Controls - Single Row
+    col_toggle, col_dates, col_info = st.columns([1, 2, 2])
+    
+    with col_toggle:
+        if st.session_state.rejected_view_mode == 'current_run':
+            if st.button("📊 Show Historical", key="show_historical", help="View all historical failed attempts"):
+                st.session_state.rejected_view_mode = 'historical'
+                st.rerun()
+        else:
+            if st.button("🔄 Current Run", key="show_current", help="View only the most recent processing run"):
+                st.session_state.rejected_view_mode = 'current_run'
+                st.rerun()
+    
+    # Date range filtering (only shown in historical mode)
+    start_date = None
+    end_date = None
+    
+    with col_dates:
+        if st.session_state.rejected_view_mode == 'historical':
+            col_start, col_end = st.columns(2)
+            with col_start:
+                # Default to 30 days ago
+                from datetime import datetime, timedelta
+                default_start = datetime.now() - timedelta(days=30)
+                start_date = st.date_input("From", value=default_start, key="rejected_start_date")
+            with col_end:
+                # Default to today
+                default_end = datetime.now()
+                end_date = st.date_input("To", value=default_end, key="rejected_end_date")
+    
+    with col_info:
+        if st.session_state.rejected_view_mode == 'current_run':
+            st.caption("🔄 Current run failures only")
+        else:
+            date_range = ""
+            if start_date and end_date:
+                date_range = f" ({start_date} to {end_date})"
+            st.caption(f"📊 Historical view{date_range}")
+    
     # Load rejected clips and failed processing attempts from database
     try:
-        # Get rejected clips from database
+        # Choose data source based on mode
+        if st.session_state.rejected_view_mode == 'current_run':
+            # Current run mode - get only the most recent processing run
+            current_run_failed_clips = db.get_current_run_failed_clips()
+            
+            # Get run info for display
+            if current_run_failed_clips:
+                latest_run_id = db.get_latest_processing_run_id()
+                run_info = db.get_processing_run_info(latest_run_id) if latest_run_id else None
+                
+                if run_info:
+                    run_name = run_info.get('run_name', 'Unknown')
+                    run_date = run_info.get('start_time', 'Unknown')[:19] if run_info.get('start_time') else 'Unknown'  # Truncate timestamp
+                    st.caption(f"🔄 **{run_name}** - {run_date}")
+            
+            # Convert to combined issues format
+            combined_issues = []
+            for clip in current_run_failed_clips:
+                combined_issues.append({
+                    'WO #': clip['wo_number'],
+                    'Office': clip.get('office', ''),
+                    'Make': clip.get('make', ''),
+                    'Model': clip.get('model', ''),
+                    'To': clip.get('contact', ''),
+                    'Affiliation': clip.get('office', ''),
+                    'Rejection_Reason': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
+                    'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
+                    'Processed_Date': clip.get('processed_date', ''),
+                    'Type': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
+                    'original_urls': clip.get('original_urls', ''),
+                    'urls_attempted': clip.get('urls_attempted', 0),
+                    'failure_reason': clip.get('failure_reason', '')
+                })
+            
+        else:
+            # Historical mode - get all failed clips with optional date filtering
+            start_date_str = start_date.strftime('%Y-%m-%d') if start_date else None
+            end_date_str = end_date.strftime('%Y-%m-%d') if end_date else None
+            
+            all_failed_clips = db.get_all_failed_clips(
+                start_date=start_date_str,
+                end_date=end_date_str
+            )
+            
+            # Display date range info compactly
+            if start_date_str and end_date_str:
+                st.caption(f"📊 **Historical:** {start_date_str} to {end_date_str}")
+            elif start_date_str:
+                st.caption(f"📊 **Historical:** From {start_date_str}")
+            elif end_date_str:
+                st.caption(f"📊 **Historical:** Until {end_date_str}")
+            else:
+                st.caption("📊 **Historical:** All Time")
+            
+            # Convert to combined issues format
+            combined_issues = []
+            for clip in all_failed_clips:
+                combined_issues.append({
+                    'WO #': clip['wo_number'],
+                    'Office': clip.get('office', ''),
+                    'Make': clip.get('make', ''),
+                    'Model': clip.get('model', ''),
+                    'To': clip.get('contact', ''),
+                    'Affiliation': clip.get('office', ''),
+                    'Rejection_Reason': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
+                    'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
+                    'Processed_Date': clip.get('processed_date', ''),
+                    'Type': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
+                    'original_urls': clip.get('original_urls', ''),
+                    'urls_attempted': clip.get('urls_attempted', 0),
+                    'failure_reason': clip.get('failure_reason', '')
+                })
+        
+        # Also add manually rejected clips (always shown regardless of mode)
         rejected_clips = db.get_rejected_clips()
-        
-        # Convert to DataFrames
-        rejected_df = pd.DataFrame(rejected_clips) if rejected_clips else pd.DataFrame()
-        
-        # Combine rejected clips and failed attempts for display
-        combined_issues = []
-        
-        # Add rejected clips
         for clip in rejected_clips:
             combined_issues.append({
                 'WO #': clip['wo_number'],
@@ -3512,62 +3620,21 @@ with rejected_tab:
                 'Make': clip.get('make', ''),
                 'Model': clip.get('model', ''),
                 'To': clip.get('contact', ''),
-                'Affiliation': clip.get('office', ''),  # Use office as affiliation fallback
+                'Affiliation': clip.get('office', ''),
                 'Rejection_Reason': 'User Rejected Clip',
                 'URL_Details': clip.get('clip_url', ''),
                 'Processed_Date': clip.get('processed_date', ''),
-                'Type': 'Rejected Clip'
+                'Type': 'Rejected Clip',
+                'original_urls': '',  # Rejected clips don't have original URLs
+                'urls_attempted': 0,
+                'failure_reason': ''
             })
         
-        # Add clips where no content was found
-        no_content_clips = db.get_no_content_clips()
-        for clip in no_content_clips:
-            combined_issues.append({
-                'WO #': clip['wo_number'],
-                'Office': clip.get('office', ''),
-                'Make': clip.get('make', ''),
-                'Model': clip.get('model', ''),
-                'To': clip.get('contact', ''),
-                'Affiliation': clip.get('office', ''),  # Use office as affiliation fallback
-                'Rejection_Reason': 'No Content Found',
-                'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
-                'Processed_Date': clip.get('processed_date', ''),
-                'Type': 'No Content Found',
-                # NEW: Include original URLs from database
-                'original_urls': clip.get('original_urls', ''),
-                'urls_attempted': clip.get('urls_attempted', 0),
-                'failure_reason': clip.get('failure_reason', '')
-            })
-        
-        # Add clips where processing failed
-        processing_failed_clips = db.get_processing_failed_clips()
-        for clip in processing_failed_clips:
-            combined_issues.append({
-                'WO #': clip['wo_number'],
-                'Office': clip.get('office', ''),
-                'Make': clip.get('make', ''),
-                'Model': clip.get('model', ''),
-                'To': clip.get('contact', ''),
-                'Affiliation': clip.get('office', ''),  # Use office as affiliation fallback
-                'Rejection_Reason': 'Processing Failed',
-                'URL_Details': f"Error: {clip.get('last_attempt_result', 'Technical error')}",
-                'Processed_Date': clip.get('processed_date', ''),
-                'Type': 'Processing Failed',
-                # NEW: Include original URLs from database
-                'original_urls': clip.get('original_urls', ''),
-                'urls_attempted': clip.get('urls_attempted', 0),
-                'failure_reason': clip.get('failure_reason', '')
-            })
-        
-        # NOTE: No longer adding from wo_tracking table to avoid duplicates
-        # The wo_tracking table is only used for smart retry logic
-        # All display data now comes from the clips table with proper status
-        
+        # Create DataFrame from combined issues
         if combined_issues:
-            # Create DataFrame from combined issues
             rejected_df = pd.DataFrame(combined_issues)
         else:
-            rejected_df = pd.DataFrame()  # Empty DataFrame if no issues
+            rejected_df = pd.DataFrame()
             
     except Exception as e:
         st.error(f"❌ Error loading rejected clips from database: {e}")
@@ -3580,25 +3647,16 @@ with rejected_tab:
             rejected_df['WO #'] = rejected_df['WO #'].astype(str)
         
         if not rejected_df.empty:
-            # Summary metrics for rejected records
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("📝 Total Rejected", len(rejected_df))
-            with col2:
-                urls_processed = rejected_df['URLs_Processed'].sum() if 'URLs_Processed' in rejected_df.columns else 0
-                st.metric("🔗 URLs Attempted", urls_processed)
-            with col3:
-                # Count by rejection reason
-                rejection_counts = rejected_df['Rejection_Reason'].value_counts() if 'Rejection_Reason' in rejected_df.columns else {}
-                top_reason = rejection_counts.index[0] if len(rejection_counts) > 0 else "None"
-                st.metric("🚫 Top Issue", top_reason[:20] + "..." if len(top_reason) > 20 else top_reason)
-            with col4:
-                # Processing efficiency
-                total_attempted = len(rejected_df)
-                failed_crawls = len(rejected_df[rejected_df['Rejection_Reason'].str.contains('No relevant clips|Low relevance', case=False, na=False)]) if 'Rejection_Reason' in rejected_df.columns else 0
-                st.metric("⚡ Technical Issues", f"{total_attempted - failed_crawls}/{total_attempted}")
-            
-            st.markdown("---")
+            # Compact metrics in a single row
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 8px; border-radius: 4px; margin: 8px 0;">
+                <small>
+                    📝 <strong>{len(rejected_df)}</strong> rejected  •  
+                    🚫 <strong>{rejected_df['Rejection_Reason'].value_counts().index[0] if 'Rejection_Reason' in rejected_df.columns and len(rejected_df) > 0 else 'N/A'}</strong> top issue  •  
+                    ⚡ <strong>{len(rejected_df[rejected_df['Rejection_Reason'].str.contains('No Content Found|Processing Failed', case=False, na=False)] if 'Rejection_Reason' in rejected_df.columns else [])}/{len(rejected_df)}</strong> technical failures
+                </small>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Create AgGrid table (same format as bulk review but for rejected records)
             clean_df = rejected_df.copy()
@@ -3818,8 +3876,7 @@ with rejected_tab:
             grid_options = gb.build()
             
             # Display AgGrid table for rejected records
-            st.markdown("### 📋 Rejected Records Table")
-            st.markdown(f"*Showing all {len(clean_df)} rejected records*")
+            st.markdown("**📋 Rejected Records**")
             selected_rejected = AgGrid(
                 clean_df,  # Pass full dataframe so JavaScript can access hidden columns
                 gridOptions=grid_options,
