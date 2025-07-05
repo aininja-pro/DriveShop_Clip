@@ -364,19 +364,47 @@ def apply_custom_sidebar_styling():
         margin: 0 !important;
     }
     
-    /* Button styling in sidebar */
+    /* Button styling in sidebar - LIGHT BLUE BUTTONS with DARK TEXT for visibility */
     .stSidebar .stButton > button {
-        background-color: #000000 !important;
-        color: white !important;
-        border: none !important;
+        background-color: #e3f2fd !important;
+        color: #1565c0 !important;
+        border: 2px solid #90caf9 !important;
         border-radius: 6px !important;
-        font-weight: 500;
-        transition: background-color 0.3s ease;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+        padding: 12px 16px !important;
+        min-height: 44px !important;
+        width: 100% !important;
+        text-align: center !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
     
     .stSidebar .stButton > button:hover {
-        background-color: #333333 !important;
-        color: white !important;
+        background-color: #bbdefb !important;
+        color: #0d47a1 !important;
+        border-color: #64b5f6 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.25) !important;
+    }
+    
+    /* Force dark blue text on all sidebar buttons - override any inherited styles */
+    .stSidebar .stButton > button * {
+        color: #1565c0 !important;
+    }
+    
+    .stSidebar .stButton > button span {
+        color: #1565c0 !important;
+    }
+    
+    .stSidebar .stButton > button:hover * {
+        color: #0d47a1 !important;
+    }
+    
+    .stSidebar .stButton > button:hover span {
+        color: #0d47a1 !important;
     }
     
     /* Logo container styling */
@@ -1688,7 +1716,9 @@ with st.sidebar:
             st.session_state.mapping_update_msg = (success, msg)
             st.rerun()
 
-    st.markdown("---")
+    # Thin separator line
+    st.markdown('<hr style="margin: 1rem 0; border: none; height: 1px; background-color: #666666;">', unsafe_allow_html=True)
+    
     st.markdown("### Process Loans from Live URL")
     
     loans_url = st.text_input(
@@ -1831,7 +1861,7 @@ with st.sidebar:
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Load Data for Filtering", key='load_data_for_filtering'):
+        if st.button("Load Data", key='load_data_for_filtering'):
             with st.spinner("Loading data from URL..."):
                 success, df, data_info = load_loans_data_for_filtering(loans_url)
                 if success:
@@ -1924,7 +1954,9 @@ with st.sidebar:
         info = st.session_state.get('loans_data_info', {})
         st.markdown(f"📊 Data loaded: **{info.get('total_records', 0)}** total records, **{info.get('offices_count', 0)}** offices, **{info.get('makes_count', 0)}** makes")
 
-    st.markdown("---")
+    # Thin separator line
+    st.markdown('<hr style="margin: 1rem 0; border: none; height: 1px; background-color: #666666;">', unsafe_allow_html=True)
+    
     st.markdown("**📁 Process from File Upload**")
     uploaded_file = st.file_uploader("Upload Loans CSV/XLSX", type=['csv', 'xlsx'], label_visibility="collapsed")
     
@@ -1942,7 +1974,8 @@ with st.sidebar:
                 else:
                     st.error("❌ Failed")
     
-    st.markdown("---")
+    # Thin separator line
+    st.markdown('<hr style="margin: 1rem 0; border: none; height: 1px; background-color: #666666;">', unsafe_allow_html=True)
 
     if st.button("🔄 Process Default File (for testing)", use_container_width=True):
         with st.spinner("Processing default file..."):
@@ -3314,8 +3347,8 @@ with bulk_review_tab:
 
 # ========== APPROVED QUEUE TAB (Enhanced with FMS Export) ==========
 with approved_queue_tab:
-    st.markdown("### ✅ Approved Queue")
-    st.markdown("*Manage approved clips through the FMS export workflow*")
+    st.markdown('<h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.2rem; font-weight: 600; color: #2c3e50;">✅ Approved Queue</h4>', unsafe_allow_html=True)
+    st.markdown('<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #6c757d; font-style: italic;">Manage approved clips through the FMS export workflow</p>', unsafe_allow_html=True)
     
     # Initialize session state for workflow filtering
     if 'approved_queue_filter' not in st.session_state:
@@ -3373,13 +3406,13 @@ with approved_queue_tab:
             tab_description = "Delete old clips to manage database size"
         
         # Display current filter info
-        st.markdown(f"#### {tab_title}")
-        st.markdown(f"*{tab_description}*")
+        st.markdown(f'<h5 style="margin-top: 0.5rem; margin-bottom: 0.3rem; font-size: 1.1rem; font-weight: 600; color: #2c3e50;">{tab_title}</h5>', unsafe_allow_html=True)
+        st.markdown(f'<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.85rem; color: #6c757d; font-style: italic;">{tab_description}</p>', unsafe_allow_html=True)
         
         if st.session_state.approved_queue_filter == 'archive_mgmt':
             # Archive Management Section
-            st.markdown("---")
-            st.markdown("### 🗑️ Archive Management")
+            st.markdown('<hr style="margin: 1rem 0; border: none; height: 1px; background-color: #e0e0e0;">', unsafe_allow_html=True)
+            st.markdown('<h5 style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 600; color: #2c3e50;">🗑️ Archive Management</h5>', unsafe_allow_html=True)
             
             col_days, col_action = st.columns([1, 2])
             
