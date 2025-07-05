@@ -50,6 +50,7 @@ sys.path.append(str(project_root))
 # Import local modules
 try:
     from src.ingest.ingest_database import run_ingest_database, run_ingest_database_with_filters
+    from src.utils.database import get_database
 except ImportError:
     # Define a stub for when the module is not yet implemented
     def run_ingest_database(file_path):
@@ -58,6 +59,9 @@ except ImportError:
     def run_ingest_database_with_filters(url, filters):
         st.error("Database ingest with filters module not implemented yet")
         return False
+    def get_database():
+        st.error("Database module not available")
+        return None
 
 def load_person_outlets_mapping():
     """Load Person_ID to Media Outlets mapping from JSON file"""
@@ -771,6 +775,16 @@ def apply_custom_sidebar_styling():
 
 def create_client_excel_report(df, approved_df=None):
     """Create a professional Excel report for client presentation"""
+    
+    # Handle empty DataFrame case
+    if df is None or df.empty:
+        st.warning("⚠️ No data available to create Excel report. Please process some loans first.")
+        # Return a minimal workbook with just headers
+        wb = Workbook()
+        wb.remove(wb.active)
+        summary_ws = wb.create_sheet("No Data Available")
+        summary_ws.append(["No clips found", "Please process loans first"])
+        return wb
     
     # Create workbook with multiple sheets
     wb = Workbook()
@@ -1941,8 +1955,9 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_review_tab, rejected_tab, analysis_tab, creatoriq_tab, history_tab = st.tabs([
+bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, creatoriq_tab, history_tab = st.tabs([
     "📋 Bulk Review", 
+    "✅ Approved Queue",
     "⚠️ Rejected/Issues", 
     "📊 Detailed Analysis", 
     "🎬 CreatorIQ Export",
@@ -2191,7 +2206,6 @@ with bulk_review_tab:
     
     # Try to load results from database
     try:
-        from src.utils.database import get_database
         db = get_database()
         clips_data = db.get_pending_clips()
         
@@ -3102,27 +3116,31 @@ with bulk_review_tab:
                     # Excel Export Button
                     if st.button("📊 Excel Report"):
                         try:
-                            # Load approved clips if available
-                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                            approved_df = None
-                            if os.path.exists(approved_file):
-                                approved_df = pd.read_csv(approved_file)
-                            
-                            # Create professional Excel report using current display data
-                            wb = create_client_excel_report(df, approved_df)
-                            
-                            # Save to bytes
-                            import io
-                            excel_buffer = io.BytesIO()
-                            wb.save(excel_buffer)
-                            excel_buffer.seek(0)
-                            
-                            st.download_button(
-                                label="📥 Download Excel Report",
-                                data=excel_buffer.getvalue(),
-                                file_name=f"DriveShop_Bulk_Review_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
+                            # Check if we have data to export
+                            if df.empty:
+                                st.warning("⚠️ No clips available for Excel export. Process some loans first.")
+                            else:
+                                # Load approved clips if available
+                                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                                approved_df = None
+                                if os.path.exists(approved_file):
+                                    approved_df = pd.read_csv(approved_file)
+                                
+                                # Create professional Excel report using current display data
+                                wb = create_client_excel_report(df, approved_df)
+                                
+                                # Save to bytes
+                                import io
+                                excel_buffer = io.BytesIO()
+                                wb.save(excel_buffer)
+                                excel_buffer.seek(0)
+                                
+                                st.download_button(
+                                    label="📥 Download Excel Report",
+                                    data=excel_buffer.getvalue(),
+                                    file_name=f"DriveShop_Bulk_Review_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
                         except Exception as e:
                             st.error(f"Error creating Excel report: {e}")
                 
@@ -3137,11 +3155,30 @@ with bulk_review_tab:
                     col_confirm, col_cancel = st.columns(2)
                     with col_confirm:
                         if st.button("✅ Confirm Approval", type="primary", key="confirm_approval_btn"):
-                            # Process the approvals
+                                                            # Process the approvals
                             selected_wos = st.session_state.selected_for_approval
                             if selected_wos:
+                                # Update clips in database to approved status (workflow_stage stays 'found' for Approved Queue)
+                                try:
+                                    for wo_number in selected_wos:
+                                        db.supabase.table('clips').update({
+                                            'status': 'approved',
+                                            'workflow_stage': 'found'  # Clips go to Approved Queue first
+                                        }).eq('wo_number', wo_number).execute()
+                                    
+                                    logger.info(f"✅ Approved {len(selected_wos)} clips - moved to Approved Queue")
+                                except Exception as e:
+                                    st.error(f"❌ Error approving clips in database: {e}")
+                                    logger.error(f"Database approval error: {e}")
+                                
+                                # Also maintain CSV compatibility for legacy systems
                                 approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                                selected_rows = df[df['WO #'].astype(str).isin(selected_wos)]
+                                # Use the original df from database (ensure it has WO # column)
+                                if 'WO #' in df.columns:
+                                    selected_rows = df[df['WO #'].astype(str).isin(selected_wos)]
+                                else:
+                                    # Fallback: create minimal rows for CSV compatibility
+                                    selected_rows = pd.DataFrame([{'WO #': wo} for wo in selected_wos])
                                 
                                 # Save to approved clips CSV
                                 if os.path.exists(approved_file):
@@ -3484,6 +3521,215 @@ with bulk_review_tab:
     st.markdown('<div style="height: 100px;"></div>', unsafe_allow_html=True)
 
 
+# ========== APPROVED QUEUE TAB (New Workflow Stage) ==========
+with approved_queue_tab:
+    st.markdown("### ✅ Approved Queue")
+    st.markdown("*Clips approved in Bulk Review, awaiting sentiment analysis and export*")
+    
+    # Load approved queue clips from database
+    try:
+        db = get_database()
+        approved_queue_clips = db.get_approved_queue_clips()
+        
+        if approved_queue_clips:
+            # Convert to DataFrame
+            approved_df = pd.DataFrame(approved_queue_clips)
+            
+            # Ensure WO # is treated as string
+            if 'wo_number' in approved_df.columns:
+                approved_df['wo_number'] = approved_df['wo_number'].astype(str)
+            
+            # Quick stats overview
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Approved Clips", len(approved_df))
+            with col2:
+                avg_score = approved_df['relevance_score'].mean() if 'relevance_score' in approved_df.columns and not approved_df.empty else 0
+                st.metric("Avg Relevance", f"{avg_score:.1f}/10")
+            with col3:
+                unique_contacts = approved_df['contact'].nunique() if 'contact' in approved_df.columns else 0
+                st.metric("Media Contacts", unique_contacts)
+            with col4:
+                # Count clips ready for sentiment analysis
+                ready_count = len(approved_df[approved_df['workflow_stage'] == 'found']) if 'workflow_stage' in approved_df.columns else len(approved_df)
+                st.metric("Ready for Sentiment", ready_count)
+            
+            # Display approved clips table
+            display_df = approved_df.copy()
+            
+            # Create clean display structure
+            clean_df = pd.DataFrame()
+            clean_df['WO #'] = display_df['wo_number'] if 'wo_number' in display_df.columns else ''
+            clean_df['Office'] = display_df['office'] if 'office' in display_df.columns else ''
+            clean_df['Make'] = display_df['make'] if 'make' in display_df.columns else ''
+            clean_df['Model'] = display_df['model'] if 'model' in display_df.columns else ''
+            clean_df['Contact'] = display_df['contact'] if 'contact' in display_df.columns else ''
+            clean_df['Media Outlet'] = display_df['media_outlet'] if 'media_outlet' in display_df.columns else ''
+            clean_df['Relevance'] = display_df['relevance_score'].apply(lambda x: f"{x}/10" if pd.notna(x) and x != 'N/A' else 'N/A') if 'relevance_score' in display_df.columns else 'N/A'
+            clean_df['Approved Date'] = pd.to_datetime(display_df['processed_date']).dt.strftime('%b %d, %Y') if 'processed_date' in display_df.columns else ''
+            
+            # Add View column for URLs
+            clean_df['Clip URL'] = display_df['clip_url'] if 'clip_url' in display_df.columns else ''
+            clean_df['📄 View'] = clean_df['Clip URL']
+            
+            # Add workflow status
+            clean_df['Status'] = display_df['workflow_stage'].apply(
+                lambda x: "📋 Ready for Sentiment" if x == 'found' else 
+                         "✅ Sentiment Complete" if x == 'sentiment_analyzed' else 
+                         f"📊 {x.replace('_', ' ').title()}"
+            ) if 'workflow_stage' in display_df.columns else 'Unknown'
+            
+            # Add selection column for batch operations
+            clean_df['Select'] = False
+            
+            # Configure AgGrid for approved queue
+            gb = GridOptionsBuilder.from_dataframe(clean_df)
+            
+            # Enable advanced features
+            gb.configure_side_bar()
+            gb.configure_default_column(
+                filter="agSetColumnFilter",
+                sortable=True,
+                resizable=True,
+                editable=False,
+                groupable=True,
+                value=True,
+                enableRowGroup=True,
+                enablePivot=True,
+                enableValue=True,
+                filterParams={
+                    "buttons": ["reset", "apply"],
+                    "closeOnApply": True,
+                    "newRowsAction": "keep"
+                }
+            )
+            
+            # Configure selection
+            gb.configure_selection('multiple', use_checkbox=True)
+            
+            # Configure columns
+            gb.configure_column("WO #", width=100, pinned='left')
+            gb.configure_column("Office", width=100)
+            gb.configure_column("Make", width=100)
+            gb.configure_column("Model", width=120)
+            gb.configure_column("Contact", width=150)
+            gb.configure_column("Media Outlet", width=180)
+            gb.configure_column("Relevance", width=100)
+            gb.configure_column("Approved Date", width=120)
+            gb.configure_column("Status", width=180)
+            
+            # Hide raw URL column
+            gb.configure_column("Clip URL", hide=True)
+            
+            # Configure View column with URL renderer
+            cellRenderer_view = JsCode("""
+            class UrlCellRenderer {
+              init(params) {
+                this.eGui = document.createElement('a');
+                this.eGui.innerText = '📄 View';
+                this.eGui.href = params.data['Clip URL'];
+                this.eGui.target = '_blank';
+                this.eGui.style.color = '#1f77b4';
+                this.eGui.style.textDecoration = 'underline';
+                this.eGui.style.cursor = 'pointer';
+              }
+
+              getGui() {
+                return this.eGui;
+              }
+
+              refresh(params) {
+                return false;
+              }
+            }
+            """)
+            
+            gb.configure_column(
+                "📄 View", 
+                cellRenderer=cellRenderer_view,
+                width=100,
+                sortable=False,
+                filter=False
+            )
+            
+            # Build and display grid
+            grid_options = gb.build()
+            
+            selected_approved = AgGrid(
+                clean_df,
+                gridOptions=grid_options,
+                allow_unsafe_jscode=True,
+                update_mode=GridUpdateMode.SELECTION_CHANGED,
+                height=400,
+                fit_columns_on_grid_load=True,
+                theme="alpine",
+                enable_enterprise_modules=True
+            )
+            
+            # Action buttons for batch operations
+            st.markdown("---")
+            st.markdown("### 🎯 Batch Actions")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("🧠 Run Sentiment Analysis", help="Analyze sentiment for selected clips"):
+                    selected_rows = selected_approved.get('selected_rows', [])
+                    if selected_rows:
+                        st.info(f"📊 Sentiment analysis for {len(selected_rows)} clips will be implemented in Phase 2")
+                        # TODO: Implement sentiment analysis batch job
+                    else:
+                        st.warning("Please select clips for sentiment analysis")
+            
+            with col2:
+                if st.button("📤 Prepare for Export", help="Mark selected clips as ready for FMS export"):
+                    selected_rows = selected_approved.get('selected_rows', [])
+                    if selected_rows:
+                        st.info(f"📋 Export preparation for {len(selected_rows)} clips will be implemented in Phase 3")
+                        # TODO: Implement export preparation
+                    else:
+                        st.warning("Please select clips to prepare for export")
+            
+            with col3:
+                if st.button("🔄 Move Back to Review", help="Move selected clips back to Bulk Review"):
+                    selected_rows = selected_approved.get('selected_rows', [])
+                    if selected_rows:
+                        # Move clips back to pending_review status
+                        try:
+                            for row in selected_rows:
+                                wo_number = str(row.get('WO #', ''))
+                                if wo_number:
+                                    # Update status back to pending_review
+                                    db.supabase.table('clips').update({
+                                        'status': 'pending_review'
+                                    }).eq('wo_number', wo_number).execute()
+                            
+                            st.success(f"✅ Moved {len(selected_rows)} clips back to Bulk Review")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error moving clips: {e}")
+                    else:
+                        st.warning("Please select clips to move back")
+            
+        else:
+            st.info("📋 No approved clips in queue. Approve clips in Bulk Review to see them here.")
+            
+            # Show helpful instructions
+            st.markdown("""
+            **How the Approved Queue works:**
+            1. 📋 **Clips approved** in Bulk Review automatically appear here
+            2. 🧠 **Sentiment analysis** can be run in batches (Phase 2)
+            3. 📤 **Export preparation** readies clips for FMS delivery (Phase 3)
+            4. 🔄 **Move back** option if clips need re-review
+            
+            **Workflow Stages:**
+            - 📋 **Ready for Sentiment**: Just approved, needs AI analysis
+            - ✅ **Sentiment Complete**: Ready for export preparation
+            - 📤 **Export Ready**: Prepared for FMS delivery
+            """)
+    
+    except Exception as e:
+        st.error(f"❌ Error loading approved queue: {e}")
 
 
 # ========== REJECTED/ISSUES TAB (Enhanced with Current Run + Historical + Date Range) ==========

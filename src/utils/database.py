@@ -335,6 +335,101 @@ class DatabaseManager:
             logger.error(f"❌ Failed to get approved clips: {e}")
             return []
     
+    def get_approved_queue_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get approved clips that are in the queue (found stage, awaiting sentiment analysis)"""
+        try:
+            query = self.supabase.table('clips')\
+                .select('*')\
+                .eq('status', 'approved')\
+                .eq('workflow_stage', 'found')
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} approved queue clips")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get approved queue clips: {e}")
+            return []
+    
+    def get_ready_for_export_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
+        """Get clips that are ready for FMS export (approved + sentiment analyzed)"""
+        try:
+            query = self.supabase.table('clips')\
+                .select('*')\
+                .eq('status', 'approved')\
+                .eq('workflow_stage', 'sentiment_analyzed')
+            
+            if run_id:
+                query = query.eq('processing_run_id', run_id)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} ready for export clips")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get ready for export clips: {e}")
+            return []
+    
+    def get_exported_clips(self, start_date: str = None, end_date: str = None) -> List[Dict[str, Any]]:
+        """Get clips that have been exported to FMS"""
+        try:
+            query = self.supabase.table('clips')\
+                .select('*')\
+                .eq('status', 'approved')\
+                .eq('workflow_stage', 'exported')
+            
+            if start_date:
+                query = query.gte('processed_date', start_date)
+            if end_date:
+                query = query.lte('processed_date', end_date)
+            
+            result = query.order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} exported clips")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get exported clips: {e}")
+            return []
+    
+    def update_clip_workflow_stage(self, clip_id: str, workflow_stage: str) -> bool:
+        """Update a clip's workflow stage"""
+        try:
+            result = self.supabase.table('clips').update({
+                "workflow_stage": workflow_stage
+            }).eq('id', clip_id).execute()
+            
+            if result.data:
+                logger.info(f"✅ Updated clip {clip_id} workflow stage to {workflow_stage}")
+                return True
+            else:
+                logger.warning(f"⚠️ No clip found with ID {clip_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update clip workflow stage: {e}")
+            return False
+    
+    def bulk_update_workflow_stage(self, clip_ids: List[str], workflow_stage: str) -> int:
+        """Update multiple clips' workflow stage"""
+        try:
+            result = self.supabase.table('clips').update({
+                "workflow_stage": workflow_stage
+            }).in_('id', clip_ids).execute()
+            
+            updated_count = len(result.data) if result.data else 0
+            logger.info(f"✅ Updated {updated_count} clips to workflow stage {workflow_stage}")
+            return updated_count
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to bulk update workflow stage: {e}")
+            return 0
+    
     def get_rejected_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
         """Get clips that have been rejected"""
         try:
