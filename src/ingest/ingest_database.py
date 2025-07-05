@@ -238,16 +238,32 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str) -> Dict[str, An
             
             clip_results.append(result)
             successful_urls += 1
-            # REMOVED: Early termination - process ALL URLs to find BEST clip like OLD system
-            # break  # Only store first successful clip per loan
+            # Continue processing all URLs to find the BEST clip
     
-    logger.info(f"📊 URL Summary for {wo_number}: {successful_urls}/{len(urls)} URLs successful")
-    
-    return {
-        'wo_number': wo_number,
-        'successful': successful_urls > 0,
-        'clips': clip_results
-    }
+    # NEW: Select only the BEST clip per WO# (highest relevance score)
+    if clip_results:
+        # Sort by relevance score (highest first), then by processed date (most recent first)
+        best_clip = max(clip_results, key=lambda clip: (
+            clip.get('relevance_score', 0),
+            clip.get('processed_date', '1970-01-01')
+        ))
+        
+        logger.info(f"📊 Selected BEST clip for {wo_number}: relevance {best_clip.get('relevance_score', 0):.1f}/10")
+        logger.info(f"📊 URL Summary for {wo_number}: {successful_urls}/{len(urls)} URLs found, keeping best clip")
+        
+        return {
+            'wo_number': wo_number,
+            'successful': True,
+            'clips': [best_clip]  # Only return the best clip
+        }
+    else:
+        logger.info(f"📊 URL Summary for {wo_number}: {successful_urls}/{len(urls)} URLs successful")
+        
+        return {
+            'wo_number': wo_number,
+            'successful': False,
+            'clips': []
+        }
 
 async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[str, Any], db, run_id: str) -> bool:
     """
@@ -286,7 +302,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                     'model': loan.get('model'),
                     'contact': loan.get('to'),  # FIX: Get contact name from loan data, not clip_result
                     'person_id': clip_result.get('person_id'),
-                    'activity_id': clip_result.get('activity_id'),
+                    'activity_id': loan.get('activity_id'),  # FIX: Get Activity_ID from loan data, not clip_result
                     'clip_url': clip_result.get('clip_url'),
                     'extracted_content': clip_result.get('extracted_content'),
                     'published_date': clip_result.get('published_date').isoformat() if clip_result.get('published_date') else None,
@@ -329,7 +345,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                 'model': loan.get('model'),
                 'contact': loan.get('to'),
                 'person_id': loan.get('person_id'),
-                'activity_id': loan.get('activity_id'),
+                'activity_id': loan.get('activity_id'),  # Activity_ID is correctly sourced from loan data
                 'tier_used': result.get('tier_used', 'Unknown') if result else 'Unknown',
                 'workflow_stage': 'found',
                 # NEW: Store original source URLs for View link

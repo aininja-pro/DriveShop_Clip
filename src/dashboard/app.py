@@ -1855,7 +1855,7 @@ with st.sidebar:
                             'urls': urls,
                             'start_date': record.get('Start Date'),
                             'make': record.get('Make'),
-                            'article_id': record.get('Activity_ID'),  # Fixed: Use Activity_ID (with underscore)
+                            'activity_id': record.get('ActivityID'),  # FIXED: Use ActivityID (no underscore) - this is the actual column name in source data
                             'person_id': record.get('Person_ID'),
                             'office': record.get('Office')
                         })
@@ -1874,7 +1874,7 @@ with st.sidebar:
                         # Store batch processing info for next batch suggestion
                         if remapped_records:
                             # Get the last Activity ID from the processed records
-                            processed_activity_ids = [r.get('article_id') for r in remapped_records if r.get('article_id')]
+                            processed_activity_ids = [r.get('activity_id') for r in remapped_records if r.get('activity_id')]
                             if processed_activity_ids:
                                 last_processed_id = processed_activity_ids[-1]
                                 
