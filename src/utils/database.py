@@ -438,6 +438,28 @@ class DatabaseManager:
             logger.error(f"❌ Failed to update clip status: {e}")
             return False
     
+    def update_clip_media_outlet(self, wo_number: str, media_outlet: str) -> bool:
+        """Update the media outlet for a clip by WO number"""
+        try:
+            # Update the dedicated media_outlet field
+            result = self.supabase.table('clips').update({
+                "media_outlet": media_outlet
+            }).eq('wo_number', wo_number).execute()
+            
+            if result.data:
+                logger.info(f"✅ Updated media outlet for WO# {wo_number} to: {media_outlet}")
+                return True
+            else:
+                logger.warning(f"⚠️ No clip found with WO# {wo_number}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update media outlet for WO# {wo_number}: {e}")
+            # If the media_outlet column doesn't exist, show helpful error
+            if "column" in str(e).lower() and "media_outlet" in str(e).lower():
+                logger.error("💡 SOLUTION: Run the add_media_outlet_column.sql script in your Supabase SQL Editor first!")
+            return False
+    
     # ========== SMART RETRY LOGIC ==========
     
     def should_retry_wo(self, wo_number: str) -> bool:

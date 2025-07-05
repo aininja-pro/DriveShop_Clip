@@ -2210,12 +2210,11 @@ with bulk_review_tab:
                 'relevance_score': 'Relevance Score',
                 'status': 'Status',
                 'tier_used': 'Processing Method',
-                'published_date': 'Published Date'
+                'published_date': 'Published Date',
+                'media_outlet': 'Affiliation'  # Map media_outlet to Affiliation for UI compatibility
             })
             
-            # Set default values for missing columns
-            if 'Overall Sentiment' not in df.columns:
-                df['Overall Sentiment'] = 'N/A'
+            # Set default values for missing columns  
             if 'Affiliation' not in df.columns:
                 df['Affiliation'] = df.get('Media Outlet', 'N/A')
         else:
@@ -2331,22 +2330,8 @@ with bulk_review_tab:
                 else:
                     clean_df['Relevance'] = 'N/A'
                 
-                # Format sentiment with abbreviations and emojis for display
-                if 'Overall Sentiment' in display_df.columns:
-                    def format_sentiment(sentiment):
-                        if pd.isna(sentiment) or sentiment == 'N/A':
-                            return 'N/A'
-                        sentiment_map = {
-                            'positive': 'POS 😊',
-                            'negative': 'NEG 😞',
-                            'neutral': 'NEU 😐'
-                        }
-                        cleaned_sentiment = str(sentiment).lower().strip()
-                        return sentiment_map.get(cleaned_sentiment, str(sentiment))
-                    
-                    clean_df['Sentiment'] = display_df['Overall Sentiment'].apply(format_sentiment)
-                else:
-                    clean_df['Sentiment'] = 'N/A'
+                # REMOVED: Sentiment column - NEW database system uses cost-optimized GPT (relevance-only)
+                # Sentiment analysis is not performed in the NEW system to save costs
                 
                 # Handle the URL for the View column
                 url_column = None
@@ -2778,7 +2763,6 @@ with bulk_review_tab:
                 gb.configure_column("Media Outlet", width=180)
                 gb.configure_column("Person_ID", width=80)  # Narrow for small ID numbers
                 gb.configure_column("Relevance", width=80)
-                gb.configure_column("Sentiment", width=100)
                 gb.configure_column("📅 Published Date", width=120)
                 
                 # Load Person_ID to Media Outlets mapping for dropdown
@@ -2979,7 +2963,7 @@ with bulk_review_tab:
                     if not approved_rows.empty or not rejected_rows.empty:
                         print(f"🔍 Checkbox changes detected: {len(approved_rows)} approved, {len(rejected_rows)} rejected")
                     
-                    # 1. First handle Media Outlet changes (non-blocking)
+                    # 1. First handle Media Outlet changes (save to database)
                     outlet_changed = False
                     changed_count = 0
                     changed_wos = []
@@ -2988,27 +2972,38 @@ with bulk_review_tab:
                         wo_num = str(row.get('WO #', ''))
                         new_outlet = row.get('Media Outlet', '')
                         
-                        # Find the corresponding row in the original dataframe
                         if wo_num and new_outlet:
-                            mask = df['WO #'].astype(str) == wo_num
-                            if mask.any():
-                                original_affiliation = df.loc[mask, 'Affiliation'].iloc[0] if 'Affiliation' in df.columns else ''
-                                last_saved = st.session_state.last_saved_outlets.get(wo_num, '')
-                                
-                                # Save if different from original OR different from last saved
-                                if new_outlet != original_affiliation or new_outlet != last_saved:
-                                    # Update the original dataframe silently
-                                    df.loc[mask, 'Affiliation'] = new_outlet
-                                    outlet_changed = True
-                                    changed_count += 1
-                                    changed_wos.append(wo_num)
-                                    st.session_state.last_saved_outlets[wo_num] = new_outlet
-                                    print(f"💾 Saved Media Outlet change for WO# {wo_num}: '{original_affiliation}' → '{new_outlet}'")
+                            # Get the last saved value to avoid duplicate saves
+                            last_saved = st.session_state.last_saved_outlets.get(wo_num, '')
+                            
+                            # Save if different from last saved
+                            if new_outlet != last_saved:
+                                outlet_changed = True
+                                changed_count += 1
+                                changed_wos.append(wo_num)
+                                st.session_state.last_saved_outlets[wo_num] = new_outlet
+                                print(f"💾 Saving Media Outlet change for WO# {wo_num}: → '{new_outlet}'")
                     
-                    # Save outlet changes to file (background operation)
+                    # Save outlet changes to database (background operation)
                     if outlet_changed:
                         try:
-                            df.to_csv(results_file, index=False)
+                            # Update the database with new media outlet selections
+                            # Since there's no dedicated media_outlet field, we'll store it in the contact field temporarily
+                            # or add a new field to the database schema
+                            
+                            # Update clips in the database
+                            for wo_num in changed_wos:
+                                new_outlet = st.session_state.last_saved_outlets[wo_num]
+                                try:
+                                    # Update the clip in database using the new method
+                                    success = db.update_clip_media_outlet(wo_num, new_outlet)
+                                    if success:
+                                        print(f"✅ Updated WO# {wo_num} media outlet to: {new_outlet}")
+                                    else:
+                                        print(f"⚠️ Failed to update WO# {wo_num} in database")
+                                except Exception as e:
+                                    print(f"❌ Error updating WO# {wo_num}: {e}")
+                            
                             # Use session state to show success message without rerun
                             from datetime import datetime
                             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -3016,7 +3011,7 @@ with bulk_review_tab:
                                 st.session_state.outlet_save_message = f"💾 Media Outlet saved for WO# {changed_wos[0]} at {timestamp}"
                             else:
                                 st.session_state.outlet_save_message = f"💾 {changed_count} Media Outlet selections saved at {timestamp}"
-                            print(f"✅ Updated loan_results.csv with {changed_count} Media Outlet changes")
+                            print(f"✅ Updated database with {changed_count} Media Outlet changes")
                         except Exception as e:
                             st.session_state.outlet_save_message = f"❌ Error saving Media Outlet changes: {e}"
                             print(f"❌ Error saving changes: {e}")
