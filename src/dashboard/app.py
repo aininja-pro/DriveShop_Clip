@@ -3113,36 +3113,14 @@ with bulk_review_tab:
                             st.info("No high-quality clips (9+) found")
                 
                 with col4:
-                    # Excel Export Button
-                    if st.button("📊 Excel Report"):
-                        try:
-                            # Check if we have data to export
-                            if df.empty:
-                                st.warning("⚠️ No clips available for Excel export. Process some loans first.")
-                            else:
-                                # Load approved clips if available
-                                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                                approved_df = None
-                                if os.path.exists(approved_file):
-                                    approved_df = pd.read_csv(approved_file)
-                                
-                                # Create professional Excel report using current display data
-                                wb = create_client_excel_report(df, approved_df)
-                                
-                                # Save to bytes
-                                import io
-                                excel_buffer = io.BytesIO()
-                                wb.save(excel_buffer)
-                                excel_buffer.seek(0)
-                                
-                                st.download_button(
-                                    label="📥 Download Excel Report",
-                                    data=excel_buffer.getvalue(),
-                                    file_name=f"DriveShop_Bulk_Review_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                )
-                        except Exception as e:
-                            st.error(f"Error creating Excel report: {e}")
+                    # Clear All Selections Button
+                    if st.button("🗑️ Clear All"):
+                        st.session_state.selected_for_approval = set()
+                        st.session_state.selected_for_rejection = set()
+                        st.session_state.approved_records = set()
+                        st.session_state.rejected_records = set()
+                        st.success("✅ All selections cleared")
+                        st.rerun()
                 
                 # Close sticky action bar container
                 st.markdown('</div>', unsafe_allow_html=True)
@@ -3155,7 +3133,7 @@ with bulk_review_tab:
                     col_confirm, col_cancel = st.columns(2)
                     with col_confirm:
                         if st.button("✅ Confirm Approval", type="primary", key="confirm_approval_btn"):
-                                                            # Process the approvals
+                            # Process the approvals - SIMPLIFIED WORKFLOW
                             selected_wos = st.session_state.selected_for_approval
                             if selected_wos:
                                 # Update clips in database to approved status (workflow_stage stays 'found' for Approved Queue)
@@ -3167,204 +3145,22 @@ with bulk_review_tab:
                                         }).eq('wo_number', wo_number).execute()
                                     
                                     logger.info(f"✅ Approved {len(selected_wos)} clips - moved to Approved Queue")
+                                    
+                                    # Success message and cleanup
+                                    st.success(f"✅ Successfully approved {len(selected_wos)} clips!")
+                                    st.info("📋 **Clips moved to Approved Queue** - ready for batch processing")
+                                    
+                                    # Clear selections and dialog
+                                    st.session_state.selected_for_approval = set()
+                                    st.session_state.approved_records = set()
+                                    st.session_state.show_approval_dialog = False
+                                    
+                                    # Refresh the page to update the Bulk Review table
+                                    st.rerun()
+                                    
                                 except Exception as e:
                                     st.error(f"❌ Error approving clips in database: {e}")
                                     logger.error(f"Database approval error: {e}")
-                                
-                                # Also maintain CSV compatibility for legacy systems
-                                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                                # Use the original df from database (ensure it has WO # column)
-                                if 'WO #' in df.columns:
-                                    selected_rows = df[df['WO #'].astype(str).isin(selected_wos)]
-                                else:
-                                    # Fallback: create minimal rows for CSV compatibility
-                                    selected_rows = pd.DataFrame([{'WO #': wo} for wo in selected_wos])
-                                
-                                # Save to approved clips CSV
-                                if os.path.exists(approved_file):
-                                    approved_df = pd.read_csv(approved_file)
-                                    if 'WO #' in approved_df.columns:
-                                        approved_df['WO #'] = approved_df['WO #'].astype(str)
-                                    # Only add rows that aren't already approved
-                                    new_rows = selected_rows[~selected_rows['WO #'].astype(str).isin(approved_df['WO #'].astype(str))]
-                                    if not new_rows.empty:
-                                        approved_df = pd.concat([approved_df, new_rows], ignore_index=True)
-                                        approved_df.to_csv(approved_file, index=False)
-                                else:
-                                    selected_rows.to_csv(approved_file, index=False)
-                                
-                                # Create comprehensive JSON file for client with ALL fields
-                                json_data = []
-                                
-                                # CRITICAL FIX: Read approved_clips.csv with dtype=str to prevent date auto-conversion
-                                # This ensures dates like "1/8/25" stay as strings instead of becoming datetime objects
-                                if os.path.exists(approved_file):
-                                    approved_df_for_json = pd.read_csv(approved_file, dtype=str)
-                                    # Filter to only the selected WO numbers for JSON
-                                    selected_approved_rows = approved_df_for_json[approved_df_for_json['WO #'].isin(selected_wos)]
-                                else:
-                                    selected_approved_rows = pd.DataFrame()
-                                
-                                # FIXED: Get actual loan end dates AND Activity_IDs from source data
-                                source_mapping = {}
-                                activity_id_mapping = {}
-                                try:
-                                    import requests
-                                    response = requests.get("https://reports.driveshop.com/?report=file:/home/deployer/reports/clips/media_loans_without_clips.rpt&init=csv", timeout=30)
-                                    if response.status_code == 200:
-                                        source_lines = response.text.strip().split('\n')
-                                        for line in source_lines:
-                                            if line.strip() and not line.startswith('"Activity_ID"'):  # Skip header
-                                                # Parse CSV line properly (handle quoted fields)
-                                                import csv
-                                                from io import StringIO
-                                                reader = csv.reader(StringIO(line))
-                                                parts = next(reader)
-                                                if len(parts) >= 10:
-                                                    # Position mapping: Activity_ID(1st), Person_ID(2nd), Make(3rd), Model(4th), WO#(5th), ..., Stop_Date(10th)
-                                                    activity_id = parts[0].strip()  # Activity_ID is in 1st position
-                                                    wo_number = parts[4].strip()    # WO# is in 5th position
-                                                    stop_date = parts[9].strip()    # Stop Date is in 10th position
-                                                    source_mapping[wo_number] = stop_date
-                                                    activity_id_mapping[wo_number] = activity_id
-                                    print(f"✅ Fetched Activity_ID mapping for JSON export: {len(activity_id_mapping)} WO# records")
-                                except Exception as e:
-                                    print(f"Warning: Could not fetch source data for loan end dates and Activity_IDs: {e}")
-                                
-                                for _, row in selected_approved_rows.iterrows():
-                                    # Get the work order number for this row
-                                    wo_number = str(row.get('WO #', ''))
-                                    
-                                    # Get the article published date - now as raw string from dtype=str CSV read
-                                    raw_article_date = row.get('Published Date', '')
-                                    if pd.isna(raw_article_date) or str(raw_article_date).lower() in ['nan', 'none', '']:
-                                        article_published_date = ''
-                                    else:
-                                        # Keep the raw date string (like "1/8/25") - no conversion needed
-                                        article_published_date = str(raw_article_date).strip()
-                                    
-                                    # Get the loan end date from source data mapping (this is the real loan end date)
-                                    loan_end_date = source_mapping.get(wo_number, '')
-                                    
-                                    # FIX: Get Activity_ID from external mapping using WO#
-                                    activity_id = activity_id_mapping.get(wo_number, '') if activity_id_mapping else str(row.get('Activity_ID', ''))
-                                    
-                                    json_data.append({
-                                        # Basic Information
-                                        "work_order": str(row.get('WO #', '')),
-                                        "activity_id": activity_id,
-                                        "make": str(row.get('Make', '')),
-                                        "vehicle_model": str(row.get('Model', '')),
-                                        "contact": str(row.get('To', '')),
-                                        "media_outlet": str(row.get('Affiliation', '')),
-                                        "office": str(row.get('Office', '')),
-                                        
-                                        # URLs and Links
-                                        "clip_url": str(row.get('Clip URL', '')),
-                                        "original_links": str(row.get('Links', '')),
-                                        
-                                        # Date Information (FIXED: proper date handling)
-                                        "article_published_date": article_published_date,  # From Published Date column (when media outlet published)
-                                        "loan_end_date": loan_end_date,  # From source data Stop Date (10th position - when loan ended)
-                                        "processed_date": str(row.get('Processed Date', '')),  # When our system processed it
-                                        
-                                        # AI Analysis Results
-                                        "relevance_score": row.get('Relevance Score', 0),
-                                        "overall_score": row.get('Overall Score', 0),
-                                        "sentiment": str(row.get('Sentiment', '')),
-                                        "overall_sentiment": str(row.get('Overall Sentiment', '')),
-                                        "summary": str(row.get('Summary', '')),
-                                        "brand_alignment": row.get('Brand Alignment', False),
-                                        "recommendation": str(row.get('Recommendation', '')),
-                                        "key_mentions": str(row.get('Key Mentions', '')),
-                                        
-                                        # Detailed Aspect Scores
-                                        "performance_score": row.get('Performance Score', 0),
-                                        "performance_note": str(row.get('Performance Note', '')),
-                                        "design_score": row.get('Design Score', 0),
-                                        "design_note": str(row.get('Design Note', '')),
-                                        "interior_score": row.get('Interior Score', 0),
-                                        "interior_note": str(row.get('Interior Note', '')),
-                                        "technology_score": row.get('Technology Score', 0),
-                                        "technology_note": str(row.get('Technology Note', '')),
-                                        "value_score": row.get('Value Score', 0),
-                                        "value_note": str(row.get('Value Note', '')),
-                                        
-                                        # Pros and Cons
-                                        "pros": str(row.get('Pros', '')),
-                                        "cons": str(row.get('Cons', '')),
-                                        
-                                        # Processing Information
-                                        "url_tracking": str(row.get('URL_Tracking', '')),
-                                        "urls_processed": row.get('URLs_Processed', 0),
-                                        "urls_successful": row.get('URLs_Successful', 0),
-                                        "approval_timestamp": datetime.now().isoformat()
-                                    })
-                                
-                                # Save JSON file
-                                json_filename = f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                                json_filepath = os.path.join(project_root, "data", json_filename)
-                                import json
-                                with open(json_filepath, 'w') as f:
-                                    json.dump(json_data, f, indent=2)
-                                
-                                # Store JSON data in session state for persistent access
-                                st.session_state.latest_json_data = json_data
-                                st.session_state.latest_json_filename = json_filename
-                                
-                                # Provide download buttons for both files
-                                st.success(f"✅ Successfully approved {len(selected_wos)} clips!")
-                                st.info("📁 **Both Excel and JSON files are ready for download below**")
-                                
-                                # Download buttons - Generate files ONLY when clicked
-                                col_excel, col_json = st.columns(2)
-                                
-                                with col_excel:
-                                    # Excel download - GENERATE ON DEMAND (slower but includes all data)
-                                    def generate_excel():
-                                        try:
-                                            # Load the most current approved data
-                                            if os.path.exists(approved_file):
-                                                current_approved_df = pd.read_csv(approved_file)
-                                            else:
-                                                current_approved_df = pd.DataFrame()
-                                            
-                                            # Create Excel with cleaned data
-                                            excel_wb = create_client_excel_report(current_approved_df, current_approved_df)
-                                            excel_buffer = io.BytesIO()
-                                            excel_wb.save(excel_buffer)
-                                            excel_buffer.seek(0)
-                                            return excel_buffer.getvalue()
-                                        except Exception as e:
-                                            st.error(f"Error generating Excel: {e}")
-                                            return None
-                                    
-                                    excel_data = generate_excel()
-                                    if excel_data:
-                                        st.download_button(
-                                            label="📊 Download Excel Report",
-                                            data=excel_data,
-                                            file_name=f"DriveShop_FINAL_CORRECT_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                            key="excel_download_primary"
-                                        )
-                                    else:
-                                        st.error("❌ Excel generation failed. Please try the JSON download instead.")
-                                
-                                with col_json:
-                                    # JSON download - INSTANT (already generated)
-                                    st.download_button(
-                                        label="📄 Download JSON Report",
-                                        data=json.dumps(json_data, indent=2),
-                                        file_name=json_filename,
-                                        mime="application/json",
-                                        key="json_download_primary"
-                                    )
-                                
-                                # Clear selections and dialog
-                                st.session_state.selected_for_approval = set()
-                                st.session_state.show_approval_dialog = False
-                                st.rerun()
                     
                     with col_cancel:
                         if st.button("❌ Cancel", key="cancel_approval_btn"):
@@ -3481,41 +3277,36 @@ with bulk_review_tab:
     else:
         st.info("No results file found. Upload and process loans to begin.")
 
-    # ========== COMPACT DOWNLOAD SECTION ==========
-    # Show download buttons for the latest approved clips (if any exist)
-    if hasattr(st.session_state, 'latest_json_data') and st.session_state.latest_json_data:
-        with st.expander("📁 Download Latest Approved Clips", expanded=False):
-            st.markdown("*Your most recent approval session files are ready for download*")
-            
-            col_excel_persist, col_json_persist = st.columns(2)
-            
-            with col_excel_persist:
-                # Excel download
-                approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                if os.path.exists(approved_file):
-                    wb = create_client_excel_report(df if 'df' in locals() else pd.DataFrame(), pd.read_csv(approved_file))
-                    excel_buffer = io.BytesIO()
-                    wb.save(excel_buffer)
-                    excel_buffer.seek(0)
-                    st.download_button(
-                        label="📊 Download Excel Report",
-                        data=excel_buffer.getvalue(),
-                        file_name=f"DriveShop_Approved_Clips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="excel_download_persistent",
-                        help="Download Excel file with multiple tabs including Approved Clips details"
-                    )
-            
-            with col_json_persist:
-                # JSON download
-                st.download_button(
-                    label="📋 Download JSON Report",
-                    data=json.dumps(st.session_state.latest_json_data, indent=2),
-                    file_name=st.session_state.latest_json_filename,
-                    mime="application/json",
-                    key="json_download_persistent",
-                    help="Download comprehensive JSON with all clip data including scores, recommendations, pros/cons"
-                )
+    # ========== WORKFLOW PROGRESS SECTION ==========
+    # Show current workflow status
+    if len(df) > 0:
+        st.markdown("---")
+        st.markdown("### 🔄 Workflow Status")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            pending_count = len(df)
+            st.metric("📋 Pending Review", pending_count)
+        
+        with col2:
+            try:
+                approved_queue_clips = db.get_approved_queue_clips()
+                approved_count = len(approved_queue_clips)
+            except:
+                approved_count = 0
+            st.metric("✅ Approved Queue", approved_count)
+        
+        with col3:
+            # This will be implemented in Phase 2
+            st.metric("🧠 Sentiment Ready", "Phase 2")
+        
+        with col4:
+            # This will be implemented in Phase 3
+            st.metric("📤 Export Ready", "Phase 3")
+        
+        if approved_count > 0:
+            st.info(f"💡 **Next Step:** Visit the **Approved Queue** tab to manage {approved_count} approved clips")
     
     # Add bottom padding to prevent UI elements from touching the bottom (CORRECTLY PLACED)
     st.markdown('<div style="height: 100px;"></div>', unsafe_allow_html=True)
