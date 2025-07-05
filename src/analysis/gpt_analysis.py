@@ -494,6 +494,96 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
 #     """
 #     pass
 
+def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str, Any]:
+    """
+    Analyze content for relevance only (no sentiment analysis) to save costs.
+    This function mirrors the OLD system's GPT analysis but skips sentiment scoring.
+    
+    Args:
+        content: Article or video transcript content
+        make: Vehicle make
+        model: Vehicle model
+        
+    Returns:
+        Dictionary with relevance_score only, or None if analysis fails
+    """
+    api_key = get_openai_key()
+    
+    if not api_key:
+        logger.error("No OpenAI API key found. Cannot analyze content.")
+        return None
+
+    # Basic content validation
+    if not content or len(content.strip()) < 100:
+        logger.warning("Content too short for relevance analysis")
+        return {'relevance_score': 0}
+    
+    # Simple relevance-only prompt
+    prompt = f"""
+    Analyze this automotive content for relevance to the {make} {model}.
+    
+    Content: {content[:3000]}...
+    
+    Rate relevance on a scale of 0-10 where:
+    - 0: No mention of the vehicle
+    - 1-3: Brief mention only
+    - 4-6: Some discussion of the vehicle
+    - 7-8: Substantial coverage of the vehicle
+    - 9-10: Comprehensive review or detailed analysis
+    
+    Respond with ONLY a JSON object: {{"relevance_score": <number>}}
+    """
+    
+    # Set API key for older OpenAI client version
+    openai.api_key = api_key
+    
+    try:
+        logger.info(f"Making relevance-only GPT call for {make} {model}")
+        
+        response = openai.ChatCompletion.create(
+            model="gpt-4-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100,
+            temperature=0.1,
+            request_timeout=30
+        )
+        
+        response_content = response.choices[0].message.content.strip()
+        logger.info(f"GPT relevance response: {response_content}")
+        
+        # Parse the response
+        try:
+            import json
+            # Try to extract JSON from response
+            if '{' in response_content and '}' in response_content:
+                json_start = response_content.find('{')
+                json_end = response_content.rfind('}') + 1
+                json_str = response_content[json_start:json_end]
+                result = json.loads(json_str)
+                
+                relevance_score = result.get('relevance_score', 0)
+                logger.info(f"✅ Relevance analysis successful: {relevance_score}/10")
+                return {'relevance_score': relevance_score}
+            else:
+                # Try to extract number from response
+                import re
+                relevance_match = re.search(r'(\d+)', response_content)
+                if relevance_match:
+                    relevance_score = int(relevance_match.group(1))
+                    logger.info(f"✅ Extracted relevance score from text: {relevance_score}/10")
+                    return {'relevance_score': relevance_score}
+                else:
+                    logger.warning("Could not extract relevance score from response")
+                    return {'relevance_score': 0}
+                    
+        except Exception as e:
+            logger.error(f"Error parsing relevance response: {e}")
+            return {'relevance_score': 0}
+            
+    except Exception as e:
+        logger.error(f"Error in relevance analysis: {e}")
+        return {'relevance_score': 0}
+
 def _create_fallback_analysis(content: str, make: str, model: str) -> Dict[str, Any]:
     """
     Create a fallback analysis when GPT response parsing fails.

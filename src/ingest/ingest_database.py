@@ -24,6 +24,7 @@ from src.ingest.ingest import (
     parse_start_date,
     MAX_CONCURRENT
 )
+from src.analysis.gpt_analysis import analyze_clip_relevance_only
 
 logger = setup_logger(__name__)
 
@@ -156,10 +157,10 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str) -> Dict[str, An
     for url in urls:
         logger.info(f"Processing URL: {url}")
         
-        # Skip if this is obviously a homepage/index URL
-        if is_homepage_or_index_url(url):
-            logger.warning(f"⚠️ SKIPPING homepage/index URL: {url}")
-            continue
+        # DISABLED: Homepage filtering was blocking valid review URLs like carpro.com/resources/vehicle-reviews
+        # if is_homepage_or_index_url(url):
+        #     logger.warning(f"⚠️ SKIPPING homepage/index URL: {url}")
+        #     continue
             
         # Process the URL (YouTube or Web) - using correct function signatures
         if 'youtube.com' in url or 'youtu.be' in url:
@@ -167,37 +168,78 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str) -> Dict[str, An
         else:
             result = process_web_url(url, loan)
         
-        if result and result.get('clip_url'):
+        if result and (result.get('clip_url') or result.get('url')):
             # Additional validation: Check if result URL is also a homepage
-            result_url = result.get('clip_url', '')
+            result_url = result.get('clip_url') or result.get('url', '')
             if is_homepage_or_index_url(result_url):
                 logger.warning(f"⚠️ REJECTING result - homepage URL returned: {result_url}")
                 continue
             
-            # Calculate relevance score before storing
-            content = result.get('extracted_content', '')
-            relevance_score = calculate_relevance_score(content, make, model, result_url)
+            # Use GPT relevance-only analysis (like OLD system but without sentiment)
+            content = result.get('extracted_content') or result.get('content', '')
             
-            # Only store if relevance score is reasonable
-            MIN_RELEVANCE_THRESHOLD = 2.0  # At least some vehicle mentions
-            if relevance_score < MIN_RELEVANCE_THRESHOLD:
-                logger.warning(f"⚠️ REJECTING clip - low relevance score {relevance_score:.1f} < {MIN_RELEVANCE_THRESHOLD}")
-                logger.info(f"   URL: {result_url}")
-                logger.info(f"   Content preview: {content[:200]}...")
-                continue
+            # CRITICAL FIX: Extract clean article text from HTML before GPT analysis
+            # This ensures GPT analyzes article content, not HTML tags and navigation
+            if content and not ('youtube.com' in url or 'youtu.be' in url):
+                # Check if content is HTML and extract article text
+                import re
+                is_html = bool(re.search(r'<html|<body|<div|<p>', content))
+                if is_html:
+                    logger.info("Content appears to be HTML. Extracting clean article text...")
+                    
+                    # Import the content extractor
+                    from src.utils.content_extractor import extract_article_content
+                    
+                    # Create expected topic from vehicle make and model for quality checking
+                    expected_topic = f"{make} {model}"
+                    extracted_content = extract_article_content(content, result_url, expected_topic)
+                    
+                    # Check if extraction was successful
+                    if extracted_content and len(extracted_content.strip()) > 100:
+                        logger.info(f"✅ Successfully extracted clean article text: {len(extracted_content)} characters")
+                        content = extracted_content  # Use the clean extracted content for GPT analysis
+                    else:
+                        logger.warning("⚠️ Article extraction failed or returned minimal content. Using raw HTML.")
+                        # Don't reject entirely - let GPT try with raw HTML as fallback
+            
+            try:
+                gpt_result = analyze_clip_relevance_only(content, make, model)
+                relevance_score = gpt_result.get('relevance_score', 0) if gpt_result else 0
+                
+                # Only store if relevance score is reasonable (same threshold as OLD system)
+                if relevance_score <= 0:
+                    logger.warning(f"⚠️ REJECTING clip - GPT relevance score {relevance_score} <= 0")
+                    logger.info(f"   URL: {result_url}")
+                    logger.info(f"   Content preview: {content[:200]}...")
+                    continue
+            except Exception as e:
+                logger.error(f"❌ GPT relevance analysis failed: {e}")
+                # Fallback to simple scoring on GPT failure
+                relevance_score = calculate_relevance_score(content, make, model, result_url)
+                if relevance_score < 2.0:
+                    logger.warning(f"⚠️ REJECTING clip - fallback relevance score {relevance_score:.1f} < 2.0")
+                    continue
             
             logger.info(f"✅ Found clip for {wo_number} at {result_url} - content extracted ({len(content)} chars)")
             logger.info(f"📊 Relevance score: {relevance_score:.1f}/10.0")
             
-            # Add relevance score to result
+            # Add relevance score to result and normalize field names
             result['relevance_score'] = relevance_score
             result['office'] = loan.get('office', '')
             result['person_id'] = person_id
             result['activity_id'] = activity_id
             
+            # CRITICAL FIX: Normalize field names between OLD and NEW systems
+            # OLD system expects 'clip_url', NEW system gets 'url' from process_web_url
+            if not result.get('clip_url') and result.get('url'):
+                result['clip_url'] = result['url']
+            if not result.get('extracted_content') and result.get('content'):
+                result['extracted_content'] = result['content']
+            
             clip_results.append(result)
             successful_urls += 1
-            break  # Only store first successful clip per loan
+            # REMOVED: Early termination - process ALL URLs to find BEST clip like OLD system
+            # break  # Only store first successful clip per loan
     
     logger.info(f"📊 URL Summary for {wo_number}: {successful_urls}/{len(urls)} URLs successful")
     
