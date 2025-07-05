@@ -816,6 +816,89 @@ class DatabaseManager:
             logger.error(f"❌ Failed to get latest processing run ID: {e}")
             return None
     
+    def get_clips_ready_for_export(self) -> List[Dict[str, Any]]:
+        """Get clips ready for FMS export (workflow_stage='found')"""
+        try:
+            result = self.supabase.table('clips').select('*').eq('status', 'approved').eq('workflow_stage', 'found').order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} clips ready for export")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get clips ready for export: {e}")
+            return []
+    
+    def get_clips_needing_sentiment_analysis(self) -> List[Dict[str, Any]]:
+        """Get clips that need sentiment analysis (workflow_stage='exported')"""
+        try:
+            result = self.supabase.table('clips').select('*').eq('status', 'approved').eq('workflow_stage', 'exported').order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} clips needing sentiment analysis")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get clips needing sentiment: {e}")
+            return []
+    
+    def get_clips_complete_recent(self, days: int = 30) -> List[Dict[str, Any]]:
+        """Get recently completed clips (workflow_stage='complete', last X days)"""
+        try:
+            from datetime import datetime, timedelta
+            cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+            
+            result = self.supabase.table('clips').select('*').eq('status', 'approved').eq('workflow_stage', 'complete').gte('processed_date', cutoff_date).order('processed_date', desc=True).execute()
+            
+            logger.info(f"✅ Retrieved {len(result.data)} recently completed clips (last {days} days)")
+            return result.data
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get recently completed clips: {e}")
+            return []
+    
+    def update_clips_to_exported_basic(self, wo_numbers: List[str]) -> bool:
+        """Update clips to exported workflow stage after FMS export"""
+        try:
+            for wo_number in wo_numbers:
+                self.supabase.table('clips').update({
+                    'workflow_stage': 'exported'
+                }).eq('wo_number', wo_number).execute()
+            
+            logger.info(f"✅ Updated {len(wo_numbers)} clips to workflow_stage='exported'")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update clips to exported_basic: {e}")
+            return False
+    
+    def delete_clips_older_than_days(self, days: int, export_before_delete: bool = True) -> Dict[str, Any]:
+        """Delete clips older than X days with optional export"""
+        try:
+            from datetime import datetime, timedelta
+            cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+            
+            # Get clips to be deleted for export
+            if export_before_delete:
+                clips_to_delete = self.supabase.table('clips').select('*').lt('processed_date', cutoff_date).execute()
+                exported_clips = clips_to_delete.data
+            else:
+                exported_clips = []
+            
+            # Delete old clips
+            delete_result = self.supabase.table('clips').delete().lt('processed_date', cutoff_date).execute()
+            deleted_count = len(delete_result.data) if delete_result.data else 0
+            
+            logger.info(f"✅ Deleted {deleted_count} clips older than {days} days")
+            
+            return {
+                'deleted_count': deleted_count,
+                'exported_clips': exported_clips if export_before_delete else [],
+                'cutoff_date': cutoff_date
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to delete old clips: {e}")
+            return {'deleted_count': 0, 'exported_clips': [], 'error': str(e)}
+
     def get_all_failed_clips(self, run_id: str = None, start_date: str = None, end_date: str = None) -> List[Dict[str, Any]]:
         """
         Get all failed clips (no_content_found + processing_failed) with optional filtering
