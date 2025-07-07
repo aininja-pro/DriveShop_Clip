@@ -3504,13 +3504,32 @@ with approved_queue_tab:
                          f"📊 {x.replace('_', ' ').title()}"
             ) if 'workflow_stage' in approved_df.columns else 'Unknown'
             
-            # Configure AgGrid for approved queue
+            # Configure ADVANCED AgGrid for approved queue (same as Bulk Review)
             gb = GridOptionsBuilder.from_dataframe(clean_df)
             
-            # Enable selection for batch operations
-            gb.configure_selection('multiple', use_checkbox=True)
+            # *** ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
+            gb.configure_side_bar()  # Enable filtering sidebar
+            gb.configure_default_column(
+                filter="agSetColumnFilter",  # CHECKBOX FILTERS with search
+                sortable=True,  # Enable sorting
+                resizable=True,  # Enable column resizing
+                editable=False, 
+                groupable=True, 
+                value=True, 
+                enableRowGroup=True, 
+                enablePivot=True, 
+                enableValue=True,
+                filterParams={
+                    "buttons": ["reset", "apply"],
+                    "closeOnApply": True,
+                    "newRowsAction": "keep"
+                }
+            )
             
-            # Configure columns
+            # Enable selection for batch operations
+            gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
+            
+            # Configure columns with proper widths and features
             gb.configure_column("WO #", width=100, pinned='left')
             gb.configure_column("Office", width=80)
             gb.configure_column("Make", width=100)
@@ -3524,7 +3543,7 @@ with approved_queue_tab:
             # Hide raw URL column
             gb.configure_column("Clip URL", hide=True)
             
-            # Configure View column with URL renderer
+            # Configure View column with URL renderer (same as Bulk Review)
             cellRenderer_view = JsCode("""
             class UrlCellRenderer {
               init(params) {
@@ -3555,7 +3574,7 @@ with approved_queue_tab:
                 filter=False
             )
             
-            # Build and display grid
+            # Build and display grid with ADVANCED features
             grid_options = gb.build()
             
             selected_clips = AgGrid(
@@ -3563,9 +3582,10 @@ with approved_queue_tab:
                 gridOptions=grid_options,
                 allow_unsafe_jscode=True,
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                height=400,
+                height=650,  # Same height as Bulk Review
                 fit_columns_on_grid_load=True,
-                theme="alpine"
+                theme="alpine",
+                enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
             )
             
             # Action buttons based on current filter
@@ -3622,31 +3642,44 @@ with approved_queue_tab:
                                             })
                                 
                                 if fms_export_data:
-                                    # Update workflow stage to exported_basic
-                                    success = db.update_clips_to_exported_basic(wo_numbers_to_update)
+                                    # Store export data in session state for download
+                                    export_filename = f"fms_export_basic_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                                    st.session_state.fms_export_data = json.dumps(fms_export_data, indent=2)
+                                    st.session_state.fms_export_filename = export_filename
+                                    st.session_state.fms_export_wo_numbers = wo_numbers_to_update
                                     
-                                    if success:
-                                        # Generate download
-                                        export_filename = f"fms_export_basic_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                                        
-                                        st.download_button(
-                                            label="📥 Download FMS Export",
-                                            data=json.dumps(fms_export_data, indent=2),
-                                            file_name=export_filename,
-                                            mime="application/json"
-                                        )
-                                        
-                                        st.success(f"✅ Exported {len(selected_rows)} clips to FMS format")
-                                        st.info("📋 Clips moved to 'Needs Sentiment' - ready for sentiment analysis")
-                                        st.rerun()
-                                    else:
-                                        st.error("❌ Failed to update clip workflow stages")
+                                    st.success(f"✅ Generated FMS export for {len(selected_rows)} clips - ready to download!")
                                 else:
                                     st.error("❌ No valid clips found for export")
                             except Exception as e:
                                 st.error(f"❌ Error generating FMS export: {e}")
                         else:
                             st.warning("Please select clips to export")
+                
+                # Show download button if export data is ready
+                if 'fms_export_data' in st.session_state and st.session_state.fms_export_data:
+                    with col1:
+                        if st.download_button(
+                            label="📥 Download FMS Export",
+                            data=st.session_state.fms_export_data,
+                            file_name=st.session_state.fms_export_filename,
+                            mime="application/json",
+                            key="download_fms_export"
+                        ):
+                            # Update workflow stage after successful download
+                            try:
+                                success = db.update_clips_to_exported_basic(st.session_state.fms_export_wo_numbers)
+                                if success:
+                                    st.success("✅ Clips moved to 'Needs Sentiment' workflow stage")
+                                    # Clear the export data from session state
+                                    del st.session_state.fms_export_data
+                                    del st.session_state.fms_export_filename
+                                    del st.session_state.fms_export_wo_numbers
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to update clip workflow stages")
+                            except Exception as e:
+                                st.error(f"❌ Error updating workflow stages: {e}")
                 
                 with col2:
                     if st.button("🔄 Move Back to Review", help="Move selected clips back to Bulk Review"):
