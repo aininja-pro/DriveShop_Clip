@@ -270,6 +270,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 1126,Basem Wasef,1203,Robb Report,https://robbreport.com/motors/cars/,2136005
 1129,Jon Alain Guzik,1298,Hollywood Reporter , ,24000000
 1129,Jon Alain Guzik,22,Automobile Magazine,https://www.motortrend.com/automobilemag,1900000
+1129,Jon Alain Guzik,6535,GuzControl.com,https://www.guzcontrol.com,100
 1131,Mark Fulmer,2080,The Auto Channel,https://www.theautochannel.com/vehicles/new/reviews/index.html,13989
 1134,Jeffrey Weidel,5075,Roseville Today,,106000
 1134,Jeffrey Weidel,3772,TahoeSkiWorld.com,,26000
@@ -1210,7 +1211,8 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 6480,Jorge Garcia,3095,Instagram,https://www.instagram.com/nachoautos/?hl=en,4163
 6503,Jason Torchinsky,6364,TheAutopian,https://www.theautopian.com/category/car-reviews/,1000000
 6516,Robby DeGraff,2230,AutoPacific,http://www.autopacific.com,5559
-6516,Robby DeGraff,3497,LinkedIn.com,https://www.linkedin.com/in/robby-degraff/,1328
+6516,Robby DeGraff,3497,LinkedIn.com,https://www.linkedin.com/in/robby-degraff/,1465
+6516,Robby DeGraff,1833,Youtube.com,https://www.youtube.com/@CarsWithRobby,34
 6624,Patrick Carone,23,AutoWeek,https://www.autoweek.com,317187
 6624,Patrick Carone,26,Car and Driver,https://www.caranddriver.com/reviews/,2798286
 6641,Sujeet Patel,1833,Youtube.com,http://www.youtube.com,2500000
@@ -1494,7 +1496,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 7977,Tatiana Pradilla,3404,coolmomscooltips.com,https://coolmomscooltips.com/,41400
 7977,Tatiana Pradilla,3095,Instagram,https://www.instagram.com/coolchillmom/,9425
 7981,Mark Sanew,3466,savagegeese.com,https://www.savagegeese.com/reviews,1000
-7981,Mark Sanew,5288,YouTube.com/Savagegeese,https://www.youtube.com/@savagegeese/videos,797000
+7981,Mark Sanew,5288,YouTube.com/Savagegeese,https://www.youtube.com/@savagegeese/videos,814000
 7989,Jeff Bogle,3703,owtk.com,https:/www.owtk.com,256
 7989,Jeff Bogle,4411,Facebook.com,https://www.facebook.com/OutWithTheKids/,9014
 7989,Jeff Bogle,3095,Instagram,https://www.instagram.com/owtk/,2264
@@ -3315,7 +3317,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 16767,Andy Ovaguimian,1833,Youtube.com,https://www.youtube.com/@DriveSteady/videos,39600
 16769,Morgin Buck,3095,Instagram,https://www.instagram.com/morginm/,19800
 16795,Fred Navarre,2762,Houston Style Magazine (stylemagazine.com),http://stylemagazine.com/news/auto/,25900
-16799,Zack Pradel ,1833,Youtube.com,https://www.youtube.com/@ShootingCars/videos,187000
+16799,Zack Pradel ,1833,Youtube.com,https://www.youtube.com/@ShootingCars/videos,189000
 16801,Corbin  Lissabet,6411,youtube,https://www.youtube.com/@TheIoniqGuy/videos,20400
 16805,Emily Dreibelbis,3358,PC Magazine,https://www.pcmag.com/authors/emily-dreibelbis,15391110
 16811,Miles  Somerville,6411,youtube,https://www.youtube.com/@CarswithMiles/videos,92000
@@ -3372,7 +3374,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 17059,Braden Carlson,6523,RevReflection,https://revreflection.com,250
 17063,Annie Nguyen,3095,Instagram,https://www.instagram.com/annie_eatsfood/,51400
 17116,Danny Cooper,6411,youtube,https://www.youtube.com/@PriusChatdotcom/videos,166000
-17130,George  Mallet,6434,wndu.com,https://www.wndu.com/search/?query=the%20cars%20we%20drive,294391
+17130,George  Mallet,6434,wndu.com,https://www.wndu.com/news/cars-we-drive/,294391
 17130,George  Mallet,6411,youtube,https://www.youtube.com/@16NewsNow/videos,7790
 17131,Jim Parrott,1833,Youtube.com,https://www.youtube.com/@offtheshelfrides/videos,497800
 17147,Aisha  Johnson  (Beau Frisbey),3095,Instagram,https://www.instagram.com/aishabeau/,42200

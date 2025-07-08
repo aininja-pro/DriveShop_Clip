@@ -2187,6 +2187,12 @@
         "outlet_url": "https://www.motortrend.com/automobilemag",
         "outlet_id": "22",
         "impressions": 1900000
+      },
+      {
+        "outlet_name": "GuzControl.com",
+        "outlet_url": "https://www.guzcontrol.com",
+        "outlet_id": "6535",
+        "impressions": 100
       }
     ]
   },
@@ -9792,7 +9798,13 @@
         "outlet_name": "LinkedIn.com",
         "outlet_url": "https://www.linkedin.com/in/robby-degraff/",
         "outlet_id": "3497",
-        "impressions": 1328
+        "impressions": 1465
+      },
+      {
+        "outlet_name": "Youtube.com",
+        "outlet_url": "https://www.youtube.com/@CarsWithRobby",
+        "outlet_id": "1833",
+        "impressions": 34
       }
     ]
   },
@@ -12111,7 +12123,7 @@
         "outlet_name": "YouTube.com/Savagegeese",
         "outlet_url": "https://www.youtube.com/@savagegeese/videos",
         "outlet_id": "5288",
-        "impressions": 797000
+        "impressions": 814000
       }
     ]
   },
@@ -29012,7 +29024,7 @@
         "outlet_name": "Youtube.com",
         "outlet_url": "https://www.youtube.com/@ShootingCars/videos",
         "outlet_id": "1833",
-        "impressions": 187000
+        "impressions": 189000
       }
     ]
   },
@@ -29562,7 +29574,7 @@
     "outlets": [
       {
         "outlet_name": "wndu.com",
-        "outlet_url": "https://www.wndu.com/search/?query=the%20cars%20we%20drive",
+        "outlet_url": "https://www.wndu.com/news/cars-we-drive/",
         "outlet_id": "6434",
         "impressions": 294391
       },

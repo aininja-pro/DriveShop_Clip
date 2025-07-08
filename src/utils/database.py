@@ -221,7 +221,11 @@ class DatabaseManager:
                 "tier_used": clip_data.get('tier_used'),
                 "status": clip_data.get('status', 'pending_review'),
                 "workflow_stage": clip_data.get('workflow_stage', 'found'),
-                "last_attempt_result": 'success'
+                "last_attempt_result": 'success',
+                "relevance_score": clip_data.get('relevance_score'),
+                "overall_sentiment": clip_data.get('overall_sentiment'),
+                "brand_alignment": clip_data.get('brand_alignment'),
+                "summary": clip_data.get('summary')
             }
             
             result = self.supabase.table('clips').insert(db_data).execute()
