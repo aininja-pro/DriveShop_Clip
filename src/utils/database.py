@@ -559,6 +559,25 @@ class DatabaseManager:
                 logger.error("💡 SOLUTION: Run the add_media_outlet_column.sql script in your Supabase SQL Editor first!")
             return False
     
+    def update_clip_byline_author(self, wo_number: str, byline_author: str) -> bool:
+        """Update the byline author for a clip by WO number"""
+        try:
+            # Update the byline_author field
+            result = self.supabase.table('clips').update({
+                "byline_author": byline_author
+            }).eq('wo_number', wo_number).execute()
+            
+            if result.data:
+                logger.info(f"✅ Updated byline author for WO# {wo_number} to: {byline_author}")
+                return True
+            else:
+                logger.warning(f"⚠️ No clip found with WO# {wo_number}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update byline author for WO# {wo_number}: {e}")
+            return False
+    
     # ========== SMART RETRY LOGIC ==========
     
     def should_retry_wo(self, wo_number: str) -> bool:

@@ -1,7 +1,7 @@
 import os
 import requests
 import logging
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from urllib.parse import urlparse
 import time
 
@@ -337,18 +337,9 @@ class GoogleSearchClient:
                     actual_byline = None
                     
                     if author:
-                        # Sync author verification
-                        author_found = self._verify_author_in_content_sync(url, author)
-                        if author_found:
-                            logger.info(f"✅ Strong attribution: {author} found in content")
-                            attribution_strength = 'strong'
-                        else:
-                            logger.info(f"⚠️ Delegated content: {author} not in byline, but domain-restricted content accepted")
-                            attribution_strength = 'delegated'
-                            # Try to extract actual byline for transparency
-                            actual_byline = self._extract_actual_byline_sync(url)
-                            if actual_byline:
-                                logger.info(f"📝 Actual byline author: {actual_byline}")
+                        # Get attribution strength and actual byline
+                        attribution_strength, actual_byline = self._verify_author_attribution_sync(url, author)
+                        logger.info(f"📊 Attribution: {attribution_strength}, Byline: {actual_byline}")
                     
                     if score > best_score:
                         best_score = score
@@ -425,21 +416,13 @@ class GoogleSearchClient:
                     logger.info(f"Found article URL: {url} (quality score: {score})")
                     
                     # Verify author in content if specified - NEW BUSINESS-AWARE LOGIC
-                    attribution_strength = 'strong'
+                    attribution_strength = 'unknown'
                     actual_byline = None
                     
                     if author:
-                        author_found = await self._verify_author_in_content(url, author)
-                        if author_found:
-                            logger.info(f"✅ Strong attribution: {author} found in content")
-                            attribution_strength = 'strong'
-                        else:
-                            logger.info(f"⚠️ Delegated content: {author} not in byline, but domain-restricted content accepted")
-                            attribution_strength = 'delegated'
-                            # Try to extract actual byline for transparency
-                            actual_byline = await self._extract_actual_byline(url)
-                            if actual_byline:
-                                logger.info(f"📝 Actual byline author: {actual_byline}")
+                        # Get attribution strength and actual byline
+                        attribution_strength, actual_byline = await self._verify_author_attribution(url, author)
+                        logger.info(f"📊 Attribution: {attribution_strength}, Byline: {actual_byline}")
                         
                         # BUSINESS LOGIC: Don't reject domain-restricted, vehicle-specific content
                         # This handles delegated writing, staff writers, house bylines
@@ -824,6 +807,61 @@ class GoogleSearchClient:
                 
         return max(0, score)
 
+    async def _verify_author_attribution(self, url: str, expected_author: str) -> Tuple[str, Optional[str]]:
+        """
+        Async version: Verify author attribution by comparing expected author with actual byline.
+        
+        Returns:
+            Tuple of (attribution_strength, actual_byline)
+            attribution_strength: 'strong', 'delegated', or 'unknown'
+            actual_byline: The actual author name found in the article (if any)
+        """
+        try:
+            # First, try to extract the actual byline
+            actual_byline = await self._extract_actual_byline(url)
+            
+            if not actual_byline:
+                logger.warning(f"❌ No byline found in article")
+                return ('unknown', None)
+            
+            # Clean and normalize names for comparison
+            expected_lower = expected_author.lower().strip()
+            actual_lower = actual_byline.lower().strip()
+            
+            # Direct match
+            if expected_lower == actual_lower:
+                logger.info(f"✅ Perfect match: expected '{expected_author}' == actual '{actual_byline}'")
+                return ('strong', actual_byline)
+            
+            # Fuzzy matching - check various forms
+            expected_parts = expected_lower.split()
+            actual_parts = actual_lower.split()
+            
+            # Check if last names match (common for bylines to use full name when source has partial)
+            if expected_parts and actual_parts:
+                if expected_parts[-1] == actual_parts[-1]:  # Last names match
+                    logger.info(f"✅ Last name match: expected '{expected_author}' matches actual '{actual_byline}'")
+                    return ('strong', actual_byline)
+                
+                # Check if first name matches (for cases like "John" vs "John Smith")
+                if expected_parts[0] == actual_parts[0]:
+                    logger.info(f"✅ First name match: expected '{expected_author}' matches actual '{actual_byline}'")
+                    return ('strong', actual_byline)
+            
+            # Check if expected name is contained in actual (e.g., "Smith" in "John Smith")
+            if expected_lower in actual_lower or actual_lower in expected_lower:
+                logger.info(f"✅ Partial match: expected '{expected_author}' matches actual '{actual_byline}'")
+                return ('strong', actual_byline)
+            
+            # No match - this is delegated
+            logger.info(f"⚠️ Delegated: expected '{expected_author}' but found '{actual_byline}'")
+            return ('delegated', actual_byline)
+            
+        except Exception as e:
+            logger.error(f"Error verifying author attribution: {e}")
+            # On error, return not_found
+            return ('not_found', None)
+
     async def _verify_author_in_content(self, url: str, author: str) -> bool:
         """
         Verify that the article content actually contains the specified author.
@@ -917,41 +955,65 @@ class GoogleSearchClient:
             logger.error(f"Error extracting actual byline: {e}")
             return None
 
-    def _verify_author_in_content_sync(self, url: str, author: str) -> bool:
-        """Synchronous version of author verification"""
+    def _verify_author_attribution_sync(self, url: str, expected_author: str) -> Tuple[str, Optional[str]]:
+        """
+        Verify author attribution by comparing expected author with actual byline.
+        
+        Returns:
+            Tuple of (attribution_strength, actual_byline)
+            attribution_strength: 'strong', 'delegated', or 'unknown'
+            actual_byline: The actual author name found in the article (if any)
+        """
         try:
-            from src.utils.enhanced_http import fetch_with_enhanced_http
+            # First, try to extract the actual byline
+            actual_byline = self._extract_actual_byline_sync(url)
             
-            # Quick fetch of article content
-            content = fetch_with_enhanced_http(url)
-            if not content:
-                logger.warning(f"❌ Could not fetch content for author verification: {url}")
-                return False
+            if not actual_byline:
+                logger.warning(f"❌ No byline found in article")
+                return ('unknown', None)
             
-            # Check if author name appears in the content
-            author_lower = author.lower()
-            content_lower = content.lower()
+            # Clean and normalize names for comparison
+            expected_lower = expected_author.lower().strip()
+            actual_lower = actual_byline.lower().strip()
             
-            # Look for author in various forms
-            author_variations = [
-                author_lower,
-                author_lower.replace(' ', ''),
-                author_lower.split()[0] if ' ' in author_lower else author_lower,  # First name
-                author_lower.split()[-1] if ' ' in author_lower else author_lower,  # Last name
-            ]
+            # Direct match
+            if expected_lower == actual_lower:
+                logger.info(f"✅ Perfect match: expected '{expected_author}' == actual '{actual_byline}'")
+                return ('strong', actual_byline)
             
-            for variation in author_variations:
-                if variation in content_lower:
-                    logger.info(f"✅ Author verification successful: '{variation}' found in content")
-                    return True
+            # Fuzzy matching - check various forms
+            expected_parts = expected_lower.split()
+            actual_parts = actual_lower.split()
             
-            logger.warning(f"❌ Author verification failed: {author} not found in content")
-            return False
+            # Check if last names match (common for bylines to use full name when source has partial)
+            if expected_parts and actual_parts:
+                if expected_parts[-1] == actual_parts[-1]:  # Last names match
+                    logger.info(f"✅ Last name match: expected '{expected_author}' matches actual '{actual_byline}'")
+                    return ('strong', actual_byline)
+                
+                # Check if first name matches (for cases like "John" vs "John Smith")
+                if expected_parts[0] == actual_parts[0]:
+                    logger.info(f"✅ First name match: expected '{expected_author}' matches actual '{actual_byline}'")
+                    return ('strong', actual_byline)
+            
+            # Check if expected name is contained in actual (e.g., "Smith" in "John Smith")
+            if expected_lower in actual_lower or actual_lower in expected_lower:
+                logger.info(f"✅ Partial match: expected '{expected_author}' matches actual '{actual_byline}'")
+                return ('strong', actual_byline)
+            
+            # No match - this is delegated
+            logger.info(f"⚠️ Delegated: expected '{expected_author}' but found '{actual_byline}'")
+            return ('delegated', actual_byline)
             
         except Exception as e:
-            logger.error(f"Error verifying author in content: {e}")
-            # If we can't verify, assume it's valid (don't block valid results)
-            return True
+            logger.error(f"Error verifying author attribution: {e}")
+            # On error, return not_found
+            return ('not_found', None)
+    
+    def _verify_author_in_content_sync(self, url: str, author: str) -> bool:
+        """Legacy method - kept for compatibility but now just wraps the new method"""
+        attribution, _ = self._verify_author_attribution_sync(url, author)
+        return attribution == 'match'
 
     def _extract_actual_byline_sync(self, url: str) -> Optional[str]:
         """Synchronous version of byline extraction"""

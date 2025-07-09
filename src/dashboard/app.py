@@ -2258,7 +2258,9 @@ with bulk_review_tab:
                 'status': 'Status',
                 'tier_used': 'Processing Method',
                 'published_date': 'Published Date',
-                'media_outlet': 'Affiliation'  # Map media_outlet to Affiliation for UI compatibility
+                'media_outlet': 'Affiliation',  # Map media_outlet to Affiliation for UI compatibility
+                'byline_author': 'Actual_Byline',  # Map database field to expected name
+                'attribution_strength': 'Attribution_Strength'  # Map database field to expected name
             })
             
             # Set default values for missing columns  
@@ -2475,29 +2477,43 @@ with bulk_review_tab:
                         contact_normalized = normalize_name(contact_person)
                         byline_normalized = normalize_name(actual_byline)
                         
-                        # Strong attribution: Contact person matches article byline
-                        if contact_normalized and byline_normalized:
-                            # Check for exact match or partial match (handle middle names, etc.)
-                            if contact_normalized == byline_normalized:
-                                return 'strong', actual_byline
-                            # Check if one name is contained in the other (e.g., "John Smith" vs "John A. Smith")
-                            elif contact_normalized in byline_normalized or byline_normalized in contact_normalized:
-                                return 'strong', actual_byline
-                        
-                        # Delegated: We have a contact person but different/no byline author
-                        if contact_normalized and (not byline_normalized or byline_normalized != contact_normalized):
-                            # Use the actual byline if available, otherwise mark as delegated content
-                            return 'delegated', actual_byline if actual_byline else 'Staff/Contributor'
-                        
-                        # Unknown: No clear attribution info
-                        return 'unknown', actual_byline if actual_byline else '—'
+                        # If we have a byline
+                        if byline_normalized:
+                            # Strong attribution: Contact person matches article byline
+                            if contact_normalized:
+                                # Check for exact match or partial match (handle middle names, etc.)
+                                if contact_normalized == byline_normalized:
+                                    return 'strong', actual_byline
+                                # Check if one name is contained in the other (e.g., "John Smith" vs "John A. Smith")
+                                elif contact_normalized in byline_normalized or byline_normalized in contact_normalized:
+                                    return 'strong', actual_byline
+                                else:
+                                    # Different author - this is delegated
+                                    return 'delegated', actual_byline
+                            else:
+                                # No contact to compare, but we have a byline
+                                return 'unknown', actual_byline
+                        else:
+                            # No byline found
+                            return 'unknown', None
                     
                     except Exception as e:
                         print(f"Attribution analysis error: {e}")
-                        return 'unknown', '—'
+                        return 'unknown', None
 
                 def format_attribution_strength(row):
                     """Format attribution strength for display with smart logic"""
+                    # First check if we have attribution strength from database
+                    db_attribution = str(row.get('Attribution_Strength', '')).strip().lower()
+                    if db_attribution in ['strong', 'delegated', 'unknown']:
+                        if db_attribution == 'strong':
+                            return '✅ Direct'
+                        elif db_attribution == 'delegated':
+                            return '⚠️ Delegated'
+                        else:
+                            return '❓ Unknown'
+                    
+                    # Otherwise calculate it
                     attribution_strength, _ = smart_attribution_analysis(row)
                     
                     if attribution_strength == 'strong':
@@ -2510,26 +2526,40 @@ with bulk_review_tab:
                 def get_actual_byline(row):
                     """Get actual byline author with smart fallbacks"""
                     try:
-                        _, byline_author = smart_attribution_analysis(row)
+                        # First check if we have an actual byline from the database
+                        actual_byline = str(row.get('Actual_Byline', '')).strip()
+                        if actual_byline and actual_byline.lower() not in ['nan', 'none', '', '—']:
+                            return actual_byline
                         
-                        # If we still don't have a byline, try additional fallbacks
-                        if not byline_author or byline_author in ['—', 'Staff/Contributor']:
-                            # Fallback 1: Use contact person if available
+                        # Otherwise use the smart analysis
+                        attribution_strength, byline_author = smart_attribution_analysis(row)
+                        
+                        # If we have a byline, return it
+                        if byline_author:
+                            return byline_author
+                        
+                        # For strong attribution without byline (shouldn't happen), use contact
+                        if attribution_strength == 'strong':
                             contact_person = str(row.get('To', '')).strip()
                             if contact_person and contact_person.lower() not in ['nan', 'none', '']:
-                                return f"{contact_person} (Contact)"
-                            
-                            # Fallback 2: Try to extract from summary or content if available
-                            summary = str(row.get('Summary', ''))
-                            if 'by ' in summary.lower():
-                                import re
-                                author_match = re.search(r'by\s+([A-Za-z\s\.]+)', summary, re.IGNORECASE)
-                                if author_match:
-                                    potential_author = author_match.group(1).strip()
-                                    if len(potential_author) > 2 and len(potential_author) < 50:  # Reasonable author name length
-                                        return potential_author
+                                return contact_person
+                        
+                        # For delegated/unknown, don't show contact as fallback
+                        # Try to extract from summary if available
+                        summary = str(row.get('Summary', ''))
+                        if 'by ' in summary.lower():
+                            import re
+                            author_match = re.search(r'by\s+([A-Za-z\s\.]+)', summary, re.IGNORECASE)
+                            if author_match:
+                                potential_author = author_match.group(1).strip()
+                                if len(potential_author) > 2 and len(potential_author) < 50:  # Reasonable author name length
+                                    return potential_author
                     
-                        return byline_author if byline_author else '—'
+                        # Return appropriate placeholder based on attribution
+                        if attribution_strength == 'delegated':
+                            return 'Staff/Contributor'
+                        else:
+                            return '—'
                     
                     except:
                         return '—'
@@ -2812,6 +2842,19 @@ with bulk_review_tab:
                 gb.configure_column("Relevance", width=80)
                 gb.configure_column("📅 Published Date", width=120)
                 
+                # Configure Byline Author column as editable
+                gb.configure_column(
+                    "📝 Byline Author",
+                    editable=True,
+                    cellEditor="agTextCellEditor",
+                    cellEditorParams={
+                        "maxLength": 100  # Limit input length
+                    },
+                    width=150,
+                    sortable=True,
+                    filter=True
+                )
+                
                 # Load Person_ID to Media Outlets mapping for dropdown
                 person_outlets_mapping = load_person_outlets_mapping()
                 
@@ -2995,6 +3038,8 @@ with bulk_review_tab:
                 # Initialize session state tracking
                 if 'last_saved_outlets' not in st.session_state:
                     st.session_state.last_saved_outlets = {}
+                if 'last_saved_bylines' not in st.session_state:
+                    st.session_state.last_saved_bylines = {}
                 if 'selected_for_approval' not in st.session_state:
                     st.session_state.selected_for_approval = set()
                 if 'selected_for_rejection' not in st.session_state:
@@ -3063,6 +3108,55 @@ with bulk_review_tab:
                             st.session_state.outlet_save_message = f"❌ Error saving Media Outlet changes: {e}"
                             print(f"❌ Error saving changes: {e}")
                     
+                    # 1.5. Handle Byline Author changes (save to database)
+                    byline_changed = False
+                    byline_changed_count = 0
+                    byline_changed_wos = []
+                    
+                    for idx, row in selected_rows["data"].iterrows():
+                        wo_num = str(row.get('WO #', ''))
+                        new_byline = row.get('📝 Byline Author', '')
+                        
+                        if wo_num and new_byline:
+                            # Get the last saved value to avoid duplicate saves
+                            last_saved_byline = st.session_state.last_saved_bylines.get(wo_num, '')
+                            
+                            # Save if different from last saved
+                            if new_byline != last_saved_byline:
+                                byline_changed = True
+                                byline_changed_count += 1
+                                byline_changed_wos.append(wo_num)
+                                st.session_state.last_saved_bylines[wo_num] = new_byline
+                                print(f"💾 Saving Byline Author change for WO# {wo_num}: → '{new_byline}'")
+                    
+                    # Save byline changes to database
+                    if byline_changed:
+                        try:
+                            # Update clips in the database
+                            for wo_num in byline_changed_wos:
+                                new_byline = st.session_state.last_saved_bylines[wo_num]
+                                try:
+                                    # Update the clip in database using the new method
+                                    success = db.update_clip_byline_author(wo_num, new_byline)
+                                    if success:
+                                        print(f"✅ Updated WO# {wo_num} byline author to: {new_byline}")
+                                    else:
+                                        print(f"⚠️ Failed to update WO# {wo_num} byline in database")
+                                except Exception as e:
+                                    print(f"❌ Error updating WO# {wo_num} byline: {e}")
+                            
+                            # Use session state to show success message
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            if byline_changed_count == 1:
+                                st.session_state.byline_save_message = f"💾 Byline Author saved for WO# {byline_changed_wos[0]} at {timestamp}"
+                            else:
+                                st.session_state.byline_save_message = f"💾 {byline_changed_count} Byline Author edits saved at {timestamp}"
+                            print(f"✅ Updated database with {byline_changed_count} Byline Author changes")
+                        except Exception as e:
+                            st.session_state.byline_save_message = f"❌ Error saving Byline Author changes: {e}"
+                            print(f"❌ Error saving byline changes: {e}")
+                    
                     # 2. Then handle approval/rejection checkboxes (stable tracking)
                     approved_rows = selected_rows["data"][selected_rows["data"]["✅ Approve"] == True]
                     rejected_rows = selected_rows["data"][selected_rows["data"]["❌ Reject"] == True]
@@ -3098,6 +3192,15 @@ with bulk_review_tab:
                         st.error(st.session_state.outlet_save_message)
                     # Clear message after showing
                     st.session_state.outlet_save_message = None
+                
+                # Display byline save messages
+                if hasattr(st.session_state, 'byline_save_message') and st.session_state.byline_save_message:
+                    if st.session_state.byline_save_message.startswith("💾"):
+                        st.success(st.session_state.byline_save_message)
+                    else:
+                        st.error(st.session_state.byline_save_message)
+                    # Clear message after showing
+                    st.session_state.byline_save_message = None
                 
                 # Show current selection counts
                 approved_count = len(st.session_state.selected_for_approval)

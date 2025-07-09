@@ -837,7 +837,7 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             'published_date': published_date,  # Add the extracted publication date
             # Add attribution information for UI display
             'attribution_strength': result.get('attribution_strength', 'unknown'),
-            'actual_byline': result.get('actual_byline')
+            'byline_author': result.get('actual_byline')  # Map actual_byline to byline_author for database
         }
         
     except Exception as e:
