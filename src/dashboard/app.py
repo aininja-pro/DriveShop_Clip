@@ -3322,62 +3322,25 @@ with bulk_review_tab:
                             selected_rejected_wos = st.session_state.selected_for_rejection
                             if selected_rejected_wos:
                                 try:
-                                    # Reload the DataFrame to ensure it's in scope
-                                    results_file = os.path.join(project_root, "data", "loan_results.csv")
-                                    df = pd.read_csv(results_file)
-                                    df['WO #'] = df['WO #'].astype(str)
-                                    
-                                    rejected_file = os.path.join(project_root, "data", "rejected_clips.csv")
-                                    selected_rejected_rows = df[df['WO #'].astype(str).isin(selected_rejected_wos)]
-                                    
-                                    # Prepare rejected records with proper format
-                                    rejected_records = []
-                                    for _, row in selected_rejected_rows.iterrows():
-                                        # Get office value for rejection record
-                                        office_value = row.get('Office', '')
+                                    # Update clips in database to rejected status
+                                    rejected_count = 0
+                                    for wo_number in selected_rejected_wos:
+                                        result = db.supabase.table('clips').update({
+                                            'status': 'rejected',
+                                            'failure_reason': 'Manual rejection by reviewer'
+                                        }).eq('wo_number', wo_number).execute()
                                         
-                                        rejected_record = {
-                                            'WO #': str(row.get('WO #', '')),
-                                            'Activity_ID': str(row.get('Activity_ID', '')),
-                                            'Make': str(row.get('Make', '')),
-                                            'Model': str(row.get('Model', '')),
-                                            'To': str(row.get('To', '')),
-                                            'Affiliation': str(row.get('Affiliation', '')),
-                                            'Office': str(office_value),  # Use the debug variable
-                                            'Links': str(row.get('Links', '')),
-                                            'URLs_Processed': row.get('URLs_Processed', 0),
-                                            'URLs_Successful': row.get('URLs_Successful', 0),
-                                            'Rejection_Reason': 'Manual rejection by reviewer',
-                                            'URL_Details': str(row.get('URL_Tracking', '')),
-                                            'Processed_Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                            'Loan_Start_Date': str(row.get('Start Date', '')),
-                                            # PRESERVE the original working Clip URL and relevance score for move-back
-                                            'Original_Clip_URL': str(row.get('Clip URL', '')),
-                                            'Original_Relevance_Score': row.get('Relevance Score', 5)
-                                        }
-                                        rejected_records.append(rejected_record)
+                                        if result.data:
+                                            rejected_count += 1
+                                            logger.info(f"✅ Rejected clip WO #{wo_number}")
+                                        else:
+                                            logger.warning(f"⚠️ Could not find clip WO #{wo_number} to reject")
                                     
-                                    # Save to rejected clips CSV
-                                    if os.path.exists(rejected_file):
-                                        # Load existing rejected records and append
-                                        existing_rejected_df = pd.read_csv(rejected_file)
-                                        if 'WO #' in existing_rejected_df.columns:
-                                            existing_rejected_df['WO #'] = existing_rejected_df['WO #'].astype(str)
-                                        # Only add rows that aren't already rejected
-                                        new_rejected_df = pd.DataFrame(rejected_records)
-                                        new_rejected_df['WO #'] = new_rejected_df['WO #'].astype(str)
-                                        new_rows = new_rejected_df[~new_rejected_df['WO #'].isin(existing_rejected_df['WO #'])]
-                                        if not new_rows.empty:
-                                            combined_rejected_df = pd.concat([existing_rejected_df, new_rows], ignore_index=True)
-                                            combined_rejected_df.to_csv(rejected_file, index=False)
+                                    if rejected_count > 0:
+                                        st.success(f"✅ Successfully rejected {rejected_count} clips!")
+                                        st.info("📋 **Clips moved to Rejected/Issues tab**")
                                     else:
-                                        # Create new rejected file
-                                        pd.DataFrame(rejected_records).to_csv(rejected_file, index=False)
-                                    
-                                    # Remove rejected records from the main results file
-                                    # This makes them disappear from Bulk Review table
-                                    remaining_df = df[~df['WO #'].astype(str).isin(selected_rejected_wos)]
-                                    remaining_df.to_csv(results_file, index=False)
+                                        st.error("❌ No clips were rejected - they may not exist in the database")
                                     
                                     # Clear selections and dialog (both new and legacy tracking)
                                     st.session_state.selected_for_rejection = set()
@@ -3388,14 +3351,7 @@ with bulk_review_tab:
                                     st.session_state.approved_records -= selected_rejected_wos
                                     st.session_state.selected_for_approval -= selected_rejected_wos
                                     
-                                    # Force a cache clear and state refresh to ensure AgGrid updates
-                                    if hasattr(st, 'cache_data'):
-                                        st.cache_data.clear()
-                                    
-                                    # Set a flag to indicate successful rejection for next page load
-                                    st.session_state.rejection_success = True
-                                    
-                                    # Immediate rerun without messages to update the UI
+                                    # Immediate rerun to update the UI
                                     st.rerun()
                                     
                                 except Exception as e:
@@ -4405,8 +4361,29 @@ with rejected_tab:
             if st.button("🔄 Move Selected to Bulk Review", key="move_to_bulk_review"):
                 selected_rows = selected_rejected.get('selected_rows', [])
                 if selected_rows is not None and len(selected_rows) > 0:
-                    st.success(f"Selected {len(selected_rows)} records to move back to Bulk Review")
-                    # Implementation would go here - mark these as pending_review again
+                    # Convert to list if it's a DataFrame
+                    if hasattr(selected_rows, 'to_dict'):
+                        selected_rows = selected_rows.to_dict('records')
+                    
+                    moved_count = 0
+                    for row in selected_rows:
+                        wo_number = str(row.get('WO #', ''))
+                        if wo_number:
+                            # Update status back to pending_review
+                            result = db.supabase.table('clips').update({
+                                'status': 'pending_review',
+                                'failure_reason': None  # Clear the rejection reason
+                            }).eq('wo_number', wo_number).execute()
+                            
+                            if result.data:
+                                moved_count += 1
+                                logger.info(f"✅ Moved WO #{wo_number} back to pending review")
+                    
+                    if moved_count > 0:
+                        st.success(f"✅ Moved {moved_count} clips back to Bulk Review")
+                        st.rerun()
+                    else:
+                        st.error("❌ Could not move any clips - they may not exist in the database")
                 else:
                     st.warning("No records selected")
     else:
