@@ -7,6 +7,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./src:/app/src
+      - ./migrations:/app/migrations
     env_file:
       - .env
     restart: unless-stopped
@@ -20,6 +21,7 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./src:/app/src
+      - ./migrations:/app/migrations
     env_file:
       - .env
     command: sh infra/cron/nightly_job.sh 
