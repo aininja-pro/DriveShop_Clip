@@ -56,6 +56,7 @@ class ClipData:
     brand_alignment: Optional[bool]
     summary: Optional[str]
     sentiment_analysis_date: Optional[datetime]
+    sentiment_completed: Optional[bool]
 
 class DatabaseManager:
     """Manages all database operations for the DriveShop clip tracking system"""
@@ -225,7 +226,8 @@ class DatabaseManager:
                 "relevance_score": clip_data.get('relevance_score'),
                 "overall_sentiment": clip_data.get('overall_sentiment'),
                 "brand_alignment": clip_data.get('brand_alignment'),
-                "summary": clip_data.get('summary')
+                "summary": clip_data.get('summary'),
+                "sentiment_completed": clip_data.get('sentiment_completed', False)
             }
             
             result = self.supabase.table('clips').insert(db_data).execute()
@@ -340,12 +342,13 @@ class DatabaseManager:
             return []
     
     def get_approved_queue_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
-        """Get approved clips that are in the queue (found stage, awaiting sentiment analysis)"""
+        """Get all approved clips in the queue (includes clips with sentiment analysis)"""
         try:
+            # Include 'sentiment_analyzed' clips so they stay in the queue until exported
             query = self.supabase.table('clips')\
                 .select('*')\
                 .eq('status', 'approved')\
-                .eq('workflow_stage', 'found')
+                .in_('workflow_stage', ['found', 'exported', 'sentiment_analyzed'])
             
             if run_id:
                 query = query.eq('processing_run_id', run_id)
@@ -492,25 +495,44 @@ class DatabaseManager:
     def update_clip_sentiment(self, clip_id: str, sentiment_data: Dict[str, Any]) -> bool:
         """Update a clip with sentiment analysis results"""
         try:
+            # Handle PostgreSQL array fields - convert Python lists to PostgreSQL array format
+            pros_list = sentiment_data.get('pros', [])
+            cons_list = sentiment_data.get('cons', [])
+            key_mentions_list = sentiment_data.get('key_mentions', [])
+            
             updates = {
                 "relevance_score": sentiment_data.get('relevance_score'),
                 "overall_sentiment": sentiment_data.get('overall_sentiment'),
                 "brand_alignment": sentiment_data.get('brand_alignment'),
                 "summary": sentiment_data.get('summary'),
-                "sentiment_analysis_date": datetime.now().isoformat()
+                "sentiment_analysis_date": datetime.now().isoformat(),
+                "sentiment_completed": True,
+                "workflow_stage": "sentiment_analyzed",
+                # Add additional fields from advanced analysis
+                "overall_score": sentiment_data.get('overall_score'),
+                "aspects": json.dumps(sentiment_data.get('aspects', {})) if sentiment_data.get('aspects') else None,
+                # Convert lists to PostgreSQL array format
+                "pros": pros_list if isinstance(pros_list, list) else [],
+                "cons": cons_list if isinstance(cons_list, list) else [],
+                "recommendation": sentiment_data.get('recommendation'),
+                "key_mentions": key_mentions_list if isinstance(key_mentions_list, list) else []
             }
+            
+            # Log the update for debugging
+            logger.info(f"Updating clip {clip_id} with sentiment data: workflow_stage={updates['workflow_stage']}, sentiment_completed={updates['sentiment_completed']}")
             
             result = self.supabase.table('clips').update(updates).eq('id', clip_id).execute()
             
             if result.data:
-                logger.info(f"✅ Updated sentiment for clip {clip_id}")
+                logger.info(f"✅ Updated sentiment for clip {clip_id} - workflow_stage is now 'sentiment_analyzed'")
                 return True
             else:
                 logger.warning(f"⚠️ No clip found with ID {clip_id}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Failed to update clip sentiment: {e}")
+            logger.error(f"❌ Failed to update clip sentiment for {clip_id}: {e}")
+            logger.error(f"Sentiment data that failed: {sentiment_data}")
             return False
     
     def approve_clip(self, clip_id: str) -> bool:
@@ -891,6 +913,22 @@ class DatabaseManager:
             
         except Exception as e:
             logger.error(f"❌ Failed to update clips to exported_basic: {e}")
+            return False
+    
+    def update_clips_to_complete(self, clip_ids: List[str]) -> bool:
+        """Update clips to complete workflow stage after FMS export"""
+        try:
+            for clip_id in clip_ids:
+                self.supabase.table('clips').update({
+                    'workflow_stage': 'complete',
+                    'fms_export_date': datetime.now().isoformat()
+                }).eq('id', clip_id).execute()
+            
+            logger.info(f"✅ Updated {len(clip_ids)} clips to workflow_stage='complete' after FMS export")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update clips to complete: {e}")
             return False
     
     def delete_clips_older_than_days(self, days: int, export_before_delete: bool = True) -> Dict[str, Any]:

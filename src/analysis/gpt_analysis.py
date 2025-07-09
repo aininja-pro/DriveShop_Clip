@@ -279,25 +279,9 @@ def parse_json_with_fallbacks(response_text: str) -> dict:
         import traceback
         logger.error(f"Strategy 3 traceback: {traceback.format_exc()}")
     
-    # Strategy 4: Return basic fallback structure
-    logger.error("All JSON parsing strategies failed, returning basic fallback")
-    return {
-        "relevance_score": 5,
-        "overall_score": 5,
-        "overall_sentiment": "neutral",
-        "brand_alignment": True,
-        "summary": "Analysis parsing failed but content was processed successfully. Check logs for detailed analysis.",
-        "aspects": {
-            "performance": {"score": 5, "note": "Fallback scoring due to JSON parsing issues"},
-            "exterior_design": {"score": 5, "note": "Fallback scoring due to JSON parsing issues"},
-            "interior_comfort": {"score": 5, "note": "Fallback scoring due to JSON parsing issues"},
-            "technology": {"score": 5, "note": "Fallback scoring due to JSON parsing issues"},
-            "value": {"score": 5, "note": "Fallback scoring due to JSON parsing issues"}
-        },
-        "pros": ["Content successfully analyzed", "Check logs for full details"],
-        "cons": ["JSON parsing required fallback"],
-        "recommendation": "See logs for complete analysis"
-    }
+    # Strategy 4: Return None - no fallback per user request
+    logger.error("All JSON parsing strategies failed. Returning None instead of fallback data.")
+    return None
 
 def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url: str = None) -> Dict[str, Any]:
     """
@@ -455,24 +439,9 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
                 logger.error(f"All JSON parsing strategies failed: {e}")
                 logger.error(f"Raw response (first 500 chars): {response_content[:500]}")
                 
-                # Return absolute fallback
-                return {
-                    "relevance_score": 1,
-                    "overall_score": 1,
-                    "overall_sentiment": "neutral",
-                    "brand_alignment": False,
-                    "summary": "Analysis parsing failed - using fallback scoring.",
-                    "aspects": {
-                        "performance": {"score": 1, "note": "Analysis parsing failed"},
-                        "exterior_design": {"score": 1, "note": "Analysis parsing failed"},
-                        "interior_comfort": {"score": 1, "note": "Analysis parsing failed"},
-                        "technology": {"score": 1, "note": "Analysis parsing failed"},
-                        "value": {"score": 1, "note": "Analysis parsing failed"}
-                    },
-                    "pros": ["Content was processed"],
-                    "cons": ["JSON parsing failed completely"],
-                    "recommendation": "Review logs for detailed analysis"
-                }
+                # Return None - no fallback analysis per user request
+                logger.error("JSON parsing failed completely. Returning None instead of fallback data.")
+                return None
                 
         except Exception as e:
             logger.error(f"Error in enhanced GPT analysis (attempt {attempt + 1}/{max_retries}): {e}")
