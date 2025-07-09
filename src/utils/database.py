@@ -348,12 +348,12 @@ class DatabaseManager:
             query = self.supabase.table('clips')\
                 .select('*')\
                 .eq('status', 'approved')\
-                .in_('workflow_stage', ['found', 'exported', 'sentiment_analyzed'])
+                .in_('workflow_stage', ['found', 'sentiment_analyzed'])
             
             if run_id:
                 query = query.eq('processing_run_id', run_id)
             
-            result = query.order('processed_date', desc=True).execute()
+            result = query.order('processed_date', desc=True).limit(1000).execute()
             
             logger.info(f"✅ Retrieved {len(result.data)} approved queue clips")
             return result.data
@@ -886,12 +886,12 @@ class DatabaseManager:
             return []
     
     def get_clips_complete_recent(self, days: int = 30) -> List[Dict[str, Any]]:
-        """Get recently completed clips (workflow_stage='complete', last X days)"""
+        """Get recently completed clips (workflow_stage='exported', last X days)"""
         try:
             from datetime import datetime, timedelta
             cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
             
-            result = self.supabase.table('clips').select('*').eq('status', 'approved').eq('workflow_stage', 'complete').gte('processed_date', cutoff_date).order('processed_date', desc=True).execute()
+            result = self.supabase.table('clips').select('*').eq('status', 'approved').eq('workflow_stage', 'exported').gte('processed_date', cutoff_date).order('processed_date', desc=True).execute()
             
             logger.info(f"✅ Retrieved {len(result.data)} recently completed clips (last {days} days)")
             return result.data
@@ -918,17 +918,32 @@ class DatabaseManager:
     def update_clips_to_complete(self, clip_ids: List[str]) -> bool:
         """Update clips to complete workflow stage after FMS export"""
         try:
-            for clip_id in clip_ids:
-                self.supabase.table('clips').update({
-                    'workflow_stage': 'complete',
-                    'fms_export_date': datetime.now().isoformat()
-                }).eq('id', clip_id).execute()
+            logger.info(f"🔄 Attempting to update {len(clip_ids)} clips to complete status")
+            logger.info(f"📋 Clip IDs to update: {clip_ids}")
             
-            logger.info(f"✅ Updated {len(clip_ids)} clips to workflow_stage='complete' after FMS export")
-            return True
+            updated_count = 0
+            for clip_id in clip_ids:
+                try:
+                    result = self.supabase.table('clips').update({
+                        'workflow_stage': 'exported'
+                    }).eq('id', clip_id).execute()
+                    
+                    if result.data:
+                        updated_count += 1
+                        logger.info(f"✅ Updated clip {clip_id} to complete")
+                    else:
+                        logger.warning(f"⚠️ No data returned for clip {clip_id}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Failed to update clip {clip_id}: {e}")
+            
+            logger.info(f"✅ Successfully updated {updated_count}/{len(clip_ids)} clips to workflow_stage='exported'")
+            return updated_count > 0
             
         except Exception as e:
             logger.error(f"❌ Failed to update clips to complete: {e}")
+            import traceback
+            logger.error(f"Full error: {traceback.format_exc()}")
             return False
     
     def delete_clips_older_than_days(self, days: int, export_before_delete: bool = True) -> Dict[str, Any]:

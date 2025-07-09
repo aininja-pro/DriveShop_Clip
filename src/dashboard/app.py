@@ -3292,6 +3292,11 @@ with bulk_review_tab:
                                     st.session_state.approved_records = set()
                                     st.session_state.show_approval_dialog = False
                                     
+                                    # Clear the cached approved queue data so it refreshes
+                                    if 'get_approved_queue_data' in st.session_state:
+                                        del st.session_state['get_approved_queue_data']
+                                    st.cache_data.clear()
+                                    
                                     # Refresh the page to update the Bulk Review table
                                     st.rerun()
                                     
@@ -3481,15 +3486,30 @@ with approved_queue_tab:
     
     # Load clips based on selected filter
     try:
-        db = get_database()
+        # Use cached database connection
+        @st.cache_resource
+        def get_cached_db():
+            return get_database()
+        
+        db = get_cached_db()
+        
+        # Cache the approved queue data with TTL of 60 seconds
+        @st.cache_data(ttl=60)
+        def get_approved_queue_data():
+            return db.get_approved_queue_clips()
         
         if st.session_state.approved_queue_filter == 'approved_queue':
-            clips_data = db.get_approved_queue_clips()
+            clips_data = get_approved_queue_data()
             tab_title = "✅ Approved Queue"
             tab_description = "Clips awaiting sentiment analysis and FMS export"
             
         elif st.session_state.approved_queue_filter == 'recent_complete':
-            clips_data = db.get_clips_complete_recent(days=30)
+            # Cache recent complete data with TTL of 60 seconds
+            @st.cache_data(ttl=60)
+            def get_recent_complete_data():
+                return db.get_clips_complete_recent(days=30)
+            
+            clips_data = get_recent_complete_data()
             tab_title = "📊 Recent Complete (Last 30 Days)"
             tab_description = "Fully processed clips with sentiment analysis"
             
@@ -3847,31 +3867,34 @@ with approved_queue_tab:
                                         clip_id = row.get('id')
                                         if clip_id:
                                             clip_ids_to_update.append(clip_id)
+                                            logger.info(f"📋 Found clip ID: {clip_id} for WO: {row.get('WO #')}")
+                                        else:
+                                            logger.warning(f"⚠️ No ID found for row with WO: {row.get('WO #')}")
                                     
-                                    # Update workflow stage to complete
-                                    if clip_ids_to_update:
-                                        success = db.update_clips_to_complete(clip_ids_to_update)
-                                        if success:
-                                            logger.info(f"✅ Updated {len(clip_ids_to_update)} clips to complete status")
-                                    
-                                    # Create download directly
+                                    # Store export data in session state
                                     export_filename = f"fms_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
                                     json_str = json.dumps(fms_export_data, indent=2)
                                     
-                                    st.download_button(
-                                        label="📥 Download FMS Export",
-                                        data=json_str,
-                                        file_name=export_filename,
-                                        mime="application/json",
-                                        key="download_fms_no_sentiment"
-                                    )
+                                    st.session_state.fms_export_data = json_str
+                                    st.session_state.fms_export_filename = export_filename
+                                    st.session_state.fms_clips_to_update = clip_ids_to_update
                                     
-                                    # Update workflow stage
-                                    for wo in wo_numbers_to_update:
-                                        db.update_clip_workflow_stage(wo, "exported")
+                                    # Update workflow stage to complete
+                                    if clip_ids_to_update:
+                                        logger.info(f"🔄 Updating {len(clip_ids_to_update)} clips to complete status: {clip_ids_to_update}")
+                                        success = db.update_clips_to_complete(clip_ids_to_update)
+                                        if success:
+                                            logger.info(f"✅ Updated {len(clip_ids_to_update)} clips to complete status")
+                                            st.success(f"✅ Exported {len(selected_rows)} clips to FMS - Click download button below")
+                                        else:
+                                            logger.error(f"❌ Failed to update clips to complete status")
+                                            st.error("❌ Failed to update clips status")
+                                    else:
+                                        logger.warning("⚠️ No clip IDs found to update")
+                                        st.warning("⚠️ No clip IDs found - clips may not move to Recent Complete")
                                     
-                                    st.success(f"✅ Exported {len(selected_rows)} clips to FMS")
-                                    st.rerun()
+                                    # Don't rerun immediately - let user download first
+                                    st.session_state.show_fms_download = True
                                     
                             except Exception as e:
                                 st.error(f"❌ Error generating FMS export: {e}")
@@ -3909,6 +3932,28 @@ with approved_queue_tab:
                 with col4:
                     if st.button("📊 Select All", help="Select all clips"):
                         st.info("💡 Use the checkboxes in the table to select clips")
+            
+            # Show download button if FMS export is ready
+            if st.session_state.get('show_fms_download', False) and st.session_state.get('fms_export_data'):
+                st.markdown("---")
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    # Create a download button
+                    st.download_button(
+                        label="📥 Download FMS Export JSON",
+                        data=st.session_state.fms_export_data,
+                        file_name=st.session_state.fms_export_filename,
+                        mime="application/json",
+                        key="download_fms_export"
+                    )
+                    
+                    # Add a button to clear and refresh after download
+                    if st.button("✅ Download Complete - Refresh", key="refresh_after_download"):
+                        # Clear the download state
+                        st.session_state.show_fms_download = False
+                        st.session_state.fms_export_data = None
+                        st.session_state.fms_export_filename = None
+                        st.rerun()
         
         else:
             # No clips found for current filter
@@ -4395,7 +4440,14 @@ with analysis_tab:
                     'contact': 'To',
                     'media_outlet': 'Affiliation',
                     'relevance_score': 'Relevance Score',
-                    'overall_sentiment': 'Overall Sentiment'
+                    'overall_sentiment': 'Overall Sentiment',
+                    'make': 'Make',
+                    'model': 'Model',
+                    'office': 'Office',
+                    'clip_url': 'Clip URL',
+                    'attribution_strength': 'Attribution_Strength',
+                    'byline_author': 'Actual_Byline',
+                    'brand_alignment': 'Brand Alignment'
                 }
                 
                 # Rename columns for consistency
@@ -4468,15 +4520,29 @@ with analysis_tab:
                     
                     # Display compact table
                     if not filtered_df.empty:
-                        display_cols = ['WO #', 'Model', 'To']
+                        display_cols = ['WO #']
+                        if 'Model' in filtered_df.columns:
+                            display_cols.append('Model')
+                        display_cols.append('To')
                         if 'Relevance Score' in filtered_df.columns:
                             display_cols.append('Relevance Score')
                         
                         # Make table clickable by using selectbox
+                        def format_work_order(x):
+                            if not x:
+                                return "-- Select Loan --"
+                            row = filtered_df[filtered_df['WO #']==x].iloc[0]
+                            text = f"{x}"
+                            if 'Model' in filtered_df.columns:
+                                text += f" - {row['Model']}"
+                            if 'Relevance Score' in filtered_df.columns:
+                                text += f" ({row['Relevance Score']}/10)"
+                            return text
+                        
                         selected_wo = st.selectbox(
                             "Select Work Order:",
                             options=[''] + list(filtered_df['WO #'].values),
-                            format_func=lambda x: f"{x} - {filtered_df[filtered_df['WO #']==x]['Model'].iloc[0]} ({filtered_df[filtered_df['WO #']==x]['Relevance Score'].iloc[0]}/10)" if x else "-- Select Loan --"
+                            format_func=format_work_order
                         )
                         
                         # Store selected work order in session state
@@ -4544,7 +4610,7 @@ with analysis_tab:
                                 f"{df['Relevance Score'].mean():.1f}/10" if 'Relevance Score' in df.columns else "N/A",
                                 len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns else 0,
                                 f"{(len(df[df['Relevance Score'] > 0])/len(df)*100):.1f}%" if 'Relevance Score' in df.columns and len(df) > 0 else "0%",
-                                len(df[df['Sentiment'] == 'positive']) if 'Sentiment' in df.columns else 0,
+                                len(df[df['Overall Sentiment'] == 'positive']) if 'Overall Sentiment' in df.columns else 0,
                                 f"{(len(df[df['Brand Alignment'] == True])/len(df)*100):.1f}%" if 'Brand Alignment' in df.columns and len(df) > 0 else "N/A"
                             ]
                         }
@@ -4573,12 +4639,9 @@ with analysis_tab:
         # Show details if a work order is selected
         selected_wo = st.session_state.get('selected_work_order', None)
         
-        if selected_wo and os.path.exists(results_file):
+        if selected_wo and sentiment_clips and not df.empty:
             try:
-                df = pd.read_csv(results_file)
-                if 'WO #' in df.columns:
-                    df['WO #'] = df['WO #'].astype(str)
-                
+                # Use the same DataFrame from the database
                 selected_row = df[df['WO #'] == selected_wo]
                 if not selected_row.empty:
                     selected_row = selected_row.iloc[0]
