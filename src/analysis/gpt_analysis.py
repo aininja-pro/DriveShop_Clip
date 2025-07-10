@@ -776,8 +776,9 @@ Respond ONLY with valid JSON. Do not include any explanations or text outside of
 
 # YouTube-specific prompt template for video transcript analysis
 YOUTUBE_PROMPT_TEMPLATE = """
-You are analyzing a YouTube video transcript about automotive content. Please provide a comprehensive analysis focusing on video-specific elements.
+You are an elite automotive marketing strategist analyzing content for strategic brand intelligence. This YouTube video contains valuable market signals about the {make} {model}.
 
+METADATA:
 Vehicle: {make} {model}
 Content Type: YouTube Video Transcript
 Content Length: {content_length} characters
@@ -785,72 +786,102 @@ Content Length: {content_length} characters
 TRANSCRIPT:
 {content}
 
-Please analyze this YouTube video transcript and provide:
+STRATEGIC ANALYSIS FRAMEWORK:
 
-1. RELEVANCE SCORE (0-10): How relevant is this video to the {make} {model}?
-   - 10: Dedicated review/test drive of this exact vehicle
-   - 8-9: Significant discussion/comparison featuring this vehicle  
-   - 6-7: Brief mention in context of similar vehicles
-   - 4-5: Tangential mention or category discussion
-   - 0-3: No meaningful discussion of this vehicle
+1. RELEVANCE & MARKETING IMPACT:
+   - Relevance Score (0-10): How relevant is this content to the {make} {model}?
+   - Marketing Impact Score (1-10): Rate the strategic importance for brand/marketing teams
+     * 10: Game-changing insights requiring CMO attention
+     * 8-9: Significant brand perception shifts or viral moments
+     * 5-7: Useful consumer sentiment indicators
+     * 1-4: Minimal marketing relevance
 
-2. VIDEO ANALYSIS:
-   - Overall video sentiment (positive/neutral/negative)
-   - Key video moments or timestamps mentioned
-   - Presenter's expertise level and credibility
-   - Production quality indicators from transcript
-   - Call-to-action or recommendations made
+2. CREATOR INTELLIGENCE:
+   - Influence Tier: Mega (1M+) / Macro (100K-1M) / Mid (10K-100K) / Micro (<10K) / Unknown
+   - Audience Archetype: Enthusiasts / Family Buyers / Luxury Seekers / Tech Early Adopters / Budget Conscious
+   - Credibility Score (1-10): Based on expertise demonstrated
+   - Viral Potential: High / Medium / Low
 
-3. AUTOMOTIVE ASPECTS (score 1-10 each):
-   - Performance discussion and driving impressions
-   - Exterior design and styling comments  
-   - Interior comfort and features coverage
-   - Technology and infotainment discussion
-   - Value proposition and pricing analysis
+3. STRATEGIC BRAND NARRATIVE:
+   - How does this content position the {make} brand story?
+   - What new narrative angles or messaging opportunities emerge?
+   - Brand perception trajectory: Ascending / Stable / Declining
 
-4. PROS & CONS:
-   - Specific positive points mentioned by presenter
-   - Specific criticisms or concerns raised
-   - Comparison advantages vs competitors
+4. COMPETITIVE INTELLIGENCE:
+   - How is {make} {model} positioned vs competitors?
+   - Market advantages highlighted
+   - Vulnerabilities exposed
 
-5. BRAND ALIGNMENT: Does the video content align with {make}'s brand messaging? (true/false)
+5. PURCHASE INTENT SIGNALS:
+   - Strong Positive / Moderate Positive / Neutral / Negative
+   - Key decision factors mentioned
+   - Objections or barriers identified
 
-6. KEY VIDEO QUOTES: Notable exact quotes from the presenter
+6. INFLUENTIAL STATEMENTS:
+   - Extract 3-5 quotes likely to be repeated/shared
+   - Focus on memorable, tweet-worthy content
 
-7. RECOMMENDATION: Would you recommend this vehicle based on this video review?
+7. ACTION ITEMS:
+   - Immediate Response Needed? Yes/No
+   - Marketing team recommendations
+   - Content creator relationship strategy
 
-Please format your response as valid JSON matching this structure:
+Return ONLY valid JSON:
 {{
   "relevance_score": 0-10,
-  "overall_score": 0-10,
+  "marketing_impact_score": 1-10,
   "overall_sentiment": "positive/neutral/negative",
-  "video_analysis": {{
-    "presenter_expertise": "...",
-    "production_quality": "...", 
-    "key_moments": "...",
-    "call_to_action": "..."
+  "executive_summary": "2-3 sentences for CMO/VP level briefing",
+  "brand_narrative": "How this shapes brand perception",
+  "strategic_signal": "Key trend, risk, or opportunity",
+  
+  "creator_analysis": {{
+    "influence_tier": "Mega/Macro/Mid/Micro/Unknown",
+    "audience_archetype": "...",
+    "credibility_score": 1-10,
+    "viral_potential": "High/Medium/Low"
   }},
-  "aspects": {{
-    "performance": {{"score": 0-10, "note": "..."}},
-    "exterior_design": {{"score": 0-10, "note": "..."}},
-    "interior_comfort": {{"score": 0-10, "note": "..."}},
-    "technology": {{"score": 0-10, "note": "..."}},
-    "value": {{"score": 0-10, "note": "..."}}
+  
+  "competitive_intelligence": {{
+    "positioning_vs_competitors": "...",
+    "advantages_highlighted": ["..."],
+    "vulnerabilities_exposed": ["..."]
   }},
-  "pros": ["...", "...", "..."],
-  "cons": ["...", "...", "..."],
-  "summary": "2-3 sentence summary of the video review",
-  "recommendation": "...",
+  
+  "aspect_insights": {{
+    "performance": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "design": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "technology": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "value": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "reliability": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}}
+  }},
+  
+  "influential_statements": ["memorable quote 1", "memorable quote 2", "memorable quote 3"],
+  "purchase_intent_signals": "strong positive/moderate positive/neutral/negative",
+  "messaging_opportunities": ["opportunity 1", "opportunity 2"],
+  "risks_to_address": ["risk 1", "risk 2"],
+  
+  "action_items": {{
+    "immediate_response_needed": true/false,
+    "recommendation": "Strategic action for marketing team",
+    "creator_relationship": "Engage/Monitor/Ignore"
+  }},
+  
+  "overall_score": 0-10,
+  "summary": "Strategic insight summary",
   "brand_alignment": true/false,
-  "key_mentions": ["...", "...", "..."],
-  "video_quotes": ["...", "...", "..."]
+  "pros": ["key positive 1", "key positive 2", "key positive 3"],
+  "cons": ["key concern 1", "key concern 2", "key concern 3"],
+  "key_mentions": ["key topic 1", "key topic 2", "key topic 3"],
+  "recommendation": "Strategic recommendation"
 }}
 """
 
 # Standard web article prompt template  
 ARTICLE_PROMPT_TEMPLATE = """
-You are analyzing a web article about automotive content. Please provide a comprehensive analysis focusing on article-specific elements.
+You are an elite automotive marketing strategist analyzing content for strategic brand intelligence. This article contains valuable market signals about the {make} {model}.
 
+METADATA:
 Vehicle: {make} {model}
 Content Type: Web Article
 Content Length: {content_length} characters
@@ -858,45 +889,93 @@ Content Length: {content_length} characters
 ARTICLE:
 {content}
 
-Please analyze this web article and provide:
+STRATEGIC ANALYSIS FRAMEWORK:
 
-1. RELEVANCE SCORE (0-10): How relevant is this article to the {make} {model}?
-   - 10: Dedicated review/test drive of this exact vehicle
-   - 8-9: Significant discussion/comparison featuring this vehicle  
-   - 6-7: Brief mention in context of similar vehicles
-   - 4-5: Tangential mention or category discussion
-   - 0-3: No meaningful discussion of this vehicle
+1. RELEVANCE & MARKETING IMPACT:
+   - Relevance Score (0-10): How relevant is this content to the {make} {model}?
+   - Marketing Impact Score (1-10): Rate the strategic importance for brand/marketing teams
+     * 10: Game-changing insights requiring CMO attention
+     * 8-9: Significant brand perception shifts or media influence
+     * 5-7: Useful consumer sentiment indicators
+     * 1-4: Minimal marketing relevance
 
-2. AUTOMOTIVE ASPECTS (score 1-10 each):
-   - Performance discussion and driving impressions
-   - Exterior design and styling comments  
-   - Interior comfort and features coverage
-   - Technology and infotainment discussion
-   - Value proposition and pricing analysis
+2. PUBLICATION INTELLIGENCE:
+   - Publication Credibility: Major National / Regional / Specialist / Blog / Unknown
+   - Audience Reach: Mass Market / Enthusiast / Trade / Niche
+   - Editorial Stance: Brand Advocate / Neutral / Critical
+   - SEO/Digital Influence Factor (1-10)
 
-3. BRAND ALIGNMENT: Does the article content align with {make}'s brand messaging? (true/false)
+3. STRATEGIC BRAND NARRATIVE:
+   - How does this content position the {make} brand story?
+   - What new narrative angles or messaging opportunities emerge?
+   - Brand perception trajectory: Ascending / Stable / Declining
 
-4. KEY ARTICLE QUOTES: Notable exact quotes from the article
+4. COMPETITIVE INTELLIGENCE:
+   - How is {make} {model} positioned vs competitors?
+   - Market advantages highlighted
+   - Vulnerabilities exposed
 
-5. RECOMMENDATION: Would you recommend this vehicle based on this article review?
+5. PURCHASE INTENT SIGNALS:
+   - Strong Positive / Moderate Positive / Neutral / Negative
+   - Key decision factors mentioned
+   - Objections or barriers identified
 
-Please format your response as valid JSON matching this structure:
+6. INFLUENTIAL STATEMENTS:
+   - Extract 3-5 quotes likely to be repeated in social/forums
+   - Focus on headline-worthy, shareable content
+
+7. ACTION ITEMS:
+   - Immediate Response Needed? Yes/No
+   - PR/Marketing team recommendations
+   - Media relationship strategy
+
+Return ONLY valid JSON:
 {{
   "relevance_score": 0-10,
-  "overall_score": 0-10,
+  "marketing_impact_score": 1-10,
   "overall_sentiment": "positive/neutral/negative",
-  "aspects": {{
-    "performance": {{"score": 0-10, "note": "..."}},
-    "exterior_design": {{"score": 0-10, "note": "..."}},
-    "interior_comfort": {{"score": 0-10, "note": "..."}},
-    "technology": {{"score": 0-10, "note": "..."}},
-    "value": {{"score": 0-10, "note": "..."}}
+  "executive_summary": "2-3 sentences for CMO/VP level briefing",
+  "brand_narrative": "How this shapes brand perception",
+  "strategic_signal": "Key trend, risk, or opportunity",
+  
+  "publication_analysis": {{
+    "credibility": "Major National/Regional/Specialist/Blog/Unknown",
+    "audience_reach": "Mass Market/Enthusiast/Trade/Niche",
+    "editorial_stance": "Brand Advocate/Neutral/Critical",
+    "influence_factor": 1-10
   }},
-  "pros": ["...", "...", "..."],
-  "cons": ["...", "...", "..."],
-  "summary": "2-3 sentence summary of the article review",
-  "recommendation": "...",
+  
+  "competitive_intelligence": {{
+    "positioning_vs_competitors": "...",
+    "advantages_highlighted": ["..."],
+    "vulnerabilities_exposed": ["..."]
+  }},
+  
+  "aspect_insights": {{
+    "performance": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "design": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "technology": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "value": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}},
+    "reliability": {{"sentiment": "positive/neutral/negative", "impact": "high/medium/low", "evidence": "..."}}
+  }},
+  
+  "influential_statements": ["memorable quote 1", "memorable quote 2", "memorable quote 3"],
+  "purchase_intent_signals": "strong positive/moderate positive/neutral/negative",
+  "messaging_opportunities": ["opportunity 1", "opportunity 2"],
+  "risks_to_address": ["risk 1", "risk 2"],
+  
+  "action_items": {{
+    "immediate_response_needed": true/false,
+    "recommendation": "Strategic action for marketing team",
+    "media_strategy": "Engage/Monitor/Ignore"
+  }},
+  
+  "overall_score": 0-10,
+  "summary": "Strategic insight summary",
   "brand_alignment": true/false,
-  "key_mentions": ["...", "...", "..."]
+  "pros": ["key positive 1", "key positive 2", "key positive 3"],
+  "cons": ["key concern 1", "key concern 2", "key concern 3"],
+  "key_mentions": ["key topic 1", "key topic 2", "key topic 3"],
+  "recommendation": "Strategic recommendation"
 }}
 """ 

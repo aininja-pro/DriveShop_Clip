@@ -1993,7 +1993,7 @@ bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, creatoriq_tab, 
     "📋 Bulk Review", 
     "✅ Approved Queue",
     "⚠️ Rejected/Issues", 
-    "📊 Detailed Analysis", 
+    "🚀 Strategic Intelligence", 
     "🎬 CreatorIQ Export",
     "📚 File History"
 ])
@@ -4413,7 +4413,7 @@ with analysis_tab:
     left_pane, right_pane = st.columns([0.4, 0.6])
     
     with left_pane:
-        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">📊 Command Center</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">🚀 Strategic Command Center</p>', unsafe_allow_html=True)
         
         # Load data from database for analysis (all approved clips with sentiment)
         try:
@@ -4628,7 +4628,7 @@ with analysis_tab:
             st.error(f"Error loading data: {e}")
     
     with right_pane:
-        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">🔍 Loan Inspector</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">🔍 Strategic Intelligence Dashboard</p>', unsafe_allow_html=True)
         
         # Show details if a work order is selected
         selected_wo = st.session_state.get('selected_work_order', None)
@@ -4686,13 +4686,16 @@ with analysis_tab:
                         st.metric("🎯 Relevance", f"{relevance_score}/10" if relevance_score != 'N/A' else 'N/A')
                     
                     with metric_col3:
-                        sentiment = selected_row.get('Overall Sentiment', 'N/A')
-                        sentiment_emoji = "😊" if sentiment == "positive" else "😞" if sentiment == "negative" else "😐"
-                        st.metric("💭 Sentiment", f"{sentiment_emoji} {sentiment.title()}" if sentiment != 'N/A' else 'N/A')
+                        # NEW: Marketing Impact Score
+                        marketing_impact = selected_row.get('marketing_impact_score', 'N/A')
+                        impact_color = "🔴" if marketing_impact and marketing_impact >= 8 else "🟡" if marketing_impact and marketing_impact >= 5 else "🔵"
+                        st.metric("💡 Marketing Impact", f"{impact_color} {marketing_impact}/10" if marketing_impact != 'N/A' else 'N/A')
                     
                     with metric_col4:
-                        alignment = selected_row.get('Brand Alignment', False)
-                        st.metric("🎨 Brand Fit", "✅ Yes" if alignment else "❌ No")
+                        # Purchase Intent Signal
+                        purchase_intent = selected_row.get('purchase_intent_signals', 'N/A')
+                        intent_emoji = "🚀" if purchase_intent == "strong positive" else "👍" if purchase_intent == "moderate positive" else "➖" if purchase_intent == "neutral" else "⚠️"
+                        st.metric("🛒 Purchase Intent", f"{intent_emoji} {purchase_intent.title() if purchase_intent != 'N/A' else 'N/A'}")
                     
                     # Decision buttons
                     st.markdown("---")
@@ -4747,8 +4750,13 @@ with analysis_tab:
                                 else:
                                     st.metric(label, "N/A")
                     
-                    # Summary
-                    if 'Summary' in selected_row and selected_row['Summary']:
+                    # Executive Summary (NEW)
+                    if 'executive_summary' in selected_row and selected_row['executive_summary']:
+                        with st.expander("🎯 Executive Summary", expanded=True):
+                            st.markdown(f"**CMO Briefing:** {selected_row['executive_summary']}")
+                    
+                    # Summary (Legacy)
+                    elif 'Summary' in selected_row and selected_row['Summary']:
                         with st.expander("📝 AI Summary", expanded=True):
                             st.markdown(f"*{selected_row['Summary']}*")
                     
@@ -4776,6 +4784,139 @@ with analysis_tab:
                                         st.markdown(f"• {con}")
                                 else:
                                     st.markdown("*No specific concerns noted*")
+                    
+                    # Strategic Intelligence Section (NEW)
+                    if 'brand_narrative' in selected_row and selected_row['brand_narrative']:
+                        with st.expander("🎭 Brand Narrative & Strategic Signals", expanded=False):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**Brand Story Impact:**")
+                                st.markdown(f"{selected_row['brand_narrative']}")
+                            with col2:
+                                if 'strategic_signal' in selected_row and selected_row['strategic_signal']:
+                                    st.markdown("**Strategic Signal:**")
+                                    st.markdown(f"⚡ {selected_row['strategic_signal']}")
+                    
+                    # Creator/Publication Intelligence (NEW)
+                    creator_data = selected_row.get('creator_analysis', {})
+                    publication_data = selected_row.get('publication_analysis', {})
+                    if isinstance(creator_data, str):
+                        try:
+                            import json
+                            creator_data = json.loads(creator_data) if creator_data else {}
+                        except:
+                            creator_data = {}
+                    if isinstance(publication_data, str):
+                        try:
+                            import json
+                            publication_data = json.loads(publication_data) if publication_data else {}
+                        except:
+                            publication_data = {}
+                    
+                    if creator_data or publication_data:
+                        with st.expander("📊 Media Intelligence", expanded=False):
+                            if creator_data:
+                                st.markdown("**🎬 Creator Analysis:**")
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("Influence", creator_data.get('influence_tier', 'N/A'))
+                                with col2:
+                                    st.metric("Audience", creator_data.get('audience_archetype', 'N/A'))
+                                with col3:
+                                    st.metric("Credibility", f"{creator_data.get('credibility_score', 'N/A')}/10")
+                                with col4:
+                                    st.metric("Viral Potential", creator_data.get('viral_potential', 'N/A'))
+                            
+                            if publication_data:
+                                st.markdown("**📰 Publication Analysis:**")
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("Type", publication_data.get('credibility', 'N/A'))
+                                with col2:
+                                    st.metric("Reach", publication_data.get('audience_reach', 'N/A'))
+                                with col3:
+                                    st.metric("Stance", publication_data.get('editorial_stance', 'N/A'))
+                                with col4:
+                                    st.metric("Influence", f"{publication_data.get('influence_factor', 'N/A')}/10")
+                    
+                    # Competitive Intelligence (NEW)
+                    competitive_data = selected_row.get('competitive_intelligence', {})
+                    if isinstance(competitive_data, str):
+                        try:
+                            import json
+                            competitive_data = json.loads(competitive_data) if competitive_data else {}
+                        except:
+                            competitive_data = {}
+                    
+                    if competitive_data:
+                        with st.expander("🏁 Competitive Intelligence", expanded=False):
+                            st.markdown(f"**Positioning:** {competitive_data.get('positioning_vs_competitors', 'N/A')}")
+                            
+                            advantages = competitive_data.get('advantages_highlighted', [])
+                            vulnerabilities = competitive_data.get('vulnerabilities_exposed', [])
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**✅ Advantages Highlighted:**")
+                                if advantages:
+                                    for adv in advantages:
+                                        st.markdown(f"• {adv}")
+                                else:
+                                    st.markdown("*No specific advantages noted*")
+                            
+                            with col2:
+                                st.markdown("**⚠️ Vulnerabilities Exposed:**")
+                                if vulnerabilities:
+                                    for vuln in vulnerabilities:
+                                        st.markdown(f"• {vuln}")
+                                else:
+                                    st.markdown("*No vulnerabilities identified*")
+                    
+                    # Action Items & Opportunities (NEW)
+                    action_data = selected_row.get('action_items', {})
+                    if isinstance(action_data, str):
+                        try:
+                            import json
+                            action_data = json.loads(action_data) if action_data else {}
+                        except:
+                            action_data = {}
+                    
+                    messaging_opps = selected_row.get('messaging_opportunities', [])
+                    risks = selected_row.get('risks_to_address', [])
+                    influential_statements = selected_row.get('influential_statements', [])
+                    
+                    if action_data or messaging_opps or risks or influential_statements:
+                        with st.expander("🚀 Strategic Actions & Insights", expanded=False):
+                            if action_data:
+                                immediate_response = action_data.get('immediate_response_needed', False)
+                                if immediate_response:
+                                    st.warning("⚡ **IMMEDIATE RESPONSE NEEDED**")
+                                
+                                if 'recommendation' in action_data:
+                                    st.markdown(f"**📋 Recommended Action:** {action_data['recommendation']}")
+                                
+                                if 'creator_relationship' in action_data:
+                                    st.markdown(f"**🤝 Creator Strategy:** {action_data.get('creator_relationship', 'Monitor')}")
+                                elif 'media_strategy' in action_data:
+                                    st.markdown(f"**📰 Media Strategy:** {action_data.get('media_strategy', 'Monitor')}")
+                            
+                            if influential_statements:
+                                st.markdown("**💬 Influential Quotes:**")
+                                for quote in influential_statements[:3]:  # Limit to 3
+                                    st.markdown(f"> *\"{quote}\"*")
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if messaging_opps:
+                                    st.markdown("**🎯 Messaging Opportunities:**")
+                                    for opp in messaging_opps:
+                                        st.markdown(f"• {opp}")
+                            
+                            with col2:
+                                if risks:
+                                    st.markdown("**⚠️ Risks to Address:**")
+                                    for risk in risks:
+                                        st.markdown(f"• {risk}")
                     
                     # Add bottom spacing for better visual separation
                     st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)

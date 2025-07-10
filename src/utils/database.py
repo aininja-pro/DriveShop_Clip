@@ -499,8 +499,21 @@ class DatabaseManager:
             pros_list = sentiment_data.get('pros', [])
             cons_list = sentiment_data.get('cons', [])
             key_mentions_list = sentiment_data.get('key_mentions', [])
+            influential_statements = sentiment_data.get('influential_statements', [])
+            messaging_opportunities = sentiment_data.get('messaging_opportunities', [])
+            risks_to_address = sentiment_data.get('risks_to_address', [])
+            
+            # Handle competitive intelligence arrays
+            competitive_intel = sentiment_data.get('competitive_intelligence', {})
+            if isinstance(competitive_intel, dict):
+                advantages = competitive_intel.get('advantages_highlighted', [])
+                vulnerabilities = competitive_intel.get('vulnerabilities_exposed', [])
+            else:
+                advantages = []
+                vulnerabilities = []
             
             updates = {
+                # Core sentiment fields
                 "relevance_score": sentiment_data.get('relevance_score'),
                 "overall_sentiment": sentiment_data.get('overall_sentiment'),
                 "brand_alignment": sentiment_data.get('brand_alignment'),
@@ -508,23 +521,42 @@ class DatabaseManager:
                 "sentiment_analysis_date": datetime.now().isoformat(),
                 "sentiment_completed": True,
                 "workflow_stage": "sentiment_analyzed",
-                # Add additional fields from advanced analysis
                 "overall_score": sentiment_data.get('overall_score'),
+                "recommendation": sentiment_data.get('recommendation'),
+                
+                # Strategic intelligence fields
+                "marketing_impact_score": sentiment_data.get('marketing_impact_score'),
+                "executive_summary": sentiment_data.get('executive_summary'),
+                "brand_narrative": sentiment_data.get('brand_narrative'),
+                "strategic_signal": sentiment_data.get('strategic_signal'),
+                "purchase_intent_signals": sentiment_data.get('purchase_intent_signals'),
+                
+                # JSONB fields
+                "creator_analysis": json.dumps(sentiment_data.get('creator_analysis', {})) if sentiment_data.get('creator_analysis') else None,
+                "publication_analysis": json.dumps(sentiment_data.get('publication_analysis', {})) if sentiment_data.get('publication_analysis') else None,
+                "competitive_intelligence": json.dumps(sentiment_data.get('competitive_intelligence', {})) if sentiment_data.get('competitive_intelligence') else None,
+                "aspect_insights": json.dumps(sentiment_data.get('aspect_insights', {})) if sentiment_data.get('aspect_insights') else None,
+                "action_items": json.dumps(sentiment_data.get('action_items', {})) if sentiment_data.get('action_items') else None,
+                
+                # Legacy aspects field for backward compatibility
                 "aspects": json.dumps(sentiment_data.get('aspects', {})) if sentiment_data.get('aspects') else None,
-                # Convert lists to PostgreSQL array format
+                
+                # Array fields
                 "pros": pros_list if isinstance(pros_list, list) else [],
                 "cons": cons_list if isinstance(cons_list, list) else [],
-                "recommendation": sentiment_data.get('recommendation'),
-                "key_mentions": key_mentions_list if isinstance(key_mentions_list, list) else []
+                "key_mentions": key_mentions_list if isinstance(key_mentions_list, list) else [],
+                "influential_statements": influential_statements if isinstance(influential_statements, list) else [],
+                "messaging_opportunities": messaging_opportunities if isinstance(messaging_opportunities, list) else [],
+                "risks_to_address": risks_to_address if isinstance(risks_to_address, list) else []
             }
             
             # Log the update for debugging
-            logger.info(f"Updating clip {clip_id} with sentiment data: workflow_stage={updates['workflow_stage']}, sentiment_completed={updates['sentiment_completed']}")
+            logger.info(f"Updating clip {clip_id} with strategic sentiment data: marketing_impact={updates.get('marketing_impact_score')}")
             
             result = self.supabase.table('clips').update(updates).eq('id', clip_id).execute()
             
             if result.data:
-                logger.info(f"✅ Updated sentiment for clip {clip_id} - workflow_stage is now 'sentiment_analyzed'")
+                logger.info(f"✅ Updated strategic sentiment for clip {clip_id} - workflow_stage is now 'sentiment_analyzed'")
                 return True
             else:
                 logger.warning(f"⚠️ No clip found with ID {clip_id}")
