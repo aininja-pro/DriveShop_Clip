@@ -2310,6 +2310,23 @@ with bulk_review_tab:
                         approved_count = 0
                     st.metric("Approved", approved_count)
                 
+                # Add Select All button
+                col1, col2, col3 = st.columns([1, 1, 4])
+                with col1:
+                    if st.button("✅ Select All", key="select_all_approve"):
+                        # Add all WO numbers to approved records
+                        all_wo_numbers = set(df['WO #'].astype(str))
+                        st.session_state.approved_records.update(all_wo_numbers)
+                        st.session_state.selected_for_approval = all_wo_numbers.copy()
+                        st.rerun()
+                
+                with col2:
+                    if st.button("❌ Clear All", key="clear_all_approve"):
+                        # Clear all selections
+                        st.session_state.approved_records = set()
+                        st.session_state.selected_for_approval = set()
+                        st.rerun()
+                
                 # Display filtered results with AgGrid
                 display_df = df.copy()
                 
