@@ -2260,7 +2260,7 @@ with bulk_review_tab:
                 'status': 'Status',
                 'tier_used': 'Processing Method',
                 'published_date': 'Published Date',
-                'media_outlet': 'Affiliation',  # Map media_outlet to Affiliation for UI compatibility
+                'media_outlet': 'Media Outlet',  # Map media_outlet to Media Outlet for dropdown
                 'byline_author': 'Actual_Byline',  # Map database field to expected name
                 'attribution_strength': 'Attribution_Strength'  # Map database field to expected name
             })
@@ -2389,7 +2389,14 @@ with bulk_review_tab:
                     print(f"❌ No match found for '{affiliation}'")
                     return ''  # Return empty if no match
                 
-                clean_df['Media Outlet'] = display_df.apply(smart_outlet_matching, axis=1)
+                # Use database values if they exist, otherwise use smart matching
+                if 'Media Outlet' in display_df.columns:
+                    clean_df['Media Outlet'] = display_df.apply(
+                        lambda row: row.get('Media Outlet', '') or smart_outlet_matching(row), 
+                        axis=1
+                    )
+                else:
+                    clean_df['Media Outlet'] = display_df.apply(smart_outlet_matching, axis=1)
                 
                 
                 # Format relevance score as "8/10" format
@@ -2595,6 +2602,17 @@ with bulk_review_tab:
                 # Add action columns with session state persistence
                 clean_df['✅ Approve'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.approved_records)
                 clean_df['❌ Reject'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.rejected_records)
+                
+                # Initialize last_saved_outlets with database values for persistence
+                if 'last_saved_outlets' not in st.session_state:
+                    st.session_state.last_saved_outlets = {}
+                
+                # Populate with current database values to prevent re-saving unchanged values
+                for idx, row in clean_df.iterrows():
+                    wo_num = str(row.get('WO #', ''))
+                    media_outlet = row.get('Media Outlet', '')
+                    if wo_num and media_outlet:
+                        st.session_state.last_saved_outlets[wo_num] = media_outlet
                 
                 # Create simpler view renderer with better visual feedback
                 cellRenderer_view = JsCode("""
@@ -3106,6 +3124,8 @@ with bulk_review_tab:
                             for wo_num in changed_wos:
                                 new_outlet = st.session_state.last_saved_outlets[wo_num]
                                 try:
+                                    # Get database connection
+                                    db = get_database()
                                     # Update the clip in database using the new method
                                     success = db.update_clip_media_outlet(wo_num, new_outlet)
                                     if success:
@@ -3155,6 +3175,8 @@ with bulk_review_tab:
                             for wo_num in byline_changed_wos:
                                 new_byline = st.session_state.last_saved_bylines[wo_num]
                                 try:
+                                    # Get database connection
+                                    db = get_database()
                                     # Update the clip in database using the new method
                                     success = db.update_clip_byline_author(wo_num, new_byline)
                                     if success:
