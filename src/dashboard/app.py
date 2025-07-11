@@ -2247,6 +2247,37 @@ with bulk_review_tab:
     if 'rejected_records' not in st.session_state:
         st.session_state.rejected_records = set()
     
+    # Initialize Media Outlet and Byline tracking
+    if 'last_saved_outlets' not in st.session_state:
+        st.session_state.last_saved_outlets = {}
+    if 'last_saved_bylines' not in st.session_state:
+        st.session_state.last_saved_bylines = {}
+    
+    # Load saved checkbox states from a temp file EARLY
+    import pickle
+    temp_file = os.path.join(project_root, "temp", "checkbox_state.pkl")
+    
+    # Ensure temp directory exists
+    os.makedirs(os.path.dirname(temp_file), exist_ok=True)
+    
+    # Try to load saved state
+    if os.path.exists(temp_file):
+        try:
+            with open(temp_file, 'rb') as f:
+                saved_state = pickle.load(f)
+                if 'approved' in saved_state:
+                    st.session_state.approved_records.update(saved_state['approved'])
+                if 'rejected' in saved_state:
+                    st.session_state.rejected_records.update(saved_state['rejected'])
+                if 'viewed' in saved_state:
+                    st.session_state.viewed_records = saved_state['viewed']
+                if 'outlets' in saved_state:
+                    st.session_state.last_saved_outlets.update(saved_state['outlets'])
+                if 'bylines' in saved_state:
+                    st.session_state.last_saved_bylines.update(saved_state['bylines'])
+        except Exception as e:
+            print(f"Could not load saved checkbox state: {e}")
+    
     # Cache database calls to improve performance
     @st.cache_data(ttl=60)  # Cache for 1 minute
     def cached_get_pending_clips():
@@ -2399,6 +2430,11 @@ with bulk_review_tab:
                 else:
                     clean_df['Media Outlet'] = display_df.apply(smart_outlet_matching, axis=1)
                 
+                # Override with saved Media Outlet values from session state
+                for idx, row in clean_df.iterrows():
+                    wo_num = str(row.get('WO #', ''))
+                    if wo_num in st.session_state.last_saved_outlets:
+                        clean_df.at[idx, 'Media Outlet'] = st.session_state.last_saved_outlets[wo_num]
                 
                 # Format relevance score as "8/10" format
                 if 'Relevance Score' in display_df.columns:
@@ -2594,53 +2630,36 @@ with bulk_review_tab:
                 clean_df['✍️ Attribution'] = display_df.apply(format_attribution_strength, axis=1)
                 clean_df['📝 Byline Author'] = display_df.apply(get_actual_byline, axis=1)
                 
+                # Override with saved Byline Author values from session state
+                for idx, row in clean_df.iterrows():
+                    wo_num = str(row.get('WO #', ''))
+                    if wo_num in st.session_state.last_saved_bylines:
+                        clean_df.at[idx, '📝 Byline Author'] = st.session_state.last_saved_bylines[wo_num]
+                
                 # Store the full URL tracking data for popup (hidden column)
                 clean_df['URL_Tracking_Data'] = display_df.apply(lambda row: json.dumps(parse_url_tracking(row)), axis=1)
                 
-                # Add mark viewed column
-                clean_df['👁️ Mark Viewed'] = False
+                # Add mark viewed column - check session state for persistence
+                clean_df['👁️ Mark Viewed'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.viewed_records)
                 
-                # Load saved checkbox states from a temp file
-                import pickle
-                temp_file = os.path.join(project_root, "temp", "checkbox_state.pkl")
-                
-                # Ensure temp directory exists
-                os.makedirs(os.path.dirname(temp_file), exist_ok=True)
-                
-                # Try to load saved state
-                if os.path.exists(temp_file):
-                    try:
-                        with open(temp_file, 'rb') as f:
-                            saved_state = pickle.load(f)
-                            if 'approved' in saved_state:
-                                st.session_state.approved_records.update(saved_state['approved'])
-                            if 'rejected' in saved_state:
-                                st.session_state.rejected_records.update(saved_state['rejected'])
-                    except Exception as e:
-                        print(f"Could not load saved checkbox state: {e}")
+                # Note: Saved checkbox states are already loaded at the beginning of the tab
                 
                 # Add action columns with session state persistence
                 clean_df['✅ Approve'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.approved_records)
                 clean_df['❌ Reject'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.rejected_records)
                 
-                # Initialize last_saved_outlets with database values for persistence
-                if 'last_saved_outlets' not in st.session_state:
-                    st.session_state.last_saved_outlets = {}
-                
-                # Initialize last_saved_bylines with database values for persistence
-                if 'last_saved_bylines' not in st.session_state:
-                    st.session_state.last_saved_bylines = {}
-                
-                # Populate with current database values to prevent re-saving unchanged values
+                # Populate last_saved_outlets and last_saved_bylines with current database values
+                # Only populate if not already set (to preserve changes across refreshes)
                 for idx, row in clean_df.iterrows():
                     wo_num = str(row.get('WO #', ''))
                     media_outlet = row.get('Media Outlet', '')
                     byline_author = row.get('📝 Byline Author', '')
                     
-                    if wo_num and media_outlet:
+                    # Only set if not already tracked (preserves user changes)
+                    if wo_num and media_outlet and wo_num not in st.session_state.last_saved_outlets:
                         st.session_state.last_saved_outlets[wo_num] = media_outlet
                     
-                    if wo_num and byline_author:
+                    if wo_num and byline_author and wo_num not in st.session_state.last_saved_bylines:
                         st.session_state.last_saved_bylines[wo_num] = byline_author
                 
                 # Create simpler view renderer with better visual feedback
@@ -2808,10 +2827,13 @@ with bulk_review_tab:
                     
                     this.button.addEventListener('click', () => {
                       const newValue = !params.data['Viewed'];
-                      params.setValue(newValue);
+                      const woNum = params.data['WO #'];
                       
-                      // Update the row data
+                      // Don't use setValue to avoid triggering grid update
                       params.node.setDataValue('Viewed', newValue);
+                      
+                      // Also update the 👁️ Mark Viewed column to trigger session state update
+                      params.node.setDataValue('👁️ Mark Viewed', newValue);
                       
                       // Update button appearance
                       this.button.innerHTML = newValue ? '✓ Viewed' : '👁️ Mark';
@@ -3099,8 +3121,8 @@ with bulk_review_tab:
                         if not wo_num:
                             continue
                             
-                        # Track viewed records
-                        if row.get('Viewed', False):
+                        # Track viewed records - check both columns
+                        if row.get('Viewed', False) or row.get('👁️ Mark Viewed', False):
                             new_viewed_records.add(wo_num)
                         
                         # Track approved records
@@ -3120,11 +3142,7 @@ with bulk_review_tab:
                     st.session_state.selected_for_approval = new_approved_records.copy()
                     st.session_state.selected_for_rejection = new_rejected_records.copy()
                 
-                # Initialize session state tracking
-                if 'last_saved_outlets' not in st.session_state:
-                    st.session_state.last_saved_outlets = {}
-                if 'last_saved_bylines' not in st.session_state:
-                    st.session_state.last_saved_bylines = {}
+                # Note: Session state tracking already initialized at the beginning of the tab
                 if 'selected_for_approval' not in st.session_state:
                     st.session_state.selected_for_approval = set()
                 if 'selected_for_rejection' not in st.session_state:
@@ -3280,7 +3298,10 @@ with bulk_review_tab:
                         with open(temp_file, 'wb') as f:
                             pickle.dump({
                                 'approved': st.session_state.approved_records,
-                                'rejected': st.session_state.rejected_records
+                                'rejected': st.session_state.rejected_records,
+                                'viewed': st.session_state.viewed_records,
+                                'outlets': st.session_state.last_saved_outlets,
+                                'bylines': st.session_state.last_saved_bylines
                             }, f)
                     except Exception as e:
                         print(f"Could not save checkbox state: {e}")
