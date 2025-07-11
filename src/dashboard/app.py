@@ -3292,17 +3292,67 @@ with bulk_review_tab:
                             if selected_wos:
                                 # Update clips in database to approved status (workflow_stage stays 'found' for Approved Queue)
                                 try:
+                                    # First, approve the clips
+                                    approved_clips = []
                                     for wo_number in selected_wos:
-                                        db.supabase.table('clips').update({
+                                        result = db.supabase.table('clips').update({
                                             'status': 'approved',
-                                            'workflow_stage': 'found'  # Clips go to Approved Queue first
+                                            'workflow_stage': 'found'  # Keep as 'found' for now
                                         }).eq('wo_number', wo_number).execute()
+                                        
+                                        if result.data:
+                                            approved_clips.extend(result.data)
                                     
-                                    logger.info(f"✅ Approved {len(selected_wos)} clips - moved to Approved Queue")
+                                    logger.info(f"✅ Approved {len(approved_clips)} clips")
+                                    
+                                    # Show progress bar for sentiment analysis
+                                    st.info("🧠 Running sentiment analysis on approved clips...")
+                                    progress_bar = st.progress(0)
+                                    progress_text = st.empty()
+                                    
+                                    # Run sentiment analysis on approved clips
+                                    
+                                    def update_progress(progress, message):
+                                        # Progress is already a fraction between 0 and 1
+                                        progress_bar.progress(progress)
+                                        progress_text.text(message)
+                                    
+                                    # Check if OpenAI API key is available
+                                    if not os.environ.get('OPENAI_API_KEY'):
+                                        st.error("❌ OpenAI API key not found. Clips approved but sentiment analysis skipped.")
+                                        # Update clips to sentiment_analyzed without sentiment
+                                        for clip in approved_clips:
+                                            db.supabase.table('clips').update({
+                                                'workflow_stage': 'sentiment_analyzed'
+                                            }).eq('id', clip['id']).execute()
+                                    else:
+                                        # Run sentiment analysis
+                                        results = run_sentiment_analysis(approved_clips, update_progress)
+                                        
+                                        # Update clips with sentiment results and move to ready_to_export
+                                        sentiment_success_count = 0
+                                        for clip, result in zip(approved_clips, results['results']):
+                                            if result.get('sentiment_completed'):
+                                                success = db.update_clip_sentiment(clip['id'], result)
+                                                if success:
+                                                    # Update workflow stage to sentiment_analyzed (which means ready to export)
+                                                    db.supabase.table('clips').update({
+                                                        'workflow_stage': 'sentiment_analyzed'
+                                                    }).eq('id', clip['id']).execute()
+                                                    sentiment_success_count += 1
+                                            else:
+                                                # If sentiment failed, still move to sentiment_analyzed but note the failure
+                                                db.supabase.table('clips').update({
+                                                    'workflow_stage': 'sentiment_analyzed',
+                                                    'sentiment_completed': False
+                                                }).eq('id', clip['id']).execute()
+                                        
+                                        progress_bar.progress(1.0)
+                                        progress_text.text(f"✅ Sentiment analysis complete! {sentiment_success_count}/{len(approved_clips)} successful")
                                     
                                     # Success message and cleanup
-                                    st.success(f"✅ Successfully approved {len(selected_wos)} clips!")
-                                    st.info("📋 **Clips moved to Approved Queue** - ready for batch processing")
+                                    st.success(f"✅ Successfully processed {len(approved_clips)} clips!")
+                                    st.info("📋 **Clips are ready for export** in the Approved Queue")
                                     
                                     # Clear selections and dialog
                                     st.session_state.selected_for_approval = set()
@@ -3430,31 +3480,25 @@ with bulk_review_tab:
 # ========== APPROVED QUEUE TAB (Enhanced with FMS Export) ==========
 with approved_queue_tab:
     st.markdown('<h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.2rem; font-weight: 600; color: #2c3e50;">✅ Approved Queue</h4>', unsafe_allow_html=True)
-    st.markdown('<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #6c757d; font-style: italic;">Manage approved clips - Run sentiment analysis and export to FMS</p>', unsafe_allow_html=True)
+    st.markdown('<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #6c757d; font-style: italic;">Export clips with completed sentiment analysis to FMS</p>', unsafe_allow_html=True)
     
     # Initialize session state for workflow filtering
     if 'approved_queue_filter' not in st.session_state:
-        st.session_state.approved_queue_filter = 'approved_queue'
+        st.session_state.approved_queue_filter = 'ready_to_export'
     
-    # Workflow filtering tabs (simplified)
-    filter_col1, filter_col2, filter_col3 = st.columns(3)
+    # Workflow filtering tabs (updated)
+    filter_col1, filter_col2 = st.columns(2)
     
     with filter_col1:
-        if st.button("✅ Approved Queue", key="filter_approved", 
-                    type="primary" if st.session_state.approved_queue_filter == 'approved_queue' else "secondary"):
-            st.session_state.approved_queue_filter = 'approved_queue'
+        if st.button("📤 Ready to Export", key="filter_ready_export", 
+                    type="primary" if st.session_state.approved_queue_filter == 'ready_to_export' else "secondary"):
+            st.session_state.approved_queue_filter = 'ready_to_export'
             st.rerun()
     
     with filter_col2:
-        if st.button("📊 Recent Complete", key="filter_complete",
+        if st.button("✅ Recent Complete", key="filter_complete",
                     type="primary" if st.session_state.approved_queue_filter == 'recent_complete' else "secondary"):
             st.session_state.approved_queue_filter = 'recent_complete'
-            st.rerun()
-    
-    with filter_col3:
-        if st.button("🗑️ Archive Mgmt", key="filter_archive",
-                    type="primary" if st.session_state.approved_queue_filter == 'archive_mgmt' else "secondary"):
-            st.session_state.approved_queue_filter = 'archive_mgmt'
             st.rerun()
     
     # Load clips based on selected filter
@@ -3466,86 +3510,84 @@ with approved_queue_tab:
         
         db = get_cached_db()
         
+        # One-time migration: Update any existing clips with 'exported' status to have proper workflow_stage
+        # This ensures legacy exported clips show up in Recent Complete
+        @st.cache_data(ttl=3600)  # Cache for 1 hour to avoid repeated migrations
+        def migrate_exported_clips():
+            try:
+                # Find clips with status='exported' but wrong workflow_stage
+                result = db.supabase.table('clips').select('id').eq('status', 'exported').neq('workflow_stage', 'exported').execute()
+                if result.data:
+                    for clip in result.data:
+                        db.supabase.table('clips').update({
+                            'workflow_stage': 'exported'
+                        }).eq('id', clip['id']).execute()
+                    logger.info(f"Migrated {len(result.data)} exported clips to proper workflow_stage")
+                return True
+            except Exception as e:
+                logger.error(f"Migration error: {e}")
+                return False
+        
+        # Run migration
+        migrate_exported_clips()
+        
         # Cache the approved queue data with TTL of 60 seconds
         @st.cache_data(ttl=60)
         def get_approved_queue_data():
             return db.get_approved_queue_clips()
         
-        if st.session_state.approved_queue_filter == 'approved_queue':
-            clips_data = get_approved_queue_data()
-            tab_title = "✅ Approved Queue"
-            tab_description = "Clips awaiting sentiment analysis and FMS export"
+        if st.session_state.approved_queue_filter == 'ready_to_export':
+            # Get clips that are ready to export (workflow_stage = 'ready_to_export')
+            @st.cache_data(ttl=30)
+            def get_ready_to_export_data():
+                # Get clips with workflow_stage = 'sentiment_analyzed' (ready to export)
+                result = db.supabase.table('clips').select('*').eq('workflow_stage', 'sentiment_analyzed').execute()
+                # Also get any legacy clips that are approved with sentiment completed but not exported
+                legacy_result = db.supabase.table('clips').select('*').eq('status', 'approved').eq('sentiment_completed', True).eq('workflow_stage', 'found').execute()
+                
+                all_clips = result.data if result.data else []
+                if legacy_result.data:
+                    all_clips.extend(legacy_result.data)
+                return all_clips
+            
+            clips_data = get_ready_to_export_data()
+            tab_title = "📤 Ready to Export"
+            tab_description = "Clips with completed sentiment analysis ready for FMS export"
             
         elif st.session_state.approved_queue_filter == 'recent_complete':
-            # Cache recent complete data with TTL of 60 seconds
+            # Get exported clips from the last 30 days
             @st.cache_data(ttl=60)
             def get_recent_complete_data():
-                return db.get_clips_complete_recent(days=30)
+                from datetime import datetime, timedelta
+                thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+                
+                # Get all exported clips regardless of fms_export_date
+                # Since legacy clips don't have fms_export_date, we need a different approach
+                result = db.supabase.table('clips').select('*').in_('workflow_stage', ['exported', 'complete']).execute()
+                
+                all_clips = []
+                if result.data:
+                    for clip in result.data:
+                        # For legacy clips without fms_export_date, use processed_date
+                        date_to_check = clip.get('fms_export_date') or clip.get('processed_date')
+                        
+                        if date_to_check and date_to_check >= thirty_days_ago:
+                            all_clips.append(clip)
+                        elif not date_to_check:
+                            # If no date at all, include it (shouldn't happen but safety)
+                            all_clips.append(clip)
+                
+                return all_clips
             
             clips_data = get_recent_complete_data()
-            tab_title = "📊 Recent Complete (Last 30 Days)"
-            tab_description = "Fully processed clips with sentiment analysis"
-            
-        else:  # archive_mgmt
-            clips_data = []
-            tab_title = "🗑️ Archive Management"
-            tab_description = "Delete old clips to manage database size"
+            tab_title = "✅ Recent Complete (Last 30 Days)"
+            tab_description = "Exported clips from the last 30 days"
         
         # Display current filter info
         st.markdown(f'<h5 style="margin-top: 0.5rem; margin-bottom: 0.3rem; font-size: 1.1rem; font-weight: 600; color: #2c3e50;">{tab_title}</h5>', unsafe_allow_html=True)
         st.markdown(f'<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.85rem; color: #6c757d; font-style: italic;">{tab_description}</p>', unsafe_allow_html=True)
         
-        if st.session_state.approved_queue_filter == 'archive_mgmt':
-            # Archive Management Section
-            st.markdown('<hr style="margin: 1rem 0; border: none; height: 1px; background-color: #e0e0e0;">', unsafe_allow_html=True)
-            st.markdown('<h5 style="margin-top: 0.5rem; margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 600; color: #2c3e50;">🗑️ Archive Management</h5>', unsafe_allow_html=True)
-            
-            col_days, col_action = st.columns([1, 2])
-            
-            with col_days:
-                days_to_delete = st.number_input("Delete clips older than (days):", min_value=30, max_value=365, value=90, step=30)
-            
-            with col_action:
-                st.markdown("<br>", unsafe_allow_html=True)  # Add spacing
-                col_export, col_delete = st.columns(2)
-                
-                with col_export:
-                    if st.button("📤 Export Before Delete", help="Export old clips before deletion"):
-                        try:
-                            result = db.delete_clips_older_than_days(days_to_delete, export_before_delete=True)
-                            if result['exported_clips']:
-                                # Create export file
-                                import json
-                                export_data = json.dumps(result['exported_clips'], indent=2)
-                                filename = f"archived_clips_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                                
-                                st.download_button(
-                                    label="📥 Download Archive",
-                                    data=export_data,
-                                    file_name=filename,
-                                    mime="application/json"
-                                )
-                                st.success(f"✅ Exported {len(result['exported_clips'])} clips for archive")
-                            else:
-                                st.info("No clips found older than specified days")
-                        except Exception as e:
-                            st.error(f"❌ Error creating archive: {e}")
-                
-                with col_delete:
-                    if st.button("🗑️ Delete Old Clips", help="Permanently delete old clips"):
-                        try:
-                            result = db.delete_clips_older_than_days(days_to_delete, export_before_delete=False)
-                            if result['deleted_count'] > 0:
-                                st.success(f"✅ Deleted {result['deleted_count']} clips older than {days_to_delete} days")
-                            else:
-                                st.info("No clips found older than specified days")
-                        except Exception as e:
-                            st.error(f"❌ Error deleting clips: {e}")
-            
-            # Show warning
-            st.warning(f"⚠️ This will permanently delete clips older than {days_to_delete} days. Use 'Export Before Delete' to backup data first.")
-        
-        elif clips_data:
+        if clips_data:
             # Convert to DataFrame for display
             approved_df = pd.DataFrame(clips_data)
             
@@ -3593,12 +3635,17 @@ with approved_queue_tab:
             else:
                 clean_df['Sentiment'] = "⏳ Pending"
             
+            # Add export date for Recent Complete tab
+            if st.session_state.approved_queue_filter == 'recent_complete' and 'fms_export_date' in approved_df.columns:
+                clean_df['Export Date'] = pd.to_datetime(approved_df['fms_export_date']).dt.strftime('%b %d %I:%M %p')
+            
             # Add workflow status indicator
             clean_df['Stage'] = approved_df['workflow_stage'].apply(
-                lambda x: "📋 Ready" if x == 'found' else 
-                         "📤 Exported" if x == 'exported' else 
-                         "✅ Complete" if x == 'sentiment_analyzed' else 
-                         f"📊 {x.replace('_', ' ').title()}"
+                lambda x: "📤 Ready to Export" if x == 'sentiment_analyzed' else 
+                         "✅ Exported" if x == 'exported' else 
+                         "📊 Complete" if x == 'complete' else
+                         "🧠 Processing" if x == 'found' else
+                         f"📋 {x.replace('_', ' ').title()}"
             ) if 'workflow_stage' in approved_df.columns else 'Unknown'
             
             # Configure ADVANCED AgGrid for approved queue (same as Bulk Review)
@@ -3623,12 +3670,15 @@ with approved_queue_tab:
                 }
             )
             
-            # Enable selection for batch operations
-            gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
-            
-            # Configure columns with proper widths and features
-            # Add checkbox selection to first column for Approved Queue
-            gb.configure_column("WO #", width=100, pinned='left', checkboxSelection=True, headerCheckboxSelection=True)
+            # Enable selection for batch operations (only for Ready to Export)
+            if st.session_state.approved_queue_filter == 'ready_to_export':
+                gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
+                # Add checkbox selection to first column for Ready to Export
+                gb.configure_column("WO #", width=100, pinned='left', checkboxSelection=True, headerCheckboxSelection=True)
+            else:
+                # Recent Complete is read-only
+                gb.configure_selection('single', use_checkbox=False)
+                gb.configure_column("WO #", width=100, pinned='left')
             gb.configure_column("Office", width=80)
             gb.configure_column("Make", width=100)
             gb.configure_column("Model", width=120)
@@ -3691,262 +3741,174 @@ with approved_queue_tab:
             # Action buttons based on current filter
             st.markdown("---")
             
-            if st.session_state.approved_queue_filter == 'approved_queue':
-                # Actions for Approved Queue
-                col1, col2, col3, col4 = st.columns(4)
+            if st.session_state.approved_queue_filter == 'ready_to_export':
+                # Actions for Ready to Export
+                col1, col2 = st.columns(2)
                 
                 with col1:
-                    if st.button("🧠 Run Sentiment Analysis", help="Run sentiment analysis on selected clips"):
-                        # Handle sentiment analysis
-                        selected_data = selected_clips.get('selected_rows', [])
-                        
-                        # Convert to list if it's a DataFrame
-                        if hasattr(selected_data, 'to_dict'):
-                            selected_rows = selected_data.to_dict('records')
-                        elif isinstance(selected_data, list):
-                            selected_rows = selected_data
-                        else:
-                            selected_rows = []
+                    # Count selected rows from AgGrid
+                    selected_count = len(selected_clips.selected_rows) if hasattr(selected_clips, 'selected_rows') and selected_clips.selected_rows is not None else 0
+                    st.metric("Selected", f"{selected_count}/{len(clean_df)}")
+                
+                with col2:
+                    if st.button(f"📤 FMS Export ({selected_count})", disabled=selected_count == 0, help="Export selected clips to FMS JSON"):
+                        # Handle FMS Export
+                        # Get selected rows from AgGrid response
+                        selected_rows = []
+                        if hasattr(selected_clips, 'selected_rows'):
+                            selected_data = selected_clips.selected_rows
+                            if selected_data is not None:
+                                if hasattr(selected_data, 'to_dict'):
+                                    selected_rows = selected_data.to_dict('records')
+                                elif isinstance(selected_data, list):
+                                    selected_rows = selected_data
+                                else:
+                                    selected_rows = []
                         
                         if selected_rows and len(selected_rows) > 0:
-                            # Run sentiment analysis
                             try:
-                                clips_to_analyze = []
+                                clips_to_export = []
                                 
+                                # Gather full clip data for export
                                 for row in selected_rows:
-                                    # Use database ID for accurate lookup
                                     clip_id = row.get('id')
                                     if clip_id:
                                         # Get full clip data from database using ID
                                         clip_data = next((clip for clip in clips_data if clip['id'] == clip_id), None)
                                         if clip_data:
-                                            clips_to_analyze.append(clip_data)
+                                            clips_to_export.append(clip_data)
                                     else:
                                         # Fallback to WO number if ID not available
                                         wo_number = str(row.get('WO #', ''))
                                         if wo_number:
                                             clip_data = next((clip for clip in clips_data if str(clip['wo_number']) == wo_number), None)
                                             if clip_data:
-                                                clips_to_analyze.append(clip_data)
+                                                clips_to_export.append(clip_data)
                                 
-                                if clips_to_analyze:
-                                    # Store clips for sentiment analysis in session state
-                                    st.session_state.sentiment_analysis_clips = clips_to_analyze
-                                    st.session_state.sentiment_analysis_progress = 0
-                                    st.session_state.sentiment_analysis_total = len(clips_to_analyze)
+                                if clips_to_export:
+                                    # Create FMS export data with all fields including sentiment
+                                    fms_export_data = []
+                                    export_timestamp = datetime.now().isoformat()
                                     
-                                    # Show progress
-                                    progress_bar = st.progress(0)
-                                    status_text = st.empty()
-                                    
-                                    # Run actual sentiment analysis
-                                    def update_progress(progress, message):
-                                        progress_bar.progress(progress)
-                                        status_text.text(message)
-                                    
-                                    # Check if OpenAI API key is available
-                                    if not os.environ.get("OPENAI_API_KEY"):
-                                        st.error("❌ OpenAI API key not found. Please set OPENAI_API_KEY environment variable.")
-                                        st.warning("⚠️ Cannot run sentiment analysis without OpenAI API key.")
-                                    else:
-                                        # Run real sentiment analysis ONLY
-                                        try:
-                                            results = run_sentiment_analysis(clips_to_analyze, update_progress)
+                                    for clip in clips_to_export:
+                                        export_record = {
+                                            # Core fields
+                                            "id": clip.get('id'),
+                                            "wo_number": clip.get('wo_number'),
+                                            "activity_id": clip.get('activity_id'),
+                                            "office": clip.get('office'),
+                                            "make": clip.get('make'),
+                                            "model": clip.get('model'),
+                                            "contact": clip.get('contact'),
+                                            "person_id": clip.get('person_id'),
+                                            "media_outlet": clip.get('media_outlet'),
+                                            "clip_url": clip.get('clip_url'),
+                                            "published_date": clip.get('published_date'),
+                                            "processed_date": clip.get('processed_date'),
+                                            "attribution_strength": clip.get('attribution_strength'),
+                                            "byline_author": clip.get('byline_author'),
                                             
-                                            # Update database with results
-                                            updated_count = 0
-                                            for clip, result in zip(clips_to_analyze, results['results']):
-                                                if result.get('sentiment_completed'):
-                                                    # Debug logging
-                                                    logger.info(f"Updating sentiment for clip ID: {clip.get('id')}, WO: {clip.get('wo_number')}")
-                                                    success = db.update_clip_sentiment(clip['id'], result)
-                                                    if success:
-                                                        updated_count += 1
-                                                    else:
-                                                        logger.error(f"Failed to update sentiment for clip {clip.get('id')}")
+                                            # Sentiment analysis fields
+                                            "relevance_score": clip.get('relevance_score'),
+                                            "overall_sentiment": clip.get('overall_sentiment'),
+                                            "overall_score": clip.get('overall_score'),
+                                            "brand_alignment": clip.get('brand_alignment'),
+                                            "summary": clip.get('summary'),
+                                            "sentiment_completed": clip.get('sentiment_completed'),
                                             
-                                            st.success(f"✅ Sentiment analysis completed: {results['successful']}/{results['total_processed']} successful, {updated_count} updated in database")
+                                            # Strategic intelligence fields (key fields only)
+                                            "marketing_impact_score": clip.get('marketing_impact_score'),
+                                            "executive_summary": clip.get('executive_summary'),
+                                            "purchase_intent_signals": clip.get('purchase_intent_signals'),
+                                            "strategic_signal": clip.get('strategic_signal'),
                                             
-                                            if results['failed'] > 0:
-                                                st.warning(f"⚠️ {results['failed']} clips failed sentiment analysis")
-                                            
-                                            # Force page refresh to show updated data
-                                            time.sleep(1)
-                                            st.rerun()
-                                        
-                                        except Exception as e:
-                                            st.error(f"❌ Error during sentiment analysis: {e}")
-                                            logger.error(f"Sentiment analysis error: {e}")
+                                            # Export metadata
+                                            "export_timestamp": export_timestamp,
+                                            "export_type": "fms_export"
+                                        }
+                                        fms_export_data.append(export_record)
                                     
-                                    # Clear progress
-                                    progress_bar.empty()
-                                    status_text.empty()
-                                    
-                                else:
-                                    st.error("❌ No valid clips found for analysis")
-                            except Exception as e:
-                                st.error(f"❌ Error running sentiment analysis: {e}")
-                        else:
-                            st.warning("Please select clips for sentiment analysis")
-                
-                with col2:
-                    if st.button("📤 Export to FMS", help="Export selected clips to FMS (includes sentiment if available)"):
-                        # Handle export without sentiment
-                        selected_data = selected_clips.get('selected_rows', [])
-                        if hasattr(selected_data, 'to_dict'):
-                            selected_rows = selected_data.to_dict('records')
-                        elif isinstance(selected_data, list):
-                            selected_rows = selected_data
-                        else:
-                            selected_rows = []
-                        
-                        if selected_rows:
-                            # Generate FMS export JSON
-                            try:
-                                fms_export_data = []
-                                wo_numbers_to_update = []
-                                
-                                for row in selected_rows:
-                                    wo_number = str(row.get('WO #', ''))
-                                    if wo_number:
-                                        wo_numbers_to_update.append(wo_number)
-                                        
-                                        # Get full clip data from database
-                                        clip_data = next((clip for clip in clips_data if str(clip['wo_number']) == wo_number), None)
-                                        if clip_data:
-                                            fms_export_data.append({
-                                                "work_order": wo_number,
-                                                "activity_id": clip_data.get('activity_id', ''),
-                                                "make": clip_data.get('make', ''),
-                                                "vehicle_model": clip_data.get('model', ''),
-                                                "contact": clip_data.get('contact', ''),
-                                                "media_outlet": clip_data.get('media_outlet', ''),
-                                                "office": clip_data.get('office', ''),
-                                                "clip_url": clip_data.get('clip_url', ''),
-                                                "relevance_score": clip_data.get('relevance_score', 0),
-                                                "sentiment_completed": clip_data.get('sentiment_completed', False),
-                                                "overall_sentiment": clip_data.get('overall_sentiment', ''),
-                                                "brand_alignment": clip_data.get('brand_alignment', ''),
-                                                "summary": clip_data.get('summary', ''),
-                                                "processed_date": clip_data.get('processed_date', ''),
-                                                "export_timestamp": datetime.now().isoformat(),
-                                                "export_type": "with_sentiment" if clip_data.get('sentiment_completed') else "without_sentiment"
-                                            })
-                                
-                                if fms_export_data:
-                                    # Update clips to complete status
-                                    clip_ids_to_update = []
-                                    for row in selected_rows:
-                                        clip_id = row.get('id')
-                                        if clip_id:
-                                            clip_ids_to_update.append(clip_id)
-                                            logger.info(f"📋 Found clip ID: {clip_id} for WO: {row.get('WO #')}")
-                                        else:
-                                            logger.warning(f"⚠️ No ID found for row with WO: {row.get('WO #')}")
+                                    # Create JSON export
+                                    import json
+                                    export_json = json.dumps(fms_export_data, indent=2, default=str)
+                                    filename = f"fms_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
                                     
                                     # Store export data in session state
-                                    export_filename = f"fms_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                                    json_str = json.dumps(fms_export_data, indent=2)
+                                    st.session_state.fms_export_ready = True
+                                    st.session_state.fms_export_json = export_json
+                                    st.session_state.fms_export_filename = filename
+                                    st.session_state.fms_clips_to_export = clips_to_export
+                                    st.session_state.fms_export_timestamp = export_timestamp
                                     
-                                    st.session_state.fms_export_data = json_str
-                                    st.session_state.fms_export_filename = export_filename
-                                    st.session_state.fms_clips_to_update = clip_ids_to_update
+                                    st.success(f"✅ Export prepared for {len(clips_to_export)} clips! Click the download button below.")
+                                    st.rerun()
                                     
-                                    # Update workflow stage to complete
-                                    if clip_ids_to_update:
-                                        logger.info(f"🔄 Updating {len(clip_ids_to_update)} clips to complete status: {clip_ids_to_update}")
-                                        success = db.update_clips_to_complete(clip_ids_to_update)
-                                        if success:
-                                            logger.info(f"✅ Updated {len(clip_ids_to_update)} clips to complete status")
-                                            st.success(f"✅ Exported {len(selected_rows)} clips to FMS - Click download button below")
-                                        else:
-                                            logger.error(f"❌ Failed to update clips to complete status")
-                                            st.error("❌ Failed to update clips status")
-                                    else:
-                                        logger.warning("⚠️ No clip IDs found to update")
-                                        st.warning("⚠️ No clip IDs found - clips may not move to Recent Complete")
-                                    
-                                    # Don't rerun immediately - let user download first
-                                    st.session_state.show_fms_download = True
-                                    
+                                else:
+                                    st.error("❌ No valid clips found for export")
                             except Exception as e:
-                                st.error(f"❌ Error generating FMS export: {e}")
+                                st.error(f"❌ Error during FMS export: {e}")
+                                logger.error(f"FMS export error: {e}")
                         else:
-                            st.warning("Please select clips to export")
-                
-                with col3:
-                    if st.button("🔄 Move Back to Review", help="Move selected clips back to Bulk Review"):
-                        # Handle moving back to review
-                        selected_data = selected_clips.get('selected_rows', [])
-                        if hasattr(selected_data, 'to_dict'):
-                            selected_rows = selected_data.to_dict('records')
-                        elif isinstance(selected_data, list):
-                            selected_rows = selected_data
-                        else:
-                            selected_rows = []
-                        
-                        if selected_rows and len(selected_rows) > 0:
-                            # Move clips back to pending_review status
-                            try:
-                                for row in selected_rows:
-                                    wo_number = str(row.get('WO #', ''))
-                                    if wo_number:
-                                        db.supabase.table('clips').update({
-                                            'status': 'pending_review'
-                                        }).eq('wo_number', wo_number).execute()
-                                
-                                st.success(f"✅ Moved {len(selected_rows)} clips back to Bulk Review")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Error moving clips: {e}")
-                        else:
-                            st.warning("Please select clips to move back")
-                
-                with col4:
-                    if st.button("📊 Select All", help="Select all clips"):
-                        st.info("💡 Use the checkboxes in the table to select clips")
+                            st.warning("Please select clips for FMS export")
             
-            # Show download button if FMS export is ready
-            if st.session_state.get('show_fms_download', False) and st.session_state.get('fms_export_data'):
+            # Show download button if export is ready
+            if st.session_state.get('fms_export_ready', False):
                 st.markdown("---")
                 col1, col2, col3 = st.columns([1, 2, 1])
                 with col2:
-                    # Create a download button
-                    st.download_button(
+                    if st.download_button(
                         label="📥 Download FMS Export JSON",
-                        data=st.session_state.fms_export_data,
+                        data=st.session_state.fms_export_json,
                         file_name=st.session_state.fms_export_filename,
                         mime="application/json",
-                        key="download_fms_export"
-                    )
-                    
-                    # Add a button to clear and refresh after download
-                    if st.button("✅ Download Complete - Refresh", key="refresh_after_download"):
-                        # Clear the download state
-                        st.session_state.show_fms_download = False
-                        st.session_state.fms_export_data = None
+                        key="download_fms_json"
+                    ):
+                        # Update clips to exported status after download
+                        clips_to_export = st.session_state.fms_clips_to_export
+                        export_timestamp = st.session_state.fms_export_timestamp
+                        exported_count = 0
+                        
+                        for clip in clips_to_export:
+                            result = db.supabase.table('clips').update({
+                                'workflow_stage': 'exported',
+                                'fms_export_date': export_timestamp
+                            }).eq('id', clip['id']).execute()
+                            
+                            if result.data:
+                                exported_count += 1
+                        
+                        # Clear session state
+                        st.session_state.fms_export_ready = False
+                        st.session_state.fms_export_json = None
                         st.session_state.fms_export_filename = None
+                        st.session_state.fms_clips_to_export = None
+                        st.session_state.fms_export_timestamp = None
+                        
+                        # Show success and refresh
+                        st.success(f"✅ Downloaded and moved {exported_count} clips to Recent Complete!")
+                        st.cache_data.clear()
+                        time.sleep(1)
                         st.rerun()
         
         else:
             # No clips found for current filter
-            if st.session_state.approved_queue_filter == 'approved_queue':
-                st.info("✅ No clips in the approved queue. Approve clips in Bulk Review to see them here.")
+            if st.session_state.approved_queue_filter == 'ready_to_export':
+                st.info("📤 No clips ready for export. Approve clips in Bulk Review to see them here after sentiment analysis.")
             elif st.session_state.approved_queue_filter == 'recent_complete':
-                st.info("📊 No completed clips in the last 30 days.")
+                st.info("✅ No exported clips in the last 30 days.")
             
             # Show helpful instructions
             st.markdown("""
-            **Simplified Approved Queue Workflow:**
-            1. **✅ Approved Queue** - All approved clips awaiting processing
-            2. **📊 Recent Complete** - Fully processed clips (last 30 days)
-            3. **🗑️ Archive Management** - Delete old clips to manage database size
+            **Updated Workflow:**
+            1. **📋 Bulk Review** → Select and submit approved clips
+            2. **🧠 Automatic Sentiment** → Runs immediately after approval
+            3. **📤 Ready to Export** → Select clips and export to FMS JSON
+            4. **✅ Recent Complete** → View exported clips from last 30 days
             
-            **New Workflow:**
-            - Approve clips in Bulk Review → They appear in Approved Queue
-            - Run Sentiment Analysis on clips (batch process)
-            - Export to FMS with or without sentiment data
-            - Clips with sentiment analysis move to Recent Complete
+            **Key Features:**
+            - Sentiment analysis runs automatically on approval
+            - All fields including strategic intelligence are exported
+            - Exported clips automatically move to Recent Complete
             """)
     
     except Exception as e:
@@ -4153,7 +4115,6 @@ with rejected_tab:
                             # If multiple URLs, return the first one (most common case)
                             # We'll show a count indicator if there are multiple
                             first_url = urls[0]
-                            print(f"DEBUG: Found {len(urls)} original URLs for WO#, using first: {first_url}")
                             return first_url
                 
                 # FALLBACK: Try the old URL_Details field for backward compatibility
@@ -4162,7 +4123,6 @@ with rejected_tab:
                     return ""
                 
                 url_details_str = str(url_details).strip()
-                print(f"DEBUG: Fallback to URL_Details parsing: {url_details_str[:100]}...")
                 
                 # First try JSON parsing (new format)
                 try:
@@ -4174,7 +4134,6 @@ with rejected_tab:
                         first_entry = url_data[0]
                         if isinstance(first_entry, dict) and 'original_url' in first_entry:
                             original_url = first_entry['original_url']
-                            print(f"DEBUG: Successfully extracted original_url from JSON: {original_url}")
                             return original_url
                 except (json.JSONDecodeError, KeyError, TypeError):
                     # Not JSON format, continue to old string parsing
@@ -4182,7 +4141,6 @@ with rejected_tab:
                 
                 # Handle OLD string format used by rejected records
                 # Format: "https://example.com: status; https://example2.com: status"
-                print(f"DEBUG: Using old string format parsing for: {url_details_str}")
                 
                 # Split by semicolon to get individual URL entries
                 url_entries = url_details_str.split(';')
@@ -4198,16 +4156,13 @@ with rejected_tab:
                                 url_part = entry[:colon_pos].strip()
                                 # Validate it looks like a URL
                                 if url_part.startswith(('http://', 'https://')):
-                                    print(f"DEBUG: Successfully extracted URL from old format: {url_part}")
                                     return url_part
                         else:
                             # No colon, treat entire entry as URL
                             if entry.startswith(('http://', 'https://')):
-                                print(f"DEBUG: Successfully extracted URL (no status): {entry}")
                                 return entry
                 
                 # Final fallback - return empty string if no parsing worked
-                print(f"DEBUG: No valid URL found, returning empty string")
                 return ""
             
             # Add the View column with the searched URL (using row-based function)
