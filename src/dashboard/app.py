@@ -2311,22 +2311,6 @@ with bulk_review_tab:
                         approved_count = 0
                     st.metric("Approved", approved_count)
                 
-                # Add Select All button
-                col1, col2, col3 = st.columns([1, 1, 4])
-                with col1:
-                    if st.button("✅ Select All", key="select_all_approve"):
-                        # Add all WO numbers to approved records
-                        all_wo_numbers = set(df['WO #'].astype(str))
-                        st.session_state.approved_records.update(all_wo_numbers)
-                        st.session_state.selected_for_approval = all_wo_numbers.copy()
-                        st.rerun()
-                
-                with col2:
-                    if st.button("❌ Clear All", key="clear_all_approve"):
-                        # Clear all selections
-                        st.session_state.approved_records = set()
-                        st.session_state.selected_for_approval = set()
-                        st.rerun()
                 
                 # Display filtered results with AgGrid
                 display_df = df.copy()
@@ -3266,7 +3250,7 @@ with bulk_review_tab:
                 # Create sticky action bar container
                 st.markdown('<div class="sticky-action-bar">', unsafe_allow_html=True)
                 
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3 = st.columns(3)
                 
                 with col1:
                     # Submit Approved Clips Button
@@ -3298,15 +3282,6 @@ with bulk_review_tab:
                         else:
                             st.info("No high-quality clips (9+) found")
                 
-                with col4:
-                    # Clear All Selections Button
-                    if st.button("🗑️ Clear All"):
-                        st.session_state.selected_for_approval = set()
-                        st.session_state.selected_for_rejection = set()
-                        st.session_state.approved_records = set()
-                        st.session_state.rejected_records = set()
-                        st.success("✅ All selections cleared")
-                        st.rerun()
                 
                 # Close sticky action bar container
                 st.markdown('</div>', unsafe_allow_html=True)
