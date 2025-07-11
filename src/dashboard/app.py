@@ -39,10 +39,13 @@ if not env_loaded:
     print("WARNING: No .env file found!")
 
 # Debug: Print loaded environment variables (without exposing full API keys)
-openai_key = os.environ.get('OPENAI_API_KEY', '')
-slack_webhook = os.environ.get('SLACK_WEBHOOK_URL', '')
-print(f"OPENAI_API_KEY loaded: {'Yes (starts with ' + openai_key[:5] + '...)' if openai_key else 'No'}")
-print(f"SLACK_WEBHOOK_URL loaded: {'Yes' if slack_webhook else 'No'}")
+# Only print on first load
+if 'env_vars_logged' not in st.session_state:
+    openai_key = os.environ.get('OPENAI_API_KEY', '')
+    slack_webhook = os.environ.get('SLACK_WEBHOOK_URL', '')
+    print(f"OPENAI_API_KEY loaded: {'Yes (starts with ' + openai_key[:5] + '...)' if openai_key else 'No'}")
+    print(f"SLACK_WEBHOOK_URL loaded: {'Yes' if slack_webhook else 'No'}")
+    st.session_state.env_vars_logged = True
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
@@ -64,6 +67,7 @@ except ImportError:
         st.error("Database module not available")
         return None
 
+@st.cache_data
 def load_person_outlets_mapping():
     """Load Person_ID to Media Outlets mapping from JSON file"""
     try:
@@ -1272,13 +1276,16 @@ with st.sidebar:
         
         logo_loaded = False
         for logo_path in possible_paths:
-            print(f"Trying logo path: {logo_path}")
-            print(f"Path exists: {os.path.exists(logo_path)}")
+            if 'logo_logged' not in st.session_state:
+                print(f"Trying logo path: {logo_path}")
+                print(f"Path exists: {os.path.exists(logo_path)}")
             if os.path.exists(logo_path):
                 try:
                     logo = Image.open(logo_path)
                     st.image(logo, width=180)
-                    print(f"✅ Logo loaded successfully from: {logo_path}")
+                    if 'logo_logged' not in st.session_state:
+                        print(f"✅ Logo loaded successfully from: {logo_path}")
+                        st.session_state.logo_logged = True
                     logo_loaded = True
                     break
                 except Exception as img_error:
@@ -2239,10 +2246,15 @@ with bulk_review_tab:
     if 'rejected_records' not in st.session_state:
         st.session_state.rejected_records = set()
     
+    # Cache database calls to improve performance
+    @st.cache_data(ttl=60)  # Cache for 1 minute
+    def cached_get_pending_clips():
+        db = get_database()
+        return db.get_pending_clips()
+    
     # Try to load results from database
     try:
-        db = get_database()
-        clips_data = db.get_pending_clips()
+        clips_data = cached_get_pending_clips()
         
         if clips_data:
             # Convert database results to DataFrame
@@ -2303,9 +2315,13 @@ with bulk_review_tab:
                     st.metric("High Quality", high_quality)
                 with col4:
                     # Check approved count from database
+                    @st.cache_data(ttl=60)
+                    def cached_get_approved_clips_count():
+                        db = get_database()
+                        return len(db.get_approved_clips())
+                    
                     try:
-                        approved_clips = db.get_approved_clips()
-                        approved_count = len(approved_clips)
+                        approved_count = cached_get_approved_clips_count()
                     except Exception as e:
                         logger.error(f"Error getting approved clips count: {e}")
                         approved_count = 0
@@ -2583,6 +2599,25 @@ with bulk_review_tab:
                 # Add mark viewed column
                 clean_df['👁️ Mark Viewed'] = False
                 
+                # Load saved checkbox states from a temp file
+                import pickle
+                temp_file = os.path.join(project_root, "temp", "checkbox_state.pkl")
+                
+                # Ensure temp directory exists
+                os.makedirs(os.path.dirname(temp_file), exist_ok=True)
+                
+                # Try to load saved state
+                if os.path.exists(temp_file):
+                    try:
+                        with open(temp_file, 'rb') as f:
+                            saved_state = pickle.load(f)
+                            if 'approved' in saved_state:
+                                st.session_state.approved_records.update(saved_state['approved'])
+                            if 'rejected' in saved_state:
+                                st.session_state.rejected_records.update(saved_state['rejected'])
+                    except Exception as e:
+                        print(f"Could not load saved checkbox state: {e}")
+                
                 # Add action columns with session state persistence
                 clean_df['✅ Approve'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.approved_records)
                 clean_df['❌ Reject'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.rejected_records)
@@ -2677,7 +2712,8 @@ with bulk_review_tab:
                         const rowNode = params.node;
                         rowNode.setDataValue('❌ Reject', false);
                       }
-                      params.setValue(this.checkbox.checked);
+                      // Don't use setValue to avoid triggering grid update
+                      params.node.setDataValue('✅ Approve', this.checkbox.checked);
                       
                       params.api.refreshCells({
                         force: true,
@@ -2723,7 +2759,8 @@ with bulk_review_tab:
                         const rowNode = params.node;
                         rowNode.setDataValue('✅ Approve', false);
                       }
-                      params.setValue(this.checkbox.checked);
+                      // Don't use setValue to avoid triggering grid update
+                      params.node.setDataValue('❌ Reject', this.checkbox.checked);
                       
                       params.api.refreshCells({
                         force: true,
@@ -3021,7 +3058,7 @@ with bulk_review_tab:
                     clean_df,
                     gridOptions=grid_options,
                     allow_unsafe_jscode=True,
-                    update_mode=GridUpdateMode.MODEL_CHANGED,  # Capture changes but process them carefully
+                    update_mode=GridUpdateMode.VALUE_CHANGED,  # Only trigger on cell value changes
                     height=400,  # Reduced height so action buttons are visible without scrolling
                     fit_columns_on_grid_load=True,
                     theme="alpine",
@@ -3217,6 +3254,18 @@ with bulk_review_tab:
                     if current_approved_wos:
                         st.session_state.selected_for_rejection -= current_approved_wos
                         st.session_state.rejected_records -= current_approved_wos
+                    
+                    # Save checkbox state to file for persistence
+                    try:
+                        import pickle
+                        temp_file = os.path.join(project_root, "temp", "checkbox_state.pkl")
+                        with open(temp_file, 'wb') as f:
+                            pickle.dump({
+                                'approved': st.session_state.approved_records,
+                                'rejected': st.session_state.rejected_records
+                            }, f)
+                    except Exception as e:
+                        print(f"Could not save checkbox state: {e}")
                 
                 # Display persistent messages
                 if hasattr(st.session_state, 'outlet_save_message') and st.session_state.outlet_save_message:
@@ -3366,6 +3415,14 @@ with bulk_review_tab:
                                     st.session_state.approved_records = set()
                                     st.session_state.show_approval_dialog = False
                                     
+                                    # Clear saved checkbox state
+                                    try:
+                                        temp_file = os.path.join(project_root, "temp", "checkbox_state.pkl")
+                                        if os.path.exists(temp_file):
+                                            os.remove(temp_file)
+                                    except Exception as e:
+                                        print(f"Could not clear saved checkbox state: {e}")
+                                    
                                     # Clear the cached approved queue data so it refreshes
                                     if 'get_approved_queue_data' in st.session_state:
                                         del st.session_state['get_approved_queue_data']
@@ -3420,6 +3477,14 @@ with bulk_review_tab:
                                     st.session_state.selected_for_rejection = set()
                                     st.session_state.rejected_records = set()  # Clear new tracking too
                                     st.session_state.show_rejection_dialog = False
+                                    
+                                    # Clear saved checkbox state
+                                    try:
+                                        temp_file = os.path.join(project_root, "temp", "checkbox_state.pkl")
+                                        if os.path.exists(temp_file):
+                                            os.remove(temp_file)
+                                    except Exception as e:
+                                        print(f"Could not clear saved checkbox state: {e}")
                                     
                                     # Also clear any approved selections for the rejected items
                                     st.session_state.approved_records -= selected_rejected_wos
@@ -4048,7 +4113,12 @@ with rejected_tab:
                 })
         
         # Also add manually rejected clips (always shown regardless of mode)
-        rejected_clips = db.get_rejected_clips()
+        @st.cache_data(ttl=60)
+        def cached_get_rejected_clips():
+            db = get_database()
+            return db.get_rejected_clips()
+        
+        rejected_clips = cached_get_rejected_clips()
         for clip in rejected_clips:
             combined_issues.append({
                 'WO #': clip['wo_number'],
