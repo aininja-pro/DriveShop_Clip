@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import json
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUpdateMode
@@ -1989,12 +1989,13 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, creatoriq_tab, history_tab = st.tabs([
+bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, creatoriq_tab, export_tab, history_tab = st.tabs([
     "📋 Bulk Review", 
     "✅ Approved Queue",
     "⚠️ Rejected/Issues", 
     "🚀 Strategic Intelligence", 
     "🎬 CreatorIQ Export",
+    "📊 Export",
     "📚 File History"
 ])
 
@@ -4894,6 +4895,309 @@ with analysis_tab:
             
             # Add extra bottom spacing
             st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+
+# ========== EXPORT TAB ==========
+with export_tab:
+    st.markdown('<h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.2rem; font-weight: 600; color: #2c3e50;">📊 Export Dashboard</h4>', unsafe_allow_html=True)
+    st.markdown('<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #6c757d; font-style: italic;">Export clips to Excel with custom filters and date ranges</p>', unsafe_allow_html=True)
+    
+    try:
+        # Use cached database connection
+        @st.cache_resource
+        def get_cached_db():
+            return get_database()
+        
+        db = get_cached_db()
+        
+        # Create filter columns
+        col1, col2, col3 = st.columns([1, 1, 1])
+        
+        with col1:
+            # Date range picker
+            st.markdown("**📅 Date Range**")
+            date_range = st.date_input(
+                "Select date range",
+                value=(datetime.now() - timedelta(days=30), datetime.now()),
+                key="export_date_range",
+                help="Filter clips by processed date"
+            )
+            
+            if len(date_range) == 2:
+                start_date, end_date = date_range
+            else:
+                start_date = end_date = date_range[0]
+        
+        with col2:
+            # Status filter
+            st.markdown("**📋 Status Filter**")
+            status_options = ["All", "approved", "exported", "found", "sentiment_analyzed"]
+            selected_status = st.selectbox(
+                "Select status",
+                options=status_options,
+                key="export_status_filter"
+            )
+        
+        with col3:
+            # Workflow stage filter
+            st.markdown("**🔄 Workflow Stage**")
+            workflow_options = ["All", "approved", "exported", "found", "sentiment_analyzed", "complete"]
+            selected_workflow = st.selectbox(
+                "Select workflow stage",
+                options=workflow_options,
+                key="export_workflow_filter"
+            )
+        
+        # Advanced filters in expander
+        with st.expander("🔧 Advanced Filters", expanded=False):
+            adv_col1, adv_col2, adv_col3 = st.columns(3)
+            
+            with adv_col1:
+                min_relevance = st.number_input(
+                    "Min Relevance Score",
+                    min_value=0,
+                    max_value=10,
+                    value=0,
+                    key="export_min_relevance"
+                )
+            
+            with adv_col2:
+                sentiment_filter = st.selectbox(
+                    "Sentiment",
+                    options=["All", "POS", "NEU", "NEG"],
+                    key="export_sentiment_filter"
+                )
+            
+            with adv_col3:
+                office_filter = st.text_input(
+                    "Office (comma-separated)",
+                    placeholder="e.g., San Francisco, Dallas",
+                    key="export_office_filter"
+                )
+        
+        # Query button
+        if st.button("🔍 Query Database", type="primary", key="export_query_btn"):
+            with st.spinner("Querying database..."):
+                # Build query
+                query = db.supabase.table('clips').select('*')
+                
+                # Apply date range filter
+                start_datetime = datetime.combine(start_date, datetime.min.time()).isoformat()
+                end_datetime = datetime.combine(end_date, datetime.max.time()).isoformat()
+                query = query.gte('processed_date', start_datetime).lte('processed_date', end_datetime)
+                
+                # Apply status filter
+                if selected_status != "All":
+                    query = query.eq('status', selected_status)
+                
+                # Apply workflow filter
+                if selected_workflow != "All":
+                    query = query.eq('workflow_stage', selected_workflow)
+                
+                # Apply relevance filter
+                if min_relevance > 0:
+                    query = query.gte('relevance_score', min_relevance)
+                
+                # Apply sentiment filter
+                if sentiment_filter != "All":
+                    query = query.eq('overall_sentiment', sentiment_filter)
+                
+                # Apply office filter
+                if office_filter.strip():
+                    offices = [o.strip() for o in office_filter.split(',')]
+                    query = query.in_('office', offices)
+                
+                # Execute query
+                result = query.order('processed_date', desc=True).execute()
+                
+                if result.data:
+                    st.session_state.export_query_results = result.data
+                    st.success(f"✅ Found {len(result.data)} clips matching your criteria")
+                else:
+                    st.session_state.export_query_results = []
+                    st.warning("No clips found matching your criteria")
+        
+        # Display results and export options
+        if 'export_query_results' in st.session_state and st.session_state.export_query_results:
+            clips_data = st.session_state.export_query_results
+            
+            # Create DataFrame for display
+            df = pd.DataFrame(clips_data)
+            
+            # Quick stats
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Clips", len(df))
+            with col2:
+                avg_score = df['relevance_score'].mean() if 'relevance_score' in df.columns else 0
+                st.metric("Avg Relevance", f"{avg_score:.1f}")
+            with col3:
+                sentiment_counts = df['overall_sentiment'].value_counts() if 'overall_sentiment' in df.columns else {}
+                top_sentiment = sentiment_counts.index[0] if len(sentiment_counts) > 0 else "N/A"
+                st.metric("Top Sentiment", top_sentiment)
+            with col4:
+                exported_count = len(df[df['workflow_stage'] == 'exported']) if 'workflow_stage' in df.columns else 0
+                st.metric("Exported", exported_count)
+            
+            # Show preview
+            st.markdown("### 📋 Preview (First 10 rows)")
+            
+            # Create display dataframe with selected columns
+            display_columns = ['wo_number', 'office', 'make', 'model', 'contact', 'media_outlet', 
+                             'relevance_score', 'overall_sentiment', 'processed_date']
+            available_columns = [col for col in display_columns if col in df.columns]
+            preview_df = df[available_columns].head(10)
+            
+            # Format dates
+            if 'processed_date' in preview_df.columns:
+                preview_df['processed_date'] = pd.to_datetime(preview_df['processed_date']).dt.strftime('%Y-%m-%d %H:%M')
+            
+            st.dataframe(preview_df, use_container_width=True)
+            
+            # Export options
+            st.markdown("### 📥 Export Options")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Excel export with hyperlinks
+                if st.button("📊 Generate Excel Report", type="primary", key="export_excel_btn"):
+                    with st.spinner("Generating Excel report..."):
+                        # Create Excel file with formatting
+                        output = io.BytesIO()
+                        wb = Workbook()
+                        ws = wb.active
+                        ws.title = "Clip Export"
+                        
+                        # Define headers based on your screenshot
+                        headers = ['Activity_ID', 'Office', 'WO#', 'Make', 'Model', 'Contact', 
+                                 'Media Outlet', 'URL', 'Relevance', 'Sentiment']
+                        
+                        # Header styling
+                        header_font = Font(bold=True, color="FFFFFF")
+                        header_fill = PatternFill("solid", fgColor="366092")
+                        header_alignment = Alignment(horizontal="center", vertical="center")
+                        
+                        # Write headers
+                        for col, header in enumerate(headers, 1):
+                            cell = ws.cell(row=1, column=col, value=header)
+                            cell.font = header_font
+                            cell.fill = header_fill
+                            cell.alignment = header_alignment
+                        
+                        # Write data with hyperlinks
+                        for row_idx, clip in enumerate(clips_data, 2):
+                            ws.cell(row=row_idx, column=1, value=clip.get('activity_id', ''))
+                            ws.cell(row=row_idx, column=2, value=clip.get('office', ''))
+                            ws.cell(row=row_idx, column=3, value=clip.get('wo_number', ''))
+                            ws.cell(row=row_idx, column=4, value=clip.get('make', ''))
+                            ws.cell(row=row_idx, column=5, value=clip.get('model', ''))
+                            ws.cell(row=row_idx, column=6, value=clip.get('contact', ''))
+                            ws.cell(row=row_idx, column=7, value=clip.get('media_outlet', ''))
+                            
+                            # Add hyperlink to URL
+                            url = clip.get('clip_url', '')
+                            if url:
+                                ws.cell(row=row_idx, column=8, value=url).hyperlink = url
+                                ws.cell(row=row_idx, column=8).font = Font(color="0563C1", underline="single")
+                            else:
+                                ws.cell(row=row_idx, column=8, value='')
+                            
+                            # Add relevance score with color coding
+                            relevance = clip.get('relevance_score', 0)
+                            cell = ws.cell(row=row_idx, column=9, value=relevance)
+                            if relevance >= 8:
+                                cell.font = Font(color="28a745", bold=True)
+                            elif relevance >= 5:
+                                cell.font = Font(color="007bff")
+                            else:
+                                cell.font = Font(color="ffc107")
+                            
+                            # Add sentiment with emoji
+                            sentiment = clip.get('overall_sentiment', '')
+                            sentiment_display = {
+                                'POS': '😊 POS',
+                                'NEU': '😐 NEU', 
+                                'NEG': '😟 NEG'
+                            }.get(sentiment, sentiment)
+                            ws.cell(row=row_idx, column=10, value=sentiment_display)
+                        
+                        # Auto-adjust column widths
+                        for column in ws.columns:
+                            max_length = 0
+                            column_letter = column[0].column_letter
+                            for cell in column:
+                                try:
+                                    if len(str(cell.value)) > max_length:
+                                        max_length = len(str(cell.value))
+                                except:
+                                    pass
+                            adjusted_width = min(max_length + 2, 50)
+                            ws.column_dimensions[column_letter].width = adjusted_width
+                        
+                        # Add borders
+                        border = Border(
+                            left=Side(style='thin'),
+                            right=Side(style='thin'),
+                            top=Side(style='thin'),
+                            bottom=Side(style='thin')
+                        )
+                        
+                        for row in ws.iter_rows(min_row=1, max_row=len(clips_data)+1, min_col=1, max_col=10):
+                            for cell in row:
+                                cell.border = border
+                        
+                        # Save workbook
+                        wb.save(output)
+                        output.seek(0)
+                        
+                        # Generate filename
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        filename = f"clip_export_{timestamp}.xlsx"
+                        
+                        st.session_state.export_excel_data = output.getvalue()
+                        st.session_state.export_excel_filename = filename
+                        st.success("✅ Excel report generated!")
+            
+            with col2:
+                # CSV export
+                csv_data = df.to_csv(index=False).encode('utf-8')
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                st.download_button(
+                    label="📄 Download CSV",
+                    data=csv_data,
+                    file_name=f"clip_export_{timestamp}.csv",
+                    mime="text/csv"
+                )
+            
+            with col3:
+                # JSON export (same as FMS export)
+                json_data = json.dumps(clips_data, indent=2, default=str)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                st.download_button(
+                    label="📋 Download JSON",
+                    data=json_data,
+                    file_name=f"clip_export_{timestamp}.json",
+                    mime="application/json"
+                )
+            
+            # Show Excel download button if generated
+            if 'export_excel_data' in st.session_state and st.session_state.export_excel_data:
+                st.markdown("---")
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    st.download_button(
+                        label="📥 Download Excel Report",
+                        data=st.session_state.export_excel_data,
+                        file_name=st.session_state.export_excel_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="download_export_excel"
+                    )
+                    st.info("💡 Excel file includes clickable hyperlinks in the URL column!")
+    
+    except Exception as e:
+        st.error(f"❌ Error in Export tab: {e}")
+        import traceback
+        st.error(f"Full error: {traceback.format_exc()}")
 
 # ========== FILE HISTORY TAB ==========
 with history_tab:
