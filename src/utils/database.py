@@ -283,7 +283,6 @@ class DatabaseManager:
                 "tier_used": loan_data.get('tier_used', 'Unknown'),
                 "status": reason,  # 'no_content_found' or 'processing_failed'
                 "workflow_stage": 'found',  # Default workflow stage
-                "last_attempt_result": reason,
                 # NEW: Store original source URLs for View link transparency
                 "original_urls": loan_data.get('original_urls', ''),
                 "urls_attempted": loan_data.get('urls_attempted', 0),
@@ -691,10 +690,12 @@ class DatabaseManager:
             # Define retry intervals (in days)
             RETRY_INTERVALS = {
                 'no_content': 7,        # 7 days - content might be published weekly
+                'no_content_found': 7,  # 7 days - same as no_content
                 'generic_content': 3,   # 3 days - they might publish specific content soon  
                 'crawl_failed': 1,      # 1 day - technical issues usually resolve quickly
                 'blocked_403': 2,       # 2 days - anti-bot measures might reset
                 'timeout': 1,           # 1 day - site performance issues
+                'store_failed': 1,      # 1 day - database issues
                 'success': None         # Never retry - we found what we needed!
             }
             
@@ -703,11 +704,17 @@ class DatabaseManager:
             if result in RETRY_INTERVALS and RETRY_INTERVALS[result] is not None:
                 retry_after_date = (datetime.now() + timedelta(days=RETRY_INTERVALS[result])).isoformat()
             
+            # Get current attempt count to increment it
+            existing = self.supabase.table('wo_tracking').select('attempt_count').eq('wo_number', str(wo_number)).execute()
+            current_count = existing.data[0]['attempt_count'] if existing.data and len(existing.data) > 0 else 0
+            
             # Prepare tracking data
             tracking_data = {
                 "wo_number": str(wo_number),
                 "status": "found" if result == "success" else "searching",
                 "last_attempt_date": datetime.now().isoformat(),
+                "attempt_count": current_count + 1,
+                # "last_attempt_result": result,  # COMMENTED OUT: Column doesn't exist yet
                 "retry_after_date": retry_after_date
             }
             
@@ -727,10 +734,16 @@ class DatabaseManager:
     def mark_wo_success(self, wo_number: str, clip_url: str) -> bool:
         """Mark a WO# as successfully found"""
         try:
+            # Get current attempt count to increment it
+            existing = self.supabase.table('wo_tracking').select('attempt_count').eq('wo_number', str(wo_number)).execute()
+            current_count = existing.data[0]['attempt_count'] if existing.data and len(existing.data) > 0 else 0
+            
             tracking_data = {
                 "wo_number": str(wo_number),
                 "status": "found",
                 "last_attempt_date": datetime.now().isoformat(),
+                "attempt_count": current_count + 1,
+                # "last_attempt_result": "success",  # COMMENTED OUT: Column doesn't exist yet
                 "found_clip_url": clip_url,
                 "retry_after_date": None  # Never retry successful finds
             }

@@ -1,12 +1,14 @@
 """
-Enhanced Crawler Manager with CLEAN 4-Tier Escalation System
+Enhanced Crawler Manager with 6-Tier Escalation System
 
-Tier 1: Google Search API (find specific articles from index pages)
-Tier 2: Enhanced HTTP (browser-like headers - FREE & FAST) + CONTENT QUALITY CHECK
-Tier 3: ScrapingBee API (when Enhanced HTTP fails OR returns generic content)
-Tier 4: Original Crawler (RSS + Playwright as last resort)
+Tier 1: Basic HTTP (simplest, fastest)
+Tier 2: Enhanced HTTP (browser-like headers) + CONTENT QUALITY CHECK
+Tier 3: RSS Feed (if available - FREE & FAST & STRUCTURED)
+Tier 4: ScrapFly API (premium with residential proxies)
+Tier 5: ScrapingBee API (backup premium service) - Currently disabled
+Tier 6: Original Crawler (Playwright browser as last resort)
 
-CLEAN AND SIMPLE: try each tier until one succeeds with QUALITY content.
+Plus: Index Page Discovery and Google Search for finding specific articles
 """
 
 import logging
@@ -179,12 +181,13 @@ class EnhancedCrawlerManager:
 
     def crawl_url(self, url: str, make: str, model: str, person_name: str = "") -> Dict[str, Any]:
         """
-        CLEAN 4-tier escalation system with CONTENT QUALITY DETECTION
+        6-tier escalation system with CONTENT QUALITY DETECTION
         
         Tier 1: Basic HTTP (free & fast)
         Tier 2: Enhanced HTTP (browser-like headers)
-        Tier 3: ScrapFly (premium with residential proxies - best success rate)
-        Tier 4: ScrapingBee (backup service)
+        Tier 3: RSS Feed (if available - structured data)
+        Tier 4: ScrapFly (premium with residential proxies)
+        Tier 5: ScrapingBee (backup service) - Currently disabled
         
         Returns: {
             'success': bool,
@@ -369,8 +372,50 @@ class EnhancedCrawlerManager:
                 extracted_length = len(extracted_content.strip()) if extracted_content else 0
                 logger.info(f"Tier 2: Content extraction FAILED ({extracted_length} chars from {len(http_content)} chars), escalating to ScrapingBee")
 
-        # Tier 3: ScrapFly FIRST (premium service with residential proxies - best success rate)
-        logger.info(f"Tier 3: Trying ScrapFly for {url}")
+        # Tier 3: RSS Feed (if available - FREE and FAST)
+        rss_url = self.original_crawler._get_rss_url(url)
+        if rss_url:
+            logger.info(f"Tier 3: Found RSS feed for domain, trying RSS: {rss_url}")
+            
+            # Use RSS crawling from original crawler
+            rss_content, rss_title, rss_error, found_url = self.original_crawler._crawl_level3_rss(
+                rss_url, url, make, model
+            )
+            
+            if rss_content and not rss_error:
+                # Test content quality
+                from src.utils.content_extractor import extract_article_content
+                extracted_content = extract_article_content(rss_content, found_url or url)
+                
+                if extracted_content and not self.is_generic_content(extracted_content, make, model):
+                    logger.info(f"✅ Tier 3: RSS feed returned QUALITY content for {make} {model}")
+                    result = {
+                        'success': True,
+                        'content': rss_content,
+                        'title': rss_title or 'RSS Result',
+                        'url': found_url or url,
+                        'tier_used': 'Tier 3: RSS Feed',
+                        'cached': False
+                    }
+                    # Cache the result
+                    self.cache_manager.store_result(
+                        person_id=person_name or "unknown",
+                        domain=domain,
+                        make=make,
+                        model=model,
+                        url=found_url or url,
+                        content=rss_content
+                    )
+                    return result
+                else:
+                    logger.info(f"Tier 3: RSS content is generic or extraction failed, escalating")
+            else:
+                logger.info(f"Tier 3: RSS feed failed: {rss_error}, escalating")
+        else:
+            logger.info(f"Tier 3: No RSS feed configured for this domain, skipping to Tier 4")
+        
+        # Tier 4: ScrapFly (premium service with residential proxies - best success rate)
+        logger.info(f"Tier 4: Trying ScrapFly for {url}")
         try:
             from src.utils.scrapfly_client import scrapfly_crawl_with_fallback
             scrapfly_content, scrapfly_title, scrapfly_error = scrapfly_crawl_with_fallback(url)
@@ -391,7 +436,7 @@ class EnhancedCrawlerManager:
                         'content': scrapfly_content,
                         'title': scrapfly_title or 'ScrapFly Result',
                         'url': url,
-                        'tier_used': 'Tier 3: ScrapFly',
+                        'tier_used': 'Tier 4: ScrapFly',
                         'cached': False
                     }
                     # Cache the result
@@ -405,14 +450,14 @@ class EnhancedCrawlerManager:
                     )
                     return result
                 else:
-                    logger.info(f"Tier 3: ScrapFly content extraction failed or generic, escalating to ScrapingBee")
+                    logger.info(f"Tier 4: ScrapFly content extraction failed or generic, escalating to ScrapingBee")
             else:
-                logger.warning(f"Tier 3: ScrapFly failed for {url}: {scrapfly_error}")
+                logger.warning(f"Tier 4: ScrapFly failed for {url}: {scrapfly_error}")
         except Exception as e:
-            logger.warning(f"Tier 3: ScrapFly error for {url}: {e}")
+            logger.warning(f"Tier 4: ScrapFly error for {url}: {e}")
 
-        # Tier 4: ScrapingBee (backup service) - DISABLED FOR TESTING
-        logger.info(f"Tier 4: ScrapingBee DISABLED for testing - skipping to Index Discovery")
+        # Tier 5: ScrapingBee (backup service) - DISABLED FOR TESTING
+        logger.info(f"Tier 5: ScrapingBee DISABLED for testing - skipping to Index Discovery")
         
         # bee_content = self.scraping_bee.scrape_url(url)
         bee_content = None  # Force skip ScrapingBee
@@ -435,7 +480,7 @@ class EnhancedCrawlerManager:
                         'content': bee_content,  # Return original HTML for further processing
                         'title': 'ScrapingBee Backup Result',
                         'url': url,
-                        'tier_used': 'Tier 4: ScrapingBee Backup',
+                        'tier_used': 'Tier 5: ScrapingBee Backup',
                         'cached': False
                     }
                     # Cache the result
@@ -449,19 +494,19 @@ class EnhancedCrawlerManager:
                     )
                     return result
                 else:
-                    logger.info(f"Tier 4: ScrapingBee content extraction succeeded but content is GENERIC, escalating to Google Search")
+                    logger.info(f"Tier 5: ScrapingBee content extraction succeeded but content is GENERIC, escalating to Google Search")
             else:
                 extracted_length = len(extracted_content.strip()) if extracted_content else 0
-                logger.info(f"Tier 3: ScrapingBee content extraction FAILED ({extracted_length} chars from {len(bee_content)} chars), escalating to Index Page Discovery")
+                logger.info(f"Tier 5: ScrapingBee content extraction FAILED ({extracted_length} chars from {len(bee_content)} chars), escalating to Index Page Discovery")
         
-        # Tier 3.5: Index Page Discovery (when all direct scraping fails but we have a category page)
-        logger.info(f"Tier 3.5: All direct scraping failed, trying Index Page Discovery for {make} {model}")
+        # Tier 5.5: Index Page Discovery (when all direct scraping fails but we have a category page)
+        logger.info(f"Tier 5.5: All direct scraping failed, trying Index Page Discovery for {make} {model}")
         index_discovery_result = self._try_index_page_discovery(url, make, model, person_name, domain)
         if index_discovery_result and index_discovery_result['success']:
-            logger.info(f"Tier 3.5 Success: Index Page Discovery found specific article")
+            logger.info(f"Tier 5.5 Success: Index Page Discovery found specific article")
             result = index_discovery_result.copy()
             result.update({
-                'tier_used': 'Tier 3.5: Index Discovery + ' + index_discovery_result.get('tier_used', 'Unknown'),
+                'tier_used': 'Tier 5.5: Index Discovery + ' + index_discovery_result.get('tier_used', 'Unknown'),
                 'cached': False
             })
             # Cache the result
@@ -475,8 +520,8 @@ class EnhancedCrawlerManager:
             )
             return result
         
-        # Tier 4: Google Search (FALLBACK ONLY - when all direct scraping fails)
-        logger.info(f"Tier 4: All direct scraping and Index Discovery failed, trying Google Search as FALLBACK for {make} {model}")
+        # Tier 6: Google Search (FALLBACK ONLY - when all direct scraping fails)
+        logger.info(f"Tier 6: All direct scraping and Index Discovery failed, trying Google Search as FALLBACK for {make} {model}")
         
         # Extract domain from URL
         parsed_url = urlparse(url)
@@ -518,7 +563,7 @@ class EnhancedCrawlerManager:
             if article_result['success']:
                 result = article_result.copy()
                 result.update({
-                    'tier_used': 'Tier 4: Google Search + ' + article_result.get('tier_used', 'Unknown'),
+                    'tier_used': 'Tier 6: Google Search + ' + article_result.get('tier_used', 'Unknown'),
                     'cached': False,
                     # Add attribution information for UI display
                     'attribution_strength': attribution_info.get('attribution_strength', 'unknown'),
@@ -535,8 +580,8 @@ class EnhancedCrawlerManager:
                 )
                 return result
                 
-        # Tier 5: Original crawler (RSS + Playwright as last resort)
-        logger.info(f"Tier 5: All direct scraping and Google Search failed, using original crawler for {url}")
+        # Tier 7: Original crawler (Playwright as last resort)
+        logger.info(f"Tier 7: All direct scraping and Google Search failed, using original crawler for {url}")
         
         # Original crawler returns (content, title, error, actual_url)
         content, title, error, actual_url = self.original_crawler.crawl(
@@ -553,7 +598,7 @@ class EnhancedCrawlerManager:
                 'content': content,
                 'title': title or 'Unknown Title',
                 'url': actual_url or url,
-                'tier_used': f"Tier 5: Original Crawler",
+                'tier_used': f"Tier 7: Original Crawler",
                 'cached': False
             }
             # Cache the result
@@ -999,8 +1044,11 @@ class EnhancedCrawlerManager:
                         full_url = urljoin(base_url, href)
                         parsed = urlparse(full_url)
                         
-                        # Only include links from the same domain
-                        if parsed.netloc == base_domain or parsed.netloc.endswith(f".{base_domain}"):
+                        # Only include links from the same domain (with proper subdomain handling)
+                        # Fix: Ensure we're checking actual subdomains, not just string endings
+                        link_domain = parsed.netloc.lower()
+                        if link_domain == base_domain or (link_domain.endswith(f".{base_domain}") and 
+                                                          link_domain[-(len(base_domain)+1)] == '.'):
                             # Filter out obvious non-article pages
                             path = parsed.path.lower()
                             if not any(skip in path for skip in ['/category/', '/tag/', '/author/', '/search', '/page/', '.jpg', '.png', '.pdf']):

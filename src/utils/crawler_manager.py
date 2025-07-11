@@ -81,7 +81,10 @@ class CrawlerManager:
             
         # Check if we have RSS URL for this domain
         for media_domain, config in self.media_sources.items():
-            if media_domain.endswith(domain) or domain.endswith(media_domain):
+            # Exact match or valid subdomain check
+            if media_domain == domain or domain == media_domain or \
+               (media_domain.endswith('.' + domain) and media_domain[-(len(domain)+1)] == '.') or \
+               (domain.endswith('.' + media_domain) and domain[-(len(media_domain)+1)] == '.'):
                 rss_url = config.get('rss_url', '')
                 if rss_url:
                     logger.info(f"Found RSS URL for {domain}: {rss_url}")

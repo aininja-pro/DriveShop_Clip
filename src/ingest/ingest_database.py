@@ -25,8 +25,83 @@ from src.ingest.ingest import (
     MAX_CONCURRENT
 )
 from src.analysis.gpt_analysis import analyze_clip_relevance_only
+import json
 
 logger = setup_logger(__name__)
+
+def load_person_outlets_mapping():
+    """Load Person_ID to Media Outlets mapping from JSON file"""
+    try:
+        project_root = Path(__file__).parent.parent.parent
+        mapping_file = os.path.join(project_root, "data", "person_outlets_mapping.json")
+        if os.path.exists(mapping_file):
+            with open(mapping_file, 'r') as f:
+                mapping = json.load(f)
+            logger.info(f"✅ Loaded Person_ID mapping with {len(mapping)} unique Person_IDs")
+            return mapping
+        else:
+            logger.warning("⚠️ Person_ID mapping file not found - outlet validation disabled")
+            return {}
+    except Exception as e:
+        logger.error(f"❌ Error loading Person_ID mapping: {e}")
+        return {}
+
+def is_url_from_authorized_outlet(url: str, person_id: str, outlets_mapping: dict) -> tuple[bool, str]:
+    """
+    Check if a URL belongs to an authorized outlet for the given person.
+    
+    Returns:
+        tuple: (is_authorized, outlet_name or reason for rejection)
+    """
+    if not outlets_mapping:
+        logger.warning("⚠️ No outlets mapping loaded - cannot validate URLs")
+        return True, "No outlet validation available"
+    
+    if not person_id:
+        logger.warning("⚠️ No person_id in loan data - skipping outlet validation")
+        return True, "No person_id provided"
+    
+    person_id_str = str(person_id)
+    if person_id_str not in outlets_mapping:
+        logger.warning(f"⚠️ Person_ID {person_id} not found in outlets mapping - allowing URL")
+        return True, "Person not in mapping"
+    
+    # Extract domain from URL
+    try:
+        parsed = urlparse(url)
+        url_domain = parsed.netloc.lower()
+        # Remove www. prefix for comparison
+        url_domain = url_domain.replace('www.', '')
+    except:
+        return False, "Invalid URL format"
+    
+    # Get authorized outlets for this person
+    person_data = outlets_mapping[person_id_str]
+    authorized_outlets = person_data.get('outlets', [])
+    
+    # Check if URL matches any authorized outlet
+    for outlet in authorized_outlets:
+        outlet_url = outlet.get('outlet_url', '').lower()
+        outlet_name = outlet.get('outlet_name', '')
+        
+        if outlet_url:
+            # Extract domain from outlet URL
+            try:
+                parsed_outlet = urlparse(outlet_url)
+                outlet_domain = parsed_outlet.netloc.lower().replace('www.', '')
+                
+                # Check if domains match
+                if url_domain == outlet_domain or (url_domain.endswith('.' + outlet_domain) and 
+                                                    url_domain[-(len(outlet_domain)+1)] == '.'):
+                    return True, outlet_name
+            except:
+                continue
+    
+    # URL doesn't match any authorized outlet
+    authorized_names = [o.get('outlet_name', 'Unknown') for o in authorized_outlets]
+    logger.warning(f"❌ URL {url} is not from authorized outlets for Person_ID {person_id}")
+    logger.warning(f"   Authorized outlets: {', '.join(authorized_names)}")
+    return False, f"Not from authorized outlets: {', '.join(authorized_names)}"
 
 def is_homepage_or_index_url(url: str) -> bool:
     """
@@ -133,7 +208,7 @@ def calculate_relevance_score(content: str, make: str, model: str, url: str) -> 
     
     return min(score, 10.0)
 
-def process_loan_for_database(loan: Dict[str, Any], run_id: str) -> Dict[str, Any]:
+def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping: dict = None) -> Dict[str, Any]:
     """
     Process a single loan and store results to database instead of CSV.
     Includes URL validation and relevance scoring to prevent storing bad clips.
@@ -156,6 +231,16 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str) -> Dict[str, An
     
     for url in urls:
         logger.info(f"Processing URL: {url}")
+        
+        # MEDIA OUTLET VALIDATION - Check if URL is from authorized outlet
+        if outlets_mapping and person_id:
+            is_authorized, outlet_info = is_url_from_authorized_outlet(url, person_id, outlets_mapping)
+            if not is_authorized:
+                logger.warning(f"⚠️ SKIPPING unauthorized outlet URL: {url}")
+                logger.warning(f"   Reason: {outlet_info}")
+                continue
+            else:
+                logger.info(f"✅ URL authorized: {outlet_info}")
         
         # DISABLED: Homepage filtering was blocking valid review URLs like carpro.com/resources/vehicle-reviews
         # if is_homepage_or_index_url(url):
@@ -265,7 +350,7 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str) -> Dict[str, An
             'clips': []
         }
 
-async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[str, Any], db, run_id: str) -> bool:
+async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[str, Any], db, run_id: str, outlets_mapping: dict = None) -> bool:
     """
     Async wrapper for database-integrated loan processing with smart retry logic.
     STORES ALL LOAN ATTEMPTS (successful and failed) to database.
@@ -288,7 +373,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
             return False
         
         # Process the loan (crawling + content extraction, no GPT)
-        result = await asyncio.to_thread(process_loan_for_database, loan, run_id)
+        result = await asyncio.to_thread(process_loan_for_database, loan, run_id, outlets_mapping)
         
         if result and result.get('successful') and result.get('clips'):
             # SUCCESS: Store clips to database
@@ -371,7 +456,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
             
             return True  # Return True because we DID process it (even if no clips found)
 
-async def process_loans_database_concurrent(loans: List[Dict[str, Any]], db, run_id: str) -> Dict[str, int]:
+async def process_loans_database_concurrent(loans: List[Dict[str, Any]], db, run_id: str, outlets_mapping: dict = None) -> Dict[str, int]:
     """
     Process multiple loans concurrently with database storage and smart retry logic.
     
@@ -393,7 +478,7 @@ async def process_loans_database_concurrent(loans: List[Dict[str, Any]], db, run
     
     # Create tasks for all loans
     tasks = [
-        process_loan_database_async(semaphore, loan, db, run_id) 
+        process_loan_database_async(semaphore, loan, db, run_id, outlets_mapping) 
         for loan in loans
     ]
     
@@ -481,8 +566,11 @@ def run_ingest_database(
         
         logger.info(f"📥 Loaded {len(loans)} loans for database processing")
         
+        # Load outlets mapping for media validation
+        outlets_mapping = load_person_outlets_mapping()
+        
         # Process loans with database storage and smart retry logic
-        stats = asyncio.run(process_loans_database_concurrent(loans, db, run_id))
+        stats = asyncio.run(process_loans_database_concurrent(loans, db, run_id, outlets_mapping))
         
         # Update processing run with final statistics
         db.finish_processing_run(
@@ -556,8 +644,11 @@ def run_ingest_database_with_filters(
         
         run_id = db.create_processing_run(run_name)
         
+        # Load outlets mapping for media validation
+        outlets_mapping = load_person_outlets_mapping()
+        
         # Process loans
-        stats = asyncio.run(process_loans_database_concurrent(loans_to_process, db, run_id))
+        stats = asyncio.run(process_loans_database_concurrent(loans_to_process, db, run_id, outlets_mapping))
         
         # Update processing run
         db.finish_processing_run(

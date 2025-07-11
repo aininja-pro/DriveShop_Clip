@@ -801,19 +801,28 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                     start_date = None
             
             if start_date and isinstance(start_date, datetime):
-                days_diff = (published_date - start_date).days
-                if days_diff >= 0:
-                    logger.info(f"📅 ✅ Content published: {published_date.strftime('%Y-%m-%d')} ({days_diff} days after start date) - VALID")
+                # SIMPLE RULE: Article date MUST be >= loan start date
+                if published_date < start_date:
+                    days_before = (start_date - published_date).days
+                    logger.warning(f"📅 ❌ REJECTED: Article from {published_date.strftime('%Y-%m-%d')} is {days_before} days BEFORE loan start {start_date.strftime('%Y-%m-%d')}")
+                    logger.warning(f"❌ ABSOLUTE RULE: No article before loan start date can be valid")
+                    return None
                 else:
-                    logger.warning(f"📅 ❌ Content published: {published_date.strftime('%Y-%m-%d')} ({abs(days_diff)} days BEFORE start date - REJECTING")
-                    logger.warning(f"❌ RULE VIOLATION: Articles must be published AFTER loan start date {start_date.strftime('%Y-%m-%d')}")
-                    return None  # REJECT articles published before loan start date
+                    days_after = (published_date - start_date).days
+                    logger.info(f"📅 ✅ VALID: Article from {published_date.strftime('%Y-%m-%d')} is {days_after} days after loan start")
             else:
                 logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} (start date unavailable for comparison)")
         elif published_date:
             logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} (no start date to compare)")
         else:
-            logger.info(f"📅 Content found: publication date could not be determined - allowing")
+            logger.warning(f"📅 ⚠️ Content found: publication date could not be determined")
+            # When we have a loan start date but can't extract article date = REJECT
+            if start_date:
+                logger.warning(f"❌ REJECTED: Cannot verify article is after loan start date {start_date.strftime('%Y-%m-%d') if isinstance(start_date, datetime) else start_date}")
+                logger.warning(f"❌ RULE: Must prove article is AFTER loan placement")
+                return None
+            else:
+                logger.info(f"📅 Allowing content (no start date provided for validation)")
             
         logger.info(f"✅ Successfully crawled content - date validation passed")
             
@@ -1188,6 +1197,8 @@ def run_ingest(input_file: str, output_file: Optional[str] = None) -> bool:
 
 # Configuration
 MAX_CONCURRENT = int(os.environ.get('MAX_CONCURRENT_LOANS', '5'))  # Start conservative
+
+# Date validation is simple: Article date MUST be >= loan start date. Period.
 
 async def process_loan_async(semaphore: asyncio.Semaphore, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
