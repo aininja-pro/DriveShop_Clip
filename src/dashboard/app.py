@@ -2162,16 +2162,16 @@ with creatoriq_tab:
             )
             
             # Configure columns with proper widths and features
-            gb.configure_column("#", width=60, pinned="left")
-            gb.configure_column("Platform", width=120, pinned="left")
+            gb.configure_column("#", minWidth=60, pinned="left")
+            gb.configure_column("Platform", minWidth=120, pinned="left")
             gb.configure_column("Post URL", 
                 cellRenderer=cellRenderer_url,
-                width=100,
+                minWidth=120,
                 sortable=False,
                 filter=False
             )
-            gb.configure_column("Creator", width=150)
-            gb.configure_column("Status", width=100)
+            gb.configure_column("Creator", minWidth=180)
+            gb.configure_column("Status", minWidth=120)
             
             # Configure selection
             gb.configure_selection(selection_mode="multiple", use_checkbox=False)
@@ -2187,6 +2187,7 @@ with creatoriq_tab:
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 height=650,  # Same height as Bulk Review
                 fit_columns_on_grid_load=True,
+                columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',  # Auto-size all columns
                 theme="alpine",
                 enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
             )
@@ -2874,7 +2875,8 @@ with bulk_review_tab:
                 gb.configure_column(
                     "📄 View", 
                     cellRenderer=cellRenderer_view,
-                    width=120,
+                    minWidth=80,
+                    maxWidth=100,
                     sortable=False,
                     filter=False
                 )
@@ -2898,16 +2900,16 @@ with bulk_review_tab:
                 # Configure selection
                 gb.configure_selection(selection_mode="multiple", use_checkbox=False)
                 
-                # Configure other columns as before
-                gb.configure_column("Office", width=100)
-                gb.configure_column("WO #", width=100)
-                gb.configure_column("Make", width=100)
-                gb.configure_column("Model", width=120)
-                gb.configure_column("Contact", width=150)
-                gb.configure_column("Media Outlet", width=180)
-                gb.configure_column("Person_ID", width=80)  # Narrow for small ID numbers
-                gb.configure_column("Relevance", width=80)
-                gb.configure_column("📅 Published Date", width=120)
+                # Configure other columns with auto-sizing - increased minWidth and removed restrictive maxWidth
+                gb.configure_column("Office", minWidth=100)
+                gb.configure_column("WO #", minWidth=100)
+                gb.configure_column("Make", minWidth=120)
+                gb.configure_column("Model", minWidth=150)
+                gb.configure_column("Contact", minWidth=180)
+                gb.configure_column("Media Outlet", minWidth=220)
+                gb.configure_column("Person_ID", minWidth=100)
+                gb.configure_column("Relevance", minWidth=110)
+                gb.configure_column("📅 Published Date", minWidth=150)
                 
                 # Configure Byline Author column as editable
                 gb.configure_column(
@@ -2917,7 +2919,7 @@ with bulk_review_tab:
                     cellEditorParams={
                         "maxLength": 100  # Limit input length
                     },
-                    width=150,
+                    minWidth=180,
                     sortable=True,
                     filter=True
                 )
@@ -2936,7 +2938,7 @@ with bulk_review_tab:
                         cellEditorParams={
                             "values": []  # Will be populated dynamically per row
                         },
-                        width=180,
+                        minWidth=220,
                         editable=True,
                         sortable=True,
                         filter=True
@@ -3004,7 +3006,7 @@ with bulk_review_tab:
                     gb.configure_column(
                         "Media Outlet",
                         cellRenderer=cellRenderer_outlet_dropdown,
-                        width=180,
+                        minWidth=220,
                         editable=True,
                         sortable=True,
                         filter=True
@@ -3025,7 +3027,7 @@ with bulk_review_tab:
                 gb.configure_column(
                     "👁️ Mark Viewed",
                     cellRenderer=cellRenderer_mark_viewed,
-                    width=110,
+                    minWidth=130,
                     editable=True,
                     sortable=False,
                     filter=False,
@@ -3036,7 +3038,7 @@ with bulk_review_tab:
                 gb.configure_column(
                     "✅ Approve", 
                     cellRenderer=cellRenderer_approve,
-                    width=100,
+                    minWidth=110,
                     editable=True,
                     sortable=False,
                     filter=False
@@ -3044,10 +3046,25 @@ with bulk_review_tab:
                 gb.configure_column(
                     "❌ Reject", 
                     cellRenderer=cellRenderer_reject,
-                    width=100,
+                    minWidth=110,
                     editable=True,
                     sortable=False,
                     filter=False
+                )
+                
+                # Configure grid auto-sizing
+                gb.configure_grid_options(
+                    domLayout='normal',
+                    onFirstDataRendered=JsCode("""
+                    function(params) {
+                        params.api.sizeColumnsToFit();
+                    }
+                    """),
+                    onGridSizeChanged=JsCode("""
+                    function(params) {
+                        params.api.sizeColumnsToFit();
+                    }
+                    """)
                 )
                 
                 # Build grid options
@@ -3061,6 +3078,7 @@ with bulk_review_tab:
                     update_mode=GridUpdateMode.VALUE_CHANGED,  # Only trigger on cell value changes
                     height=400,  # Reduced height so action buttons are visible without scrolling
                     fit_columns_on_grid_load=True,
+                    columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',  # Auto-size all columns
                     theme="alpine",
                     enable_enterprise_modules=True,  # REQUIRED for Set Filters with checkboxes
                     reload_data=False,  # Prevent automatic data reloading
@@ -3746,20 +3764,20 @@ with approved_queue_tab:
             if st.session_state.approved_queue_filter == 'ready_to_export':
                 gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
                 # Add checkbox selection to first column for Ready to Export
-                gb.configure_column("WO #", width=100, pinned='left', checkboxSelection=True, headerCheckboxSelection=True)
+                gb.configure_column("WO #", minWidth=100, pinned='left', checkboxSelection=True, headerCheckboxSelection=True)
             else:
                 # Recent Complete is read-only
                 gb.configure_selection('single', use_checkbox=False)
-                gb.configure_column("WO #", width=100, pinned='left')
-            gb.configure_column("Office", width=80)
-            gb.configure_column("Make", width=100)
-            gb.configure_column("Model", width=120)
-            gb.configure_column("Contact", width=150)
-            gb.configure_column("Media Outlet", width=180)
-            gb.configure_column("Relevance", width=100)
-            gb.configure_column("Date", width=80)
-            gb.configure_column("Sentiment", width=120)
-            gb.configure_column("Stage", width=100)
+                gb.configure_column("WO #", minWidth=100, pinned='left')
+            gb.configure_column("Office", minWidth=100)
+            gb.configure_column("Make", minWidth=120)
+            gb.configure_column("Model", minWidth=150)
+            gb.configure_column("Contact", minWidth=180)
+            gb.configure_column("Media Outlet", minWidth=220)
+            gb.configure_column("Relevance", minWidth=110)
+            gb.configure_column("Date", minWidth=100)
+            gb.configure_column("Sentiment", minWidth=140)
+            gb.configure_column("Stage", minWidth=120)
             
             # Hide raw URL column and database ID
             gb.configure_column("Clip URL", hide=True)
@@ -3791,7 +3809,7 @@ with approved_queue_tab:
             gb.configure_column(
                 "📄 View", 
                 cellRenderer=cellRenderer_view,
-                width=100,
+                minWidth=100,
                 sortable=False,
                 filter=False
             )
@@ -3806,6 +3824,7 @@ with approved_queue_tab:
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
                 height=650,  # Same height as Bulk Review
                 fit_columns_on_grid_load=True,
+                columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',  # Auto-size all columns
                 theme="alpine",
                 enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
             )
@@ -4356,7 +4375,8 @@ with rejected_tab:
                 gb.configure_column(
                     "📄 View", 
                     cellRenderer=cellRenderer_view,
-                    width=100,  # Small fixed width for View column
+                    minWidth=80,
+                    maxWidth=100,
                     sortable=False,
                     filter=False
                 )
@@ -4398,7 +4418,7 @@ with rejected_tab:
                 width='100%',
                 data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                fit_columns_on_grid_load=False,  # Disable to allow auto-sizing
+                fit_columns_on_grid_load=True,  # Enable auto-sizing on load
                 theme='streamlit',
                 enable_enterprise_modules=True,
                 allow_unsafe_jscode=True,
