@@ -2607,12 +2607,21 @@ with bulk_review_tab:
                 if 'last_saved_outlets' not in st.session_state:
                     st.session_state.last_saved_outlets = {}
                 
+                # Initialize last_saved_bylines with database values for persistence
+                if 'last_saved_bylines' not in st.session_state:
+                    st.session_state.last_saved_bylines = {}
+                
                 # Populate with current database values to prevent re-saving unchanged values
                 for idx, row in clean_df.iterrows():
                     wo_num = str(row.get('WO #', ''))
                     media_outlet = row.get('Media Outlet', '')
+                    byline_author = row.get('📝 Byline Author', '')
+                    
                     if wo_num and media_outlet:
                         st.session_state.last_saved_outlets[wo_num] = media_outlet
+                    
+                    if wo_num and byline_author:
+                        st.session_state.last_saved_bylines[wo_num] = byline_author
                 
                 # Create simpler view renderer with better visual feedback
                 cellRenderer_view = JsCode("""
