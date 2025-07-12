@@ -4612,11 +4612,28 @@ with analysis_tab:
         # Load data from database for analysis (all approved clips with sentiment)
         try:
             db = get_database()
-            # Get all approved clips, including those with sentiment analysis
-            all_approved_clips = db.get_approved_clips()
+            # Get clips that have been through sentiment analysis
+            # Look for clips with workflow_stage = 'sentiment_analyzed' OR sentiment_completed = True
+            sentiment_result = db.supabase.table('clips').select('*').eq('workflow_stage', 'sentiment_analyzed').execute()
             
-            # Filter to only clips with sentiment analysis completed
-            sentiment_clips = [clip for clip in all_approved_clips if clip.get('sentiment_completed', False)]
+            # Also check for any clips with sentiment_completed = True (legacy or direct flag)
+            legacy_sentiment_result = db.supabase.table('clips').select('*').eq('sentiment_completed', True).execute()
+            
+            # Combine results and deduplicate
+            sentiment_clips = []
+            seen_ids = set()
+            
+            if sentiment_result.data:
+                for clip in sentiment_result.data:
+                    if clip['id'] not in seen_ids:
+                        sentiment_clips.append(clip)
+                        seen_ids.add(clip['id'])
+            
+            if legacy_sentiment_result.data:
+                for clip in legacy_sentiment_result.data:
+                    if clip['id'] not in seen_ids:
+                        sentiment_clips.append(clip)
+                        seen_ids.add(clip['id'])
             
             if sentiment_clips:
                 # Convert to DataFrame for analysis
@@ -4637,6 +4654,12 @@ with analysis_tab:
                     'byline_author': 'Actual_Byline',
                     'brand_alignment': 'Brand Alignment'
                 }
+                
+                # Keep all original columns including aspect_insights
+                # Don't rename columns that aren't in the mapping
+                for col in sentiment_clips[0].keys() if sentiment_clips else []:
+                    if col not in column_mapping and col not in column_mapping.values():
+                        df[col] = [clip.get(col) for clip in sentiment_clips]
                 
                 # Rename columns for consistency
                 df.rename(columns=column_mapping, inplace=True)
@@ -4891,56 +4914,59 @@ with analysis_tab:
                         intent_emoji = "🚀" if purchase_intent == "strong positive" else "👍" if purchase_intent == "moderate positive" else "➖" if purchase_intent == "neutral" else "⚠️"
                         st.metric("🛒 Purchase Intent", f"{intent_emoji} {purchase_intent.title() if purchase_intent != 'N/A' else 'N/A'}")
                     
-                    # Decision buttons
-                    st.markdown("---")
-                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Review Decision</p>', unsafe_allow_html=True)
-                    
-                    decision_col1, decision_col2, decision_col3 = st.columns([1, 1, 2])
-                    with decision_col1:
-                        if st.button("✓", key=f"approve_detailed_{selected_wo}", use_container_width=True, help="Approve"):
-                            # Move to approved list logic
-                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
-                            if os.path.exists(approved_file):
-                                approved_df = pd.read_csv(approved_file)
-                                if 'WO #' in approved_df.columns and selected_wo not in approved_df['WO #'].astype(str).values:
-                                    approved_df = pd.concat([approved_df, pd.DataFrame([selected_row])], ignore_index=True)
-                            else:
-                                approved_df = pd.DataFrame([selected_row])
-                            approved_df.to_csv(approved_file, index=False)
-                            st.success(f"✅ Approved WO #{selected_wo}")
-                            
-                    with decision_col2:
-                        if st.button("✗", key=f"reject_detailed_{selected_wo}", use_container_width=True, help="Reject"):
-                            st.warning(f"⚠️ Flagged WO #{selected_wo}")
-                    
-                    with decision_col3:
-                        rec = selected_row.get('Recommendation', '')
-                        if rec:
-                            if 'would recommend' in rec.lower():
-                                st.info("🤖 **AI:** 👍 Recommend")
-                            elif 'would not recommend' in rec.lower():
-                                st.info("🤖 **AI:** 👎 Not Recommend")
-                            else:
-                                st.info("🤖 **AI:** 🤔 Consider")
                     
                     # Detailed analysis sections (keep all existing functionality)
                     with st.expander("📈 Aspect Breakdown", expanded=False):
                         aspect_col1, aspect_col2, aspect_col3, aspect_col4, aspect_col5 = st.columns(5)
                         
+                        # Parse aspect_insights JSONB field
+                        aspect_insights = selected_row.get('aspect_insights', {})
+                        
+                        # Debug logging
+                        logger.info(f"WO# {selected_row.get('WO #', 'Unknown')} - aspect_insights type: {type(aspect_insights)}")
+                        logger.info(f"aspect_insights raw value: {aspect_insights}")
+                        
+                        
+                        if isinstance(aspect_insights, str):
+                            try:
+                                aspect_insights = json.loads(aspect_insights)
+                                logger.info(f"Parsed aspect_insights: {aspect_insights}")
+                            except Exception as e:
+                                logger.error(f"Failed to parse aspect_insights: {e}")
+                                aspect_insights = {}
+                        
                         aspects = [
-                            ('Performance Score', 'Performance Note', '🏎️ Performance', aspect_col1),
-                            ('Design Score', 'Design Note', '🎨 Design', aspect_col2),
-                            ('Interior Score', 'Interior Note', '🪑 Interior', aspect_col3),
-                            ('Technology Score', 'Technology Note', '💻 Technology', aspect_col4),
-                            ('Value Score', 'Value Note', '💰 Value', aspect_col5)
+                            ('performance', '🏎️ Performance', aspect_col1),
+                            ('design', '🎨 Design', aspect_col2),
+                            ('interior', '🪑 Interior', aspect_col3),
+                            ('technology', '💻 Technology', aspect_col4),
+                            ('value', '💰 Value', aspect_col5)
                         ]
                         
-                        for score_field, note_field, label, col in aspects:
+                        for aspect_key, label, col in aspects:
                             with col:
-                                score = selected_row.get(score_field, 0)
-                                note = selected_row.get(note_field, '')
-                                if score and score != 0:
-                                    st.metric(label, f"{score}/10", help=note if note else None)
+                                aspect_data = aspect_insights.get(aspect_key, {})
+                                if isinstance(aspect_data, dict):
+                                    # The actual structure has 'sentiment', 'impact', 'evidence'
+                                    sentiment = aspect_data.get('sentiment', '')
+                                    impact = aspect_data.get('impact', '')
+                                    evidence = aspect_data.get('evidence', '')
+                                    
+                                    # Convert sentiment/impact to a score
+                                    score_map = {
+                                        'positive': {'high': 9, 'medium': 7, 'low': 5},
+                                        'neutral': {'high': 6, 'medium': 5, 'low': 4},
+                                        'negative': {'high': 2, 'medium': 3, 'low': 4}
+                                    }
+                                    
+                                    score = score_map.get(sentiment, {}).get(impact, 5)
+                                    
+                                    # Create insight from evidence
+                                    insight = evidence if evidence else f"{sentiment.title()} {impact} impact"
+                                    if score:
+                                        st.metric(label, f"{score}/10", help=insight)
+                                    else:
+                                        st.metric(label, "N/A")
                                 else:
                                     st.metric(label, "N/A")
                     
