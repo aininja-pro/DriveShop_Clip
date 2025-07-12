@@ -2292,6 +2292,25 @@ with bulk_review_tab:
             # Convert database results to DataFrame
             df = pd.DataFrame(clips_data)
             
+            # Load UI states from database into session state
+            # This ensures persistence across browser refreshes
+            for clip in clips_data:
+                wo_num = str(clip.get('wo_number', ''))
+                if wo_num:
+                    # Load viewed state
+                    if clip.get('ui_viewed', False):
+                        st.session_state.viewed_records.add(wo_num)
+                    
+                    # Load pending approval state
+                    if clip.get('ui_approved_pending', False):
+                        st.session_state.approved_records.add(wo_num)
+                        st.session_state.selected_for_approval.add(wo_num)
+                    
+                    # Load pending rejection state
+                    if clip.get('ui_rejected_pending', False):
+                        st.session_state.rejected_records.add(wo_num)
+                        st.session_state.selected_for_rejection.add(wo_num)
+            
             # Map database fields to expected CSV format
             df = df.rename(columns={
                 'wo_number': 'WO #',
@@ -3338,7 +3357,7 @@ with bulk_review_tab:
                 # Create sticky action bar container
                 st.markdown('<div class="sticky-action-bar">', unsafe_allow_html=True)
                 
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
                 
                 with col1:
                     # Submit Approved Clips Button
@@ -3370,6 +3389,90 @@ with bulk_review_tab:
                         else:
                             st.info("No high-quality clips (9+) found")
                 
+                with col4:
+                    # Manual Save Progress button
+                    if st.button("💾 Save Progress", help="Save all UI selections to database"):
+                        try:
+                            db = get_database()
+                            saved_count = 0
+                            
+                            # Save viewed states
+                            for wo_num in st.session_state.viewed_records:
+                                try:
+                                    db.supabase.table('clips').update({
+                                        'ui_viewed': True,
+                                        'ui_viewed_at': datetime.now().isoformat()
+                                    }).eq('wo_number', wo_num).execute()
+                                    saved_count += 1
+                                except:
+                                    pass
+                            
+                            # Save approved checkbox states (not submitted, just UI state)
+                            for wo_num in st.session_state.approved_records:
+                                try:
+                                    db.supabase.table('clips').update({
+                                        'ui_approved_pending': True
+                                    }).eq('wo_number', wo_num).execute()
+                                    saved_count += 1
+                                except:
+                                    pass
+                            
+                            # Save rejected checkbox states (not submitted, just UI state)
+                            for wo_num in st.session_state.rejected_records:
+                                try:
+                                    db.supabase.table('clips').update({
+                                        'ui_rejected_pending': True
+                                    }).eq('wo_number', wo_num).execute()
+                                    saved_count += 1
+                                except:
+                                    pass
+                            
+                            # Clear any records that were unchecked
+                            all_wos = set(str(row.get('WO #', '')) for _, row in df.iterrows() if row.get('WO #'))
+                            cleared_approved = all_wos - st.session_state.approved_records
+                            cleared_rejected = all_wos - st.session_state.rejected_records
+                            cleared_viewed = all_wos - st.session_state.viewed_records
+                            
+                            for wo_num in cleared_approved:
+                                try:
+                                    db.supabase.table('clips').update({
+                                        'ui_approved_pending': False
+                                    }).eq('wo_number', wo_num).execute()
+                                except:
+                                    pass
+                            
+                            for wo_num in cleared_rejected:
+                                try:
+                                    db.supabase.table('clips').update({
+                                        'ui_rejected_pending': False
+                                    }).eq('wo_number', wo_num).execute()
+                                except:
+                                    pass
+                            
+                            for wo_num in cleared_viewed:
+                                try:
+                                    db.supabase.table('clips').update({
+                                        'ui_viewed': False
+                                    }).eq('wo_number', wo_num).execute()
+                                except:
+                                    pass
+                            
+                            st.success(f"💾 Saved progress to database!")
+                            
+                            # Also save to pickle as backup
+                            import pickle
+                            temp_file = os.path.join(project_root, "temp", "checkbox_state.pkl")
+                            with open(temp_file, 'wb') as f:
+                                pickle.dump({
+                                    'approved': st.session_state.approved_records,
+                                    'rejected': st.session_state.rejected_records,
+                                    'viewed': st.session_state.viewed_records,
+                                    'outlets': st.session_state.last_saved_outlets,
+                                    'bylines': st.session_state.last_saved_bylines
+                                }, f)
+                                
+                        except Exception as e:
+                            st.error(f"Failed to save: {str(e)}")
                 
                 # Close sticky action bar container
                 st.markdown('</div>', unsafe_allow_html=True)
@@ -3387,6 +3490,9 @@ with bulk_review_tab:
                             if selected_wos:
                                 # Update clips in database to approved status (workflow_stage stays 'found' for Approved Queue)
                                 try:
+                                    # Get database connection
+                                    db = get_database()
+                                    
                                     # First, approve the clips
                                     approved_clips = []
                                     for wo_number in selected_wos:
@@ -3397,6 +3503,9 @@ with bulk_review_tab:
                                         
                                         if result.data:
                                             approved_clips.extend(result.data)
+                                            # Debug: Print the first clip to see what fields we have
+                                            if result.data:
+                                                logger.info(f"Sample approved clip fields: {list(result.data[0].keys())}")
                                     
                                     logger.info(f"✅ Approved {len(approved_clips)} clips")
                                     
@@ -3422,25 +3531,37 @@ with bulk_review_tab:
                                             }).eq('id', clip['id']).execute()
                                     else:
                                         # Run sentiment analysis
-                                        results = run_sentiment_analysis(approved_clips, update_progress)
-                                        
-                                        # Update clips with sentiment results and move to ready_to_export
-                                        sentiment_success_count = 0
-                                        for clip, result in zip(approved_clips, results['results']):
-                                            if result.get('sentiment_completed'):
-                                                success = db.update_clip_sentiment(clip['id'], result)
-                                                if success:
-                                                    # Update workflow stage to sentiment_analyzed (which means ready to export)
-                                                    db.supabase.table('clips').update({
-                                                        'workflow_stage': 'sentiment_analyzed'
-                                                    }).eq('id', clip['id']).execute()
-                                                    sentiment_success_count += 1
-                                            else:
-                                                # If sentiment failed, still move to sentiment_analyzed but note the failure
+                                        try:
+                                            results = run_sentiment_analysis(approved_clips, update_progress)
+                                        except Exception as e:
+                                            st.error(f"❌ Sentiment analysis error: {str(e)}")
+                                            logger.error(f"Sentiment analysis failed: {e}")
+                                            # Still move clips to ready to export even if sentiment fails
+                                            for clip in approved_clips:
                                                 db.supabase.table('clips').update({
                                                     'workflow_stage': 'sentiment_analyzed',
                                                     'sentiment_completed': False
                                                 }).eq('id', clip['id']).execute()
+                                            results = None
+                                        
+                                        # Update clips with sentiment results and move to ready_to_export
+                                        sentiment_success_count = 0
+                                        if results and 'results' in results:
+                                            for clip, result in zip(approved_clips, results['results']):
+                                                if result.get('sentiment_completed'):
+                                                    success = db.update_clip_sentiment(clip['id'], result)
+                                                    if success:
+                                                        # Update workflow stage to sentiment_analyzed (which means ready to export)
+                                                        db.supabase.table('clips').update({
+                                                            'workflow_stage': 'sentiment_analyzed'
+                                                        }).eq('id', clip['id']).execute()
+                                                        sentiment_success_count += 1
+                                                else:
+                                                    # If sentiment failed, still move to sentiment_analyzed but note the failure
+                                                    db.supabase.table('clips').update({
+                                                        'workflow_stage': 'sentiment_analyzed',
+                                                        'sentiment_completed': False
+                                                    }).eq('id', clip['id']).execute()
                                         
                                         progress_bar.progress(1.0)
                                         progress_text.text(f"✅ Sentiment analysis complete! {sentiment_success_count}/{len(approved_clips)} successful")
