@@ -3788,30 +3788,30 @@ with approved_queue_tab:
             
         elif st.session_state.approved_queue_filter == 'recent_complete':
             # Get exported clips from the last 30 days
-            @st.cache_data(ttl=60)
-            def get_recent_complete_data():
-                from datetime import datetime, timedelta
-                thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
-                
-                # Get all exported clips regardless of fms_export_date
-                # Since legacy clips don't have fms_export_date, we need a different approach
-                result = db.supabase.table('clips').select('*').in_('workflow_stage', ['exported', 'complete']).execute()
-                
-                all_clips = []
-                if result.data:
-                    for clip in result.data:
-                        # For legacy clips without fms_export_date, use processed_date
-                        date_to_check = clip.get('fms_export_date') or clip.get('processed_date')
-                        
-                        if date_to_check and date_to_check >= thirty_days_ago:
-                            all_clips.append(clip)
-                        elif not date_to_check:
-                            # If no date at all, include it (shouldn't happen but safety)
-                            all_clips.append(clip)
-                
-                return all_clips
+            from datetime import datetime, timedelta
+            thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
             
-            clips_data = get_recent_complete_data()
+            with st.spinner("Loading recent complete clips..."):
+                try:
+                    # Get all exported clips regardless of fms_export_date
+                    # Since legacy clips don't have fms_export_date, we need a different approach
+                    result = db.supabase.table('clips').select('*').in_('workflow_stage', ['exported', 'complete']).limit(1000).execute()
+                    
+                    clips_data = []
+                    if result.data:
+                        for clip in result.data:
+                            # For legacy clips without fms_export_date, use processed_date
+                            date_to_check = clip.get('fms_export_date') or clip.get('processed_date')
+                            
+                            if date_to_check and date_to_check >= thirty_days_ago:
+                                clips_data.append(clip)
+                            elif not date_to_check:
+                                # If no date at all, include it (shouldn't happen but safety)
+                                clips_data.append(clip)
+                                
+                except Exception as e:
+                    st.error(f"Error loading recent complete data: {str(e)}")
+                    clips_data = []
             tab_title = "✅ Recent Complete (Last 30 Days)"
             tab_description = "Exported clips from the last 30 days"
         
