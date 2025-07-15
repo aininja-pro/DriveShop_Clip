@@ -1809,6 +1809,26 @@ with st.sidebar:
             suggested_value = st.session_state.suggested_id_to_use
             del st.session_state.suggested_id_to_use
     
+    # Date range filter for Loan Start Date
+    st.markdown("**📅 Filter by Loan Start Date Range**")
+    date_col1, date_col2 = st.columns(2)
+    
+    with date_col1:
+        start_date_filter = st.date_input(
+            "From Date:",
+            value=None,
+            help="Select start date to filter loans (inclusive)",
+            key="loan_start_date_from"
+        )
+    
+    with date_col2:
+        end_date_filter = st.date_input(
+            "To Date:",
+            value=None,
+            help="Select end date to filter loans (inclusive)",
+            key="loan_start_date_to"
+        )
+    
     # Position-based filter for batch processing (much simpler!)
     skip_records = st.number_input(
         "Skip first X records (optional):",
@@ -1853,6 +1873,30 @@ with st.sidebar:
                 st.info(f"🎯 Filtering by {len(activity_ids)} Activity ID(s): {', '.join(activity_ids)}")
             else:
                 st.warning("⚠️ Activity_ID column not found in data")
+        
+        # Apply date range filter for Loan Start Date
+        if start_date_filter or end_date_filter:
+            if 'Start Date' in filtered_df.columns:
+                # Convert Start Date column to datetime
+                filtered_df['Start Date'] = pd.to_datetime(filtered_df['Start Date'], errors='coerce')
+                
+                # Apply start date filter
+                if start_date_filter:
+                    filtered_df = filtered_df[filtered_df['Start Date'] >= pd.Timestamp(start_date_filter)]
+                    
+                # Apply end date filter  
+                if end_date_filter:
+                    filtered_df = filtered_df[filtered_df['Start Date'] <= pd.Timestamp(end_date_filter)]
+                
+                # Show date range info
+                date_range_info = []
+                if start_date_filter:
+                    date_range_info.append(f"from {start_date_filter}")
+                if end_date_filter:
+                    date_range_info.append(f"to {end_date_filter}")
+                st.info(f"📅 Filtering by Loan Start Date {' '.join(date_range_info)}")
+            else:
+                st.warning("⚠️ Start Date column not found in data")
         
         # Apply position-based filtering (skip first X records)
         if skip_records > 0:
