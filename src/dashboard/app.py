@@ -2340,8 +2340,15 @@ with bulk_review_tab:
         except Exception as e:
             print(f"Could not load saved checkbox state: {e}")
     
+    # Add manual refresh button to control when data reloads
+    col1, col2, col3 = st.columns([1, 1, 8])
+    with col1:
+        if st.button("🔄 Refresh Data", help="Manually refresh clips data from database"):
+            st.cache_data.clear()
+            st.rerun()
+    
     # Cache database calls to improve performance
-    @st.cache_data(ttl=60)  # Cache for 1 minute
+    @st.cache_data  # Cache without TTL to prevent auto-reloads
     def cached_get_pending_clips():
         db = get_database()
         return db.get_pending_clips()
@@ -2428,7 +2435,7 @@ with bulk_review_tab:
                     st.metric("High Quality", high_quality)
                 with col4:
                     # Check approved count from database
-                    @st.cache_data(ttl=60)
+                    @st.cache_data
                     def cached_get_approved_clips_count():
                         db = get_database()
                         return len(db.get_approved_clips())
@@ -3825,7 +3832,7 @@ with approved_queue_tab:
         
         # One-time migration: Update any existing clips with 'exported' status to have proper workflow_stage
         # This ensures legacy exported clips show up in Recent Complete
-        @st.cache_data(ttl=3600)  # Cache for 1 hour to avoid repeated migrations
+        @st.cache_data  # Cache migration status
         def migrate_exported_clips():
             try:
                 # Find clips with status='exported' but wrong workflow_stage
@@ -3845,13 +3852,13 @@ with approved_queue_tab:
         migrate_exported_clips()
         
         # Cache the approved queue data with TTL of 60 seconds
-        @st.cache_data(ttl=60)
+        @st.cache_data
         def get_approved_queue_data():
             return db.get_approved_queue_clips()
         
         if st.session_state.approved_queue_filter == 'ready_to_export':
             # Get clips that are ready to export (workflow_stage = 'ready_to_export')
-            @st.cache_data(ttl=30)
+            @st.cache_data
             def get_ready_to_export_data():
                 # Get clips with workflow_stage = 'sentiment_analyzed' (ready to export)
                 result = db.supabase.table('clips').select('*').eq('workflow_stage', 'sentiment_analyzed').execute()
@@ -4348,7 +4355,7 @@ with rejected_tab:
                 })
         
         # Also add manually rejected clips (always shown regardless of mode)
-        @st.cache_data(ttl=60)
+        @st.cache_data
         def cached_get_rejected_clips():
             db = get_database()
             return db.get_rejected_clips()
