@@ -122,17 +122,23 @@ class ScrapFlyWebCrawler:
             logger.info(f"   - Stealth mode: {'ON' if use_stealth else 'OFF'}")
             logger.info(f"   - Proxy country: {country}")
             
-            # Configure ScrapFly request (minimal configuration)
-            config_options = ScrapeConfig(
-                url=url,
-                # Basic settings
-                country=country,
-                render_js=render_js,
-                # Anti-scraping protection
-                asp=use_stealth,
-                # ScrapFly handles timeouts automatically when retry is enabled
-                # Custom timeout not allowed with retry enabled
-            )
+            # YouTube-specific configuration
+            is_youtube = 'youtube.com' in url
+            config_params = {
+                'url': url,
+                'country': country,
+                'render_js': render_js,
+                'asp': use_stealth,
+            }
+            
+            # Add YouTube-specific wait behavior
+            if is_youtube and render_js:
+                logger.info(f"   - YouTube detected: Using enhanced ASP mode")
+                # ScrapFly handles YouTube automatically with ASP
+                # No need for custom wait parameters
+                
+            # Configure ScrapFly request
+            config_options = ScrapeConfig(**config_params)
             
             # Execute the scrape
             result = self.client.scrape(config_options)
@@ -153,15 +159,16 @@ class ScrapFlyWebCrawler:
                 
                 return content, title, None
             else:
-                error_msg = f"ScrapFly failed: {result.error_message}"
-                logger.error(f"❌ {error_msg}")
+                # Handle error - result might not have error_message attribute
+                error_msg = getattr(result, 'error_message', 'Unknown ScrapFly error')
+                logger.error(f"❌ ScrapFly failed: {error_msg}")
                 
                 # Check if this is a rate limit error
-                retry_after = self._handle_rate_limit_response(result.error_message)
+                retry_after = self._handle_rate_limit_response(str(error_msg))
                 if retry_after:
                     self._open_circuit_breaker(retry_after)
                 
-                return None, None, error_msg
+                return None, None, f"ScrapFly failed: {error_msg}"
                 
         except Exception as e:
             error_msg = f"ScrapFly exception: {str(e)}"

@@ -500,10 +500,10 @@ def _create_fallback_metadata_with_title(video_id, title, url):
         'url': url
     }
 
-def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90) -> Optional[List[Dict[str, Any]]]:
+def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90) -> Optional[List[Dict[str, Any]]]:
     """
-    Scrape YouTube channel page using ScrapingBee to get raw HTML and parse manually.
-    Falls back to YouTube API if ScrapingBee fails.
+    Scrape YouTube channel page using ScrapFly to get raw HTML and parse manually.
+    Falls back to YouTube API if ScrapFly fails.
     
     Args:
         channel_url: YouTube channel URL (e.g., https://www.youtube.com/@TheCarCareNutReviews/videos)
@@ -514,24 +514,24 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
         List of video dictionaries with title, url, video_id
     """
     try:
-        from src.utils.scraping_bee import ScrapingBeeClient
+        from src.utils.scrapfly_client import ScrapFlyWebCrawler
         
-        # Initialize ScrapingBee client
-        scraper = ScrapingBeeClient()
+        # Initialize ScrapFly client
+        crawler = ScrapFlyWebCrawler()
         
         # Quick API test with a simple page first
-        logger.info("🧪 Testing ScrapingBee API connectivity...")
-        test_content = scraper.scrape_url(
+        logger.info("🧪 Testing ScrapFly API connectivity...")
+        test_content, _, test_error = crawler.crawl(
             url="https://httpbin.org/html",  # This returns actual HTML content
             render_js=False,
-            premium_proxy=False
+            use_stealth=False
         )
         
         if not test_content:
-            logger.warning("⚠️ ScrapingBee API test failed - falling back to YouTube API")
+            logger.warning(f"⚠️ ScrapFly API test failed: {test_error} - falling back to YouTube API")
             return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
         else:
-            logger.info("✅ ScrapingBee API test successful - proceeding with YouTube scraping")
+            logger.info("✅ ScrapFly API test successful - proceeding with YouTube scraping")
         
         # Ensure we're using the /videos page to get all videos
         if '/videos' not in channel_url:
@@ -540,22 +540,26 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
             else:
                 channel_url = channel_url + '/videos'
         
-        logger.info(f"🎬 Scraping YouTube channel with ScrapingBee: {channel_url}")
+        logger.info(f"🎬 Scraping YouTube channel with ScrapFly: {channel_url}")
         
-        # Use ScrapingBee to get the raw HTML (simpler approach)
+        # Use ScrapFly to get the raw HTML
         try:
             # Get raw HTML from YouTube channel page
-            html_content = scraper.scrape_url(
+            # YouTube requires ASP (Anti-Scraping Protection) and JS rendering
+            html_content, title, error = crawler.crawl(
                 url=channel_url,
                 render_js=True,  # Essential for YouTube
-                premium_proxy=True  # Essential for YouTube
+                use_stealth=True,  # ASP - Essential for YouTube
+                country='US'
             )
             
             if not html_content or len(html_content) < 1000:
-                logger.warning(f"❌ ScrapingBee returned insufficient content ({len(html_content) if html_content else 0} chars) - falling back to YouTube API")
+                logger.warning(f"❌ ScrapFly returned insufficient content ({len(html_content) if html_content else 0} chars) - falling back to YouTube API")
+                if error:
+                    logger.warning(f"ScrapFly error: {error}")
                 return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                 
-            logger.info(f"✅ ScrapingBee successfully scraped YouTube channel! ({len(html_content)} chars)")
+            logger.info(f"✅ ScrapFly successfully scraped YouTube channel! ({len(html_content)} chars)")
             
             # Parse HTML manually to find video titles and links
             import re
@@ -599,7 +603,7 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                                     'video_id': video_id,
                                     'title': title,
                                     'url': f"https://www.youtube.com/watch?v={video_id}",
-                                    'method': 'scrapingbee'
+                                    'method': 'scrapfly'
                                 }
                                 
                                 videos_found.append(video_info)
@@ -609,11 +613,11 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                         logger.warning(f"   ❌ Error processing video {i+1}: {e}")
                         continue
                 
-                logger.info(f"🎬 ScrapingBee method: Found {len(videos_found)} valid videos")
+                logger.info(f"🎬 ScrapFly method: Found {len(videos_found)} valid videos")
                 
-                # If ScrapingBee found videos, use them
+                # If ScrapFly found videos, use them
                 if videos_found:
-                    logger.info("✅ ScrapingBee extraction successful!")
+                    logger.info("✅ ScrapFly extraction successful!")
                     
                     # Filter for relevant videos
                     relevant_videos = []
@@ -627,7 +631,7 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                     logger.info(f"Filtering {len(videos_found)} videos for make='{make}' and model variations: {model_variations}")
                     
                     # 🚀 SHOW MORE DEBUG INFO: Display first 50 videos instead of just 25
-                    logger.info("🔍 DEBUG: All video titles extracted by ScrapingBee:")
+                    logger.info("🔍 DEBUG: All video titles extracted by ScrapFly:")
                     for i, video in enumerate(videos_found[:50]):  # Show first 50 for debugging (to catch video #33)
                         logger.info(f"  {i+1}. '{video['title']}'")
                     
@@ -645,7 +649,7 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                             for model_var in model_variations:
                                 logger.info(f"   🔍 Checking for model variation: '{model_var}'")
                                 if model_var in title_lower:
-                                    logger.info(f"🎯 ScrapingBee found relevant video: {video['title']}")
+                                    logger.info(f"🎯 ScrapFly found relevant video: {video['title']}")
                                     relevant_videos.append(video)
                                     break
                                 else:
@@ -653,16 +657,16 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                         else:
                             logger.info(f"   ❌ Make '{make_lower}' not found in title")
                     
-                    logger.info(f"🎬 ScrapingBee found {len(relevant_videos)} relevant videos for {make} {model}")
+                    logger.info(f"🎬 ScrapFly found {len(relevant_videos)} relevant videos for {make} {model}")
                     
                     if relevant_videos:
                         return relevant_videos[:10]  # Return top 10 most relevant
                     else:
-                        logger.warning("ScrapingBee found videos but none were relevant - falling back to YouTube API")
+                        logger.warning("ScrapFly found videos but none were relevant - falling back to YouTube API")
                         return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                         
                 else:
-                    logger.warning("ScrapingBee extracted no videos - falling back to YouTube API")
+                    logger.warning("ScrapFly extracted no videos - falling back to YouTube API")
                     return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                     
             except Exception as e:
@@ -670,16 +674,16 @@ def scrape_channel_videos_with_scrapingbee(channel_url: str, make: str, model: s
                 return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
                 
         except Exception as e:
-            logger.error(f"Error processing ScrapingBee YouTube response: {e} - falling back to YouTube API")
+            logger.error(f"Error processing ScrapFly YouTube response: {e} - falling back to YouTube API")
             return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
         
     except Exception as e:
-        logger.error(f"Error scraping YouTube channel with ScrapingBee: {e} - falling back to YouTube API")
-        return _fallback_to_youtube_api(channel_url, make, model)
+        logger.error(f"Error scraping YouTube channel with ScrapFly: {e} - falling back to YouTube API")
+        return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
 
 def _fallback_to_youtube_api(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90) -> Optional[List[Dict[str, Any]]]:
     """
-    Fallback to YouTube API when ScrapingBee fails.
+    Fallback to YouTube API when ScrapFly fails.
     Provides unlimited video access to find videos at position 33+.
     """
     try:

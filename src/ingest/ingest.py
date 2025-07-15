@@ -1,6 +1,6 @@
 ### DO NOT TOUCH THIS CONTRACT ###
 # `process_loan(loan)` MUST keep its current logic:
-#  - Four-tier escalation (Google, HTTP, ScrapingBee, playwright)
+#  - Four-tier escalation (Google, HTTP, ScrapFly, playwright)
 #  - Vehicle-specific GPT prompt with {make} {model}
 #  - Returns dict with keys:
 #       work_order, media, make_model, status, url, snippet, logs
@@ -42,7 +42,7 @@ import io
 # Import local modules
 from src.utils.logger import setup_logger
 # from src.utils.notifications import send_slack_message  # Commented out to prevent hanging
-from src.utils.youtube_handler import get_channel_id, get_latest_videos, get_transcript, extract_video_id, get_video_metadata_fallback, scrape_channel_videos_with_scrapingbee
+from src.utils.youtube_handler import get_channel_id, get_latest_videos, get_transcript, extract_video_id, get_video_metadata_fallback, scrape_channel_videos_with_scrapfly
 from src.utils.escalation import crawling_strategy
 from src.utils.enhanced_crawler_manager import EnhancedCrawlerManager
 from src.analysis.gpt_analysis import analyze_clip
@@ -676,26 +676,26 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         
         logger.info(f"No relevant videos found for {make} {model} in channel {channel_id}")
         
-        # NEW: Try ScrapingBee channel search as fallback when RSS feed fails
-        logger.info(f"🔄 Falling back to ScrapingBee channel search for {make} {model}")
+        # NEW: Try ScrapFly channel search as fallback when RSS feed fails
+        logger.info(f"🔄 Falling back to ScrapFly channel search for {make} {model}")
         
         try:
-            # Use ScrapingBee to search the full channel content with date filtering
+            # Use ScrapFly to search the full channel content with date filtering
             start_date = loan.get('start_date')
-            channel_videos = scrape_channel_videos_with_scrapingbee(url, make, model, start_date, 90)
+            channel_videos = scrape_channel_videos_with_scrapfly(url, make, model, start_date, 90)
             
             if channel_videos:
-                logger.info(f"✅ ScrapingBee found {len(channel_videos)} relevant videos in channel")
+                logger.info(f"✅ ScrapFly found {len(channel_videos)} relevant videos in channel")
                 
-                # Use the first relevant video found by ScrapingBee
+                # Use the first relevant video found by ScrapFly
                 for video_info in channel_videos:
                     video_id = video_info.get('video_id')
                     if video_id:
                         # Try metadata fallback first since transcript fetching is consistently failing
-                        logger.info(f"Trying metadata fallback first for ScrapingBee video: {video_info['title']}")
+                        logger.info(f"Trying metadata fallback first for ScrapFly video: {video_info['title']}")
                         metadata = get_video_metadata_fallback(video_id, known_title=video_info['title'])
                         if metadata and metadata.get('content_text'):
-                            logger.info(f"✅ ScrapingBee + metadata success: {video_info['title']}")
+                            logger.info(f"✅ ScrapFly + metadata success: {video_info['title']}")
                             return {
                                 'url': video_info['url'],
                                 'content': metadata['content_text'],
@@ -709,7 +709,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                         # Only try transcript as fallback if metadata failed
                         transcript = get_transcript(video_id)
                         if transcript:
-                            logger.info(f"✅ ScrapingBee + transcript success: {video_info['title']}")
+                            logger.info(f"✅ ScrapFly + transcript success: {video_info['title']}")
                             return {
                                 'url': video_info['url'],
                                 'content': transcript,
@@ -718,12 +718,12 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                 'published_date': video_info.get('published_date')
                             }
             else:
-                logger.info(f"ScrapingBee found no relevant videos for {make} {model} in channel")
+                logger.info(f"ScrapFly found no relevant videos for {make} {model} in channel")
                 
         except Exception as e:
-            logger.warning(f"ScrapingBee channel search failed: {e}")
+            logger.warning(f"ScrapFly channel search failed: {e}")
         
-        # Only return None if both RSS and ScrapingBee failed
+        # Only return None if both RSS and ScrapFly failed
         logger.info(f"❌ No relevant videos found for {make} {model} in the specified channel {channel_id}")
         logger.info(f"🔒 Staying within specified channel - not searching other YouTube channels")
         

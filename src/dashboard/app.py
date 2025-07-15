@@ -4128,7 +4128,7 @@ with approved_queue_tab:
                                                     # Client-requested fields with their preferred names
                                                     "activity_id": clip.get('activity_id'),
                                                     "brand_fit": clip.get('brand_narrative'),
-                                                    "byline_author": clip.get('byline_author'),
+                                                    "byline": clip.get('byline_author'),
                                                     "link": clip.get('clip_url'),
                                                     "cons": clip.get('cons'),
                                                     "impressions": clip.get('impressions'),
@@ -4138,7 +4138,7 @@ with approved_queue_tab:
                                                     "pros": clip.get('pros'),
                                                     "date": clip.get('published_date'),
                                                     "relevance_score": clip.get('relevance_score'),
-                                                    "summary": clip.get('summary')
+                                                    "ai_summary": clip.get('summary')
                                                 }
                                                 fms_export_data.append(export_record)
                                     
