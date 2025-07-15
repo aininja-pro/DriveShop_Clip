@@ -4104,45 +4104,36 @@ with approved_queue_tab:
                                     fms_export_data = []
                                     export_timestamp = datetime.now().isoformat()
                                     
-                                    for clip in clips_to_export:
-                                        export_record = {
-                                            # Core fields
-                                            "id": clip.get('id'),
-                                            "wo_number": clip.get('wo_number'),
-                                            "activity_id": clip.get('activity_id'),
-                                            "office": clip.get('office'),
-                                            "make": clip.get('make'),
-                                            "model": clip.get('model'),
-                                            "contact": clip.get('contact'),
-                                            "person_id": clip.get('person_id'),
-                                            "media_outlet": clip.get('media_outlet'),
-                                            "media_outlet_id": clip.get('media_outlet_id'),
-                                            "impressions": clip.get('impressions'),
-                                            "clip_url": clip.get('clip_url'),
-                                            "published_date": clip.get('published_date'),
-                                            "processed_date": clip.get('processed_date'),
-                                            "attribution_strength": clip.get('attribution_strength'),
-                                            "byline_author": clip.get('byline_author'),
-                                            
-                                            # Sentiment analysis fields
-                                            "relevance_score": clip.get('relevance_score'),
-                                            "overall_sentiment": clip.get('overall_sentiment'),
-                                            "overall_score": clip.get('overall_score'),
-                                            "brand_alignment": clip.get('brand_alignment'),
-                                            "summary": clip.get('summary'),
-                                            "sentiment_completed": clip.get('sentiment_completed'),
-                                            
-                                            # Strategic intelligence fields (key fields only)
-                                            "marketing_impact_score": clip.get('marketing_impact_score'),
-                                            "executive_summary": clip.get('executive_summary'),
-                                            "purchase_intent_signals": clip.get('purchase_intent_signals'),
-                                            "strategic_signal": clip.get('strategic_signal'),
-                                            
-                                            # Export metadata
-                                            "export_timestamp": export_timestamp,
-                                            "export_type": "fms_export"
-                                        }
-                                        fms_export_data.append(export_record)
+                                    # Get export data from clips_export view with client field names
+                                    clip_ids = [clip['id'] for clip in clips_to_export if clip.get('id')]
+                                    
+                                    if clip_ids:
+                                        # Query the export view for these specific clips
+                                        export_result = db.supabase.table('clips_export').select('*').in_('activity_id', [clip['activity_id'] for clip in clips_to_export if clip.get('activity_id')]).execute()
+                                        
+                                        if export_result.data:
+                                            # Use the data directly from the view - it already has client field names
+                                            fms_export_data = export_result.data
+                                        else:
+                                            # Fallback to manual mapping if view query fails
+                                            for clip in clips_to_export:
+                                                export_record = {
+                                                    # Client-requested fields with their preferred names
+                                                    "activity_id": clip.get('activity_id'),
+                                                    "brand_fit": clip.get('brand_narrative'),
+                                                    "byline_author": clip.get('byline_author'),
+                                                    "link": clip.get('clip_url'),
+                                                    "cons": clip.get('cons'),
+                                                    "impressions": clip.get('impressions'),
+                                                    "publication_id": clip.get('media_outlet_id'),
+                                                    "overall_score": clip.get('overall_score'),
+                                                    "sentiment": clip.get('overall_sentiment'),
+                                                    "pros": clip.get('pros'),
+                                                    "date": clip.get('published_date'),
+                                                    "relevance_score": clip.get('relevance_score'),
+                                                    "summary": clip.get('summary')
+                                                }
+                                                fms_export_data.append(export_record)
                                     
                                     # Create JSON export
                                     import json
