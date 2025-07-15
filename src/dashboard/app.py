@@ -97,6 +97,19 @@ def get_outlet_options_for_person(person_id, mapping):
         return [outlet['outlet_name'] for outlet in outlets_list]
     return []
 
+def get_full_outlet_data_for_person(person_id, mapping):
+    """Get full outlet data (name, id, impressions) for a given Person_ID"""
+    if not person_id or not mapping:
+        return {}
+    
+    person_id_str = str(person_id)
+    if person_id_str in mapping:
+        person_data = mapping.get(person_id_str, {})
+        outlets_list = person_data.get('outlets', [])
+        # Return a dict mapping outlet_name to full outlet data
+        return {outlet['outlet_name']: outlet for outlet in outlets_list}
+    return {}
+
 @st.cache_data
 def create_reporter_name_to_id_mapping():
     """Create a mapping from Reporter Name to Person_ID for lookups."""
@@ -2296,6 +2309,9 @@ with bulk_review_tab:
         st.session_state.last_saved_outlets = {}
     if 'last_saved_bylines' not in st.session_state:
         st.session_state.last_saved_bylines = {}
+    # Add tracking for outlet data (id and impressions)
+    if 'outlet_data_mapping' not in st.session_state:
+        st.session_state.outlet_data_mapping = {}
     
     # Load saved checkbox states from a temp file EARLY
     import pickle
@@ -2319,6 +2335,8 @@ with bulk_review_tab:
                     st.session_state.last_saved_outlets.update(saved_state['outlets'])
                 if 'bylines' in saved_state:
                     st.session_state.last_saved_bylines.update(saved_state['bylines'])
+                if 'outlet_data' in saved_state:
+                    st.session_state.outlet_data_mapping.update(saved_state['outlet_data'])
         except Exception as e:
             print(f"Could not load saved checkbox state: {e}")
     
@@ -2717,6 +2735,7 @@ with bulk_review_tab:
                     wo_num = str(row.get('WO #', ''))
                     media_outlet = row.get('Media Outlet', '')
                     byline_author = row.get('📝 Byline Author', '')
+                    person_id = row.get('Person_ID', '')
                     
                     # Only set if not already tracked (preserves user changes)
                     if wo_num and media_outlet and wo_num not in st.session_state.last_saved_outlets:
@@ -2724,6 +2743,11 @@ with bulk_review_tab:
                     
                     if wo_num and byline_author and wo_num not in st.session_state.last_saved_bylines:
                         st.session_state.last_saved_bylines[wo_num] = byline_author
+                    
+                    # Populate outlet data mapping for this WO
+                    if wo_num and person_id and wo_num not in st.session_state.outlet_data_mapping:
+                        full_outlet_data = get_full_outlet_data_for_person(person_id, person_outlets_mapping)
+                        st.session_state.outlet_data_mapping[wo_num] = full_outlet_data
                 
                 # Create simpler view renderer with better visual feedback
                 cellRenderer_view = JsCode("""
@@ -3255,10 +3279,21 @@ with bulk_review_tab:
                                 try:
                                     # Get database connection
                                     db = get_database()
-                                    # Update the clip in database using the new method
-                                    success = db.update_clip_media_outlet(wo_num, new_outlet)
+                                    
+                                    # Get outlet data for this WO
+                                    outlet_id = None
+                                    impressions = None
+                                    if wo_num in st.session_state.outlet_data_mapping:
+                                        outlet_data_dict = st.session_state.outlet_data_mapping[wo_num]
+                                        if new_outlet in outlet_data_dict:
+                                            outlet_info = outlet_data_dict[new_outlet]
+                                            outlet_id = outlet_info.get('outlet_id')
+                                            impressions = outlet_info.get('impressions')
+                                    
+                                    # Update the clip in database with outlet data
+                                    success = db.update_clip_media_outlet(wo_num, new_outlet, outlet_id, impressions)
                                     if success:
-                                        print(f"✅ Updated WO# {wo_num} media outlet to: {new_outlet}")
+                                        print(f"✅ Updated WO# {wo_num} media outlet to: {new_outlet} (ID: {outlet_id}, Impressions: {impressions})")
                                     else:
                                         print(f"⚠️ Failed to update WO# {wo_num} in database")
                                 except Exception as e:
@@ -3364,7 +3399,8 @@ with bulk_review_tab:
                                 'rejected': st.session_state.rejected_records,
                                 'viewed': st.session_state.viewed_records,
                                 'outlets': st.session_state.last_saved_outlets,
-                                'bylines': st.session_state.last_saved_bylines
+                                'bylines': st.session_state.last_saved_bylines,
+                                'outlet_data': st.session_state.outlet_data_mapping
                             }, f)
                     except Exception as e:
                         print(f"Could not save checkbox state: {e}")
@@ -3512,7 +3548,8 @@ with bulk_review_tab:
                                     'rejected': st.session_state.rejected_records,
                                     'viewed': st.session_state.viewed_records,
                                     'outlets': st.session_state.last_saved_outlets,
-                                    'bylines': st.session_state.last_saved_bylines
+                                    'bylines': st.session_state.last_saved_bylines,
+                                    'outlet_data': st.session_state.outlet_data_mapping
                                 }, f)
                                 
                         except Exception as e:
@@ -4079,6 +4116,8 @@ with approved_queue_tab:
                                             "contact": clip.get('contact'),
                                             "person_id": clip.get('person_id'),
                                             "media_outlet": clip.get('media_outlet'),
+                                            "media_outlet_id": clip.get('media_outlet_id'),
+                                            "impressions": clip.get('impressions'),
                                             "clip_url": clip.get('clip_url'),
                                             "published_date": clip.get('published_date'),
                                             "processed_date": clip.get('processed_date'),

@@ -590,16 +590,25 @@ class DatabaseManager:
             logger.error(f"❌ Failed to update clip status: {e}")
             return False
     
-    def update_clip_media_outlet(self, wo_number: str, media_outlet: str) -> bool:
+    def update_clip_media_outlet(self, wo_number: str, media_outlet: str, media_outlet_id: str = None, impressions: int = None) -> bool:
         """Update the media outlet for a clip by WO number"""
         try:
-            # Update the dedicated media_outlet field
-            result = self.supabase.table('clips').update({
+            # Build update data
+            update_data = {
                 "media_outlet": media_outlet
-            }).eq('wo_number', wo_number).execute()
+            }
+            
+            # Add optional fields if provided
+            if media_outlet_id is not None:
+                update_data["media_outlet_id"] = media_outlet_id
+            if impressions is not None:
+                update_data["impressions"] = impressions
+            
+            # Update the clip
+            result = self.supabase.table('clips').update(update_data).eq('wo_number', wo_number).execute()
             
             if result.data:
-                logger.info(f"✅ Updated media outlet for WO# {wo_number} to: {media_outlet}")
+                logger.info(f"✅ Updated media outlet for WO# {wo_number} to: {media_outlet} (ID: {media_outlet_id}, Impressions: {impressions})")
                 return True
             else:
                 logger.warning(f"⚠️ No clip found with WO# {wo_number}")
