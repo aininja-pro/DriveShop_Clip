@@ -323,7 +323,7 @@ class EnhancedCrawlerManager:
                         url=url,
                         content=basic_content
                     )
-                    return result
+                    return self._add_byline_to_result(result, person_name)
                 else:
                     logger.info(f"Tier 1: Content extraction succeeded but content is GENERIC, escalating to Enhanced HTTP")
             else:
@@ -365,7 +365,7 @@ class EnhancedCrawlerManager:
                         url=url,
                         content=http_content
                     )
-                    return result
+                    return self._add_byline_to_result(result, person_name)
                 else:
                     logger.info(f"Tier 2: Content extraction succeeded but content is GENERIC, escalating to ScrapingBee")
             else:
@@ -406,7 +406,7 @@ class EnhancedCrawlerManager:
                         url=found_url or url,
                         content=rss_content
                     )
-                    return result
+                    return self._add_byline_to_result(result, person_name)
                 else:
                     logger.info(f"Tier 3: RSS content is generic or extraction failed, escalating")
             else:
@@ -448,7 +448,7 @@ class EnhancedCrawlerManager:
                         url=url,
                         content=scrapfly_content
                     )
-                    return result
+                    return self._add_byline_to_result(result, person_name)
                 else:
                     logger.info(f"Tier 4: ScrapFly content extraction failed or generic, escalating to ScrapingBee")
             else:
@@ -492,7 +492,7 @@ class EnhancedCrawlerManager:
                         url=url,
                         content=bee_content
                     )
-                    return result
+                    return self._add_byline_to_result(result, person_name)
                 else:
                     logger.info(f"Tier 5: ScrapingBee content extraction succeeded but content is GENERIC, escalating to Google Search")
             else:
@@ -518,7 +518,7 @@ class EnhancedCrawlerManager:
                 url=index_discovery_result['url'],
                 content=index_discovery_result['content']
             )
-            return result
+            return self._add_byline_to_result(result, person_name)
         
         # Tier 6: Google Search (FALLBACK ONLY - when all direct scraping fails)
         logger.info(f"Tier 6: All direct scraping and Index Discovery failed, trying Google Search as FALLBACK for {make} {model}")
@@ -578,7 +578,7 @@ class EnhancedCrawlerManager:
                     url=specific_url,
                     content=article_result['content']
                 )
-                return result
+                return self._add_byline_to_result(result, person_name)
                 
         # Tier 7: Original crawler (Playwright as last resort)
         logger.info(f"Tier 7: All direct scraping and Google Search failed, using original crawler for {url}")
@@ -610,7 +610,7 @@ class EnhancedCrawlerManager:
                 url=actual_url or url,
                 content=content
             )
-            return result
+            return self._add_byline_to_result(result, person_name)
             
         # All tiers failed
         return {
@@ -1226,6 +1226,41 @@ class EnhancedCrawlerManager:
         except:
             return "Unknown Article"
     
+    def _add_byline_to_result(self, result: Dict[str, Any], person_name: str = "") -> Dict[str, Any]:
+        """
+        Add byline extraction to a successful result.
+        Modifies the result dictionary to include attribution_strength and actual_byline.
+        """
+        if result.get('success') and result.get('content'):
+            try:
+                # Extract actual byline from the content
+                actual_byline = self._extract_byline_from_content(result['content'], result.get('url', ''))
+                
+                if actual_byline:
+                    logger.info(f"📝 Found byline author: {actual_byline}")
+                    result['actual_byline'] = actual_byline
+                    
+                    # Determine attribution strength if person_name provided
+                    if person_name:
+                        if person_name.lower() in actual_byline.lower():
+                            result['attribution_strength'] = 'strong'
+                            logger.info(f"✅ Strong attribution - {person_name} found in byline")
+                        else:
+                            result['attribution_strength'] = 'delegated'
+                            logger.info(f"⚠️ Delegated content - {person_name} not in byline, actual: {actual_byline}")
+                    else:
+                        result['attribution_strength'] = 'unknown'
+                else:
+                    result['actual_byline'] = None
+                    result['attribution_strength'] = 'unknown'
+                    logger.info(f"❓ Could not extract byline from article")
+            except Exception as e:
+                logger.warning(f"Error extracting byline: {e}")
+                result['actual_byline'] = None
+                result['attribution_strength'] = 'unknown'
+        
+        return result
+    
     def _extract_byline_from_content(self, html_content: str, url: str) -> Optional[str]:
         """Extract author byline from article HTML content"""
         from bs4 import BeautifulSoup
@@ -1270,7 +1305,27 @@ class EnhancedCrawlerManager:
                                 # Clean up common prefixes
                                 text = re.sub(r'^(by|author|written by|story by):\s*', '', text, flags=re.IGNORECASE)
                                 text = text.strip()
-                                if text:
+                                
+                                # Handle "Posted:date - timeAuthor:name" format
+                                if 'Posted:' in text and 'Author:' in text:
+                                    # Extract just the author name after "Author:"
+                                    author_match = re.search(r'Author:\s*([^,\|\n\r]+)', text)
+                                    if author_match:
+                                        text = author_match.group(1).strip()
+                                        logger.info(f"🔍 BYLINE: Extracted author from Posted/Author format: {text}")
+                                    else:
+                                        # If regex fails, try to manually split on "Author:"
+                                        author_parts = text.split('Author:')
+                                        if len(author_parts) > 1:
+                                            text = author_parts[1].strip()
+                                            logger.info(f"🔍 BYLINE: Extracted author via manual split: {text}")
+                                        else:
+                                            # If extraction fails, skip this text to avoid saving the full string
+                                            logger.warning(f"🔍 BYLINE: Could not extract author from Posted/Author format: {text}")
+                                            continue
+                                
+                                # Only proceed if we have reasonable author text (not the full Posted string)
+                                if text and not ('Posted:' in text and len(text) > 50):
                                     logger.info(f"🔍 BYLINE: Found author via {selector}: {text}")
                                     return text
                 except Exception as e:
@@ -1283,7 +1338,12 @@ class EnhancedCrawlerManager:
                 r'By\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
                 r'Written by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
                 r'Story by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
-                r'Author:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)'
+                r'Author:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                # Add patterns to handle "Posted:date - timeAuthor:name" format
+                r'PMAuthor:([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'AMAuthor:([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                # More flexible pattern for various author formats
+                r'Author:\s*([A-Za-z]+(?:\s+[A-Za-z]+)*)'
             ]
             
             for pattern in by_patterns:

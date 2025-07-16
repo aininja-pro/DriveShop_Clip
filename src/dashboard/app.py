@@ -2415,7 +2415,7 @@ with bulk_review_tab:
             st.rerun()
     
     # Cache database calls to improve performance
-    @st.cache_data  # Cache without TTL to prevent auto-reloads
+    @st.cache_data(ttl=300)  # Cache for 5 minutes to allow fresh data
     def cached_get_pending_clips():
         db = get_database()
         return db.get_pending_clips()
@@ -2576,11 +2576,14 @@ with bulk_review_tab:
                     print(f"❌ No match found for '{affiliation}'")
                     return ''  # Return empty if no match
                 
-                # Use database values if they exist, otherwise leave empty for dropdown
+                # Use database values if they exist, otherwise use smart matching
                 if 'Media Outlet' in display_df.columns:
-                    clean_df['Media Outlet'] = display_df['Media Outlet'].fillna('')
+                    clean_df['Media Outlet'] = display_df.apply(
+                        lambda row: row.get('Media Outlet', '') or smart_outlet_matching(row), 
+                        axis=1
+                    )
                 else:
-                    clean_df['Media Outlet'] = ''  # Empty for dropdown to show "Select Media Outlet"
+                    clean_df['Media Outlet'] = display_df.apply(smart_outlet_matching, axis=1)
                 
                 # Override with saved Media Outlet values from session state
                 for idx, row in clean_df.iterrows():
@@ -2743,8 +2746,13 @@ with bulk_review_tab:
                     try:
                         # First check if we have an actual byline from the database
                         actual_byline = str(row.get('Actual_Byline', '')).strip()
-                        if actual_byline and actual_byline.lower() not in ['nan', 'none', '', '—']:
-                            return actual_byline
+                        if actual_byline and actual_byline.lower() not in ['nan', 'none', '', '—', 'null']:
+                            # IMPORTANT: Check if this looks like the concatenated problematic string
+                            # If it contains "Posted:" and "Author:" pattern, skip it and use fallbacks
+                            if 'Posted:' in actual_byline and 'Author:' in actual_byline:
+                                pass  # Skip this value, continue to fallbacks
+                            else:
+                                return actual_byline
                         
                         # Otherwise use the smart analysis
                         attribution_strength, byline_author = smart_attribution_analysis(row)
