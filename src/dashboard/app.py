@@ -2454,6 +2454,7 @@ with bulk_review_tab:
                 'model': 'Model',
                 'contact': 'To',
                 'office': 'Office',
+                'person_id': 'Person_ID',  # Map database person_id to Person_ID for UI
                 'clip_url': 'Clip URL',
                 'relevance_score': 'Relevance Score',
                 'status': 'Status',
@@ -2539,7 +2540,16 @@ with bulk_review_tab:
                     normalized_name = ' '.join(normalized_name.split())  # Extra normalization for multiple spaces
                     return reporter_name_to_id_map.get(normalized_name, '')
                 
-                clean_df['Person_ID'] = clean_df['Contact'].apply(lookup_person_id)
+                # Use database Person_ID if available, otherwise lookup from contact name
+                def get_person_id(row):
+                    # First try to use the Person_ID from database
+                    db_person_id = row.get('Person_ID', '')
+                    if db_person_id and str(db_person_id).strip() and str(db_person_id) != 'nan':
+                        return str(db_person_id)
+                    # Fallback to lookup by contact name
+                    return lookup_person_id(row.get('Contact', ''))
+                
+                clean_df['Person_ID'] = display_df.apply(get_person_id, axis=1)
                 
                 # Add Media Outlet column right after Contact (replacing Publication)
                 # Smart matching: find the correct Outlet_Name from Person_outlets_mapping
