@@ -50,6 +50,33 @@ from src.utils.date_extractor import extract_date_from_html, extract_youtube_upl
 
 logger = setup_logger(__name__)
 
+def flexible_model_match(video_title: str, model_variation: str) -> bool:
+    """
+    Check if all words in the model variation appear in the video title,
+    allowing them to be non-consecutive.
+    
+    Examples:
+    - "accord hybrid touring" matches "The 2025 Honda Accord Touring Is A Blissful Hybrid Sedan"
+    - "cx-50 turbo" matches "The Mazda CX-50 2.5 Turbo Review"
+    
+    Args:
+        video_title: The video title to search in (already lowercased)
+        model_variation: The model string to search for (already lowercased)
+        
+    Returns:
+        True if all words in model_variation appear in video_title
+    """
+    # Split model variation into words, handling hyphens as word boundaries
+    model_words = re.split(r'[-\s]+', model_variation.strip())
+    model_words = [word for word in model_words if word]  # Remove empty strings
+    
+    # Check if all model words appear in the title
+    for word in model_words:
+        if word not in video_title:
+            return False
+    
+    return True
+
 # Initialize the enhanced crawler manager (it will be reused for all URLs)
 crawler_manager = EnhancedCrawlerManager()
 
@@ -542,22 +569,28 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         
         if not channel_id:
             logger.warning(f"Could not resolve YouTube channel ID from: {url}")
-            return None
+            # Don't return None here - let it fall through to try ScrapFly
+            # The ScrapFly fallback below will handle channel URLs without channel IDs
         
-        # Get latest videos from channel
-        logger.info(f"Fetching latest videos for channel: {channel_id}")
-        videos = get_latest_videos(channel_id, max_videos=25)
+        # Get latest videos from channel (only if we have a channel_id)
+        videos = []
+        if channel_id:
+            logger.info(f"Fetching latest videos for channel: {channel_id}")
+            videos = get_latest_videos(channel_id, max_videos=25)
+            
+            if not videos:
+                logger.warning(f"No videos found for channel: {channel_id}")
+                # Don't return None - let it fall through to ScrapFly
+        else:
+            logger.info("No channel ID available - will try ScrapFly directly")
         
-        if not videos:
-            logger.warning(f"No videos found for channel: {channel_id}")
-            return None
-        
-        logger.info(f"Found {len(videos)} videos in channel {channel_id}")
-        
-        # Debug: Show all video titles and dates
-        logger.info("Available videos in channel:")
-        for i, video in enumerate(videos):
-            logger.info(f"  {i+1}. {video.get('title', 'No title')} (Published: {video.get('published', 'Unknown')})")
+        if videos:
+            logger.info(f"Found {len(videos)} videos in channel {channel_id}")
+            
+            # Debug: Show all video titles and dates
+            logger.info("Available videos in channel:")
+            for i, video in enumerate(videos):
+                logger.info(f"  {i+1}. {video.get('title', 'No title')} (Published: {video.get('published', 'Unknown')})")
         
         # Try to find a relevant video by checking titles
         make = loan.get('make', '').lower()
@@ -635,7 +668,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                 # Check if title mentions the make and any model variation
                 if make in video_title:
                     for model_var in model_variations:
-                        if model_var in video_title:
+                        if flexible_model_match(video_title, model_var):
                             if video_date and start_date:
                                 days_diff = (video_date - start_date).days
                                 logger.info(f"✅ Found relevant video within date range ('{model_var}', {days_diff} days after start): {video['title']}")
@@ -674,9 +707,12 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
             else:
                 logger.info(f"No relevant videos found in {days_forward} days forward either")
         
-        logger.info(f"No relevant videos found for {make} {model} in channel {channel_id}")
+        if channel_id:
+            logger.info(f"No relevant videos found for {make} {model} in channel {channel_id}")
+        else:
+            logger.info(f"No channel ID available for URL: {url}")
         
-        # NEW: Try ScrapFly channel search as fallback when RSS feed fails
+        # Try ScrapFly channel search as fallback when RSS feed fails OR when we don't have a channel ID
         logger.info(f"🔄 Falling back to ScrapFly channel search for {make} {model}")
         
         try:

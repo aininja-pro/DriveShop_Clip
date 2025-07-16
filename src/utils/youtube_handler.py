@@ -13,6 +13,33 @@ from src.utils.rate_limiter import rate_limiter
 
 logger = setup_logger(__name__)
 
+def flexible_model_match(video_title: str, model_variation: str) -> bool:
+    """
+    Check if all words in the model variation appear in the video title,
+    allowing them to be non-consecutive.
+    
+    Examples:
+    - "accord hybrid touring" matches "The 2025 Honda Accord Touring Is A Blissful Hybrid Sedan"
+    - "cx-50 turbo" matches "The Mazda CX-50 2.5 Turbo Review"
+    
+    Args:
+        video_title: The video title to search in (already lowercased)
+        model_variation: The model string to search for (already lowercased)
+        
+    Returns:
+        True if all words in model_variation appear in video_title
+    """
+    # Split model variation into words, handling hyphens as word boundaries
+    model_words = re.split(r'[-\s]+', model_variation.strip())
+    model_words = [word for word in model_words if word]  # Remove empty strings
+    
+    # Check if all model words appear in the title
+    for word in model_words:
+        if word not in video_title:
+            return False
+    
+    return True
+
 def extract_video_id(url):
     """
     Extract the video ID from a YouTube URL.
@@ -57,6 +84,13 @@ def get_channel_id(url):
     Returns:
         str: Channel ID or None if not found
     """
+    # Clean the URL - remove invisible Unicode characters and whitespace
+    if url:
+        # Remove common invisible characters that can appear from copy-paste
+        url = url.strip().rstrip('\u200b\u200c\u200d\u2060\ufeff')
+        # Also remove any trailing special characters that might have been added
+        url = re.sub(r'[\s\u00A0\u2000-\u200F\u2028-\u202F\u205F-\u206F]+$', '', url)
+    
     # Check if it's a handle (@username)
     handle_match = re.search(r'youtube\.com\/@([a-zA-Z0-9_-]+)', url)
     if handle_match or url.startswith('@'):
@@ -73,6 +107,15 @@ def get_channel_id(url):
     if user_match:
         username = user_match.group(1)
         return resolve_username_to_channel_id(username)
+    
+    # Check if it's a custom URL format (youtube.com/customname)
+    custom_match = re.search(r'youtube\.com\/([a-zA-Z0-9_-]+)(?:\/|$)', url)
+    if custom_match:
+        custom_name = custom_match.group(1)
+        # Skip common YouTube pages that aren't channels
+        if custom_name not in ['watch', 'results', 'playlist', 'feed', 'trending', 'gaming', 'music', 'sports', 'learning']:
+            logger.info(f"Attempting to resolve custom channel name: {custom_name}")
+            return resolve_username_to_channel_id(custom_name)
     
     logger.warning(f"Could not extract channel ID from URL: {url}")
     return None
@@ -150,9 +193,10 @@ def resolve_handle_to_channel_id(handle):
 def resolve_username_to_channel_id(username):
     """
     Resolve a YouTube username to a channel ID using multiple extraction patterns.
+    Tries multiple URL formats to handle different types of YouTube channels.
     
     Args:
-        username (str): YouTube username
+        username (str): YouTube username or custom name
         
     Returns:
         str: Channel ID or None if not found
@@ -161,56 +205,66 @@ def resolve_username_to_channel_id(username):
         # Apply rate limiting
         rate_limiter.wait_if_needed('youtube.com')
         
-        url = f"https://www.youtube.com/user/{username}"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
-        response = requests.get(url, headers=headers, timeout=10)
+        # Try multiple URL formats since YouTube has different types
+        url_formats = [
+            f"https://www.youtube.com/{username}",  # Custom URL (e.g., /theredline)
+            f"https://www.youtube.com/c/{username}",  # /c/ format
+            f"https://www.youtube.com/user/{username}",  # Legacy /user/ format
+        ]
         
-        if response.status_code == 200:
-            html_content = response.text
-            
-            # Multiple patterns for extracting channel ID from YouTube HTML
-            channel_id_patterns = [
-                r'"channelId":"([a-zA-Z0-9_-]+)"',  # Original pattern
-                r'"externalId":"([a-zA-Z0-9_-]+)"',  # Alternative JSON field
-                r'property="og:url"\s+content="[^"]*channel/([a-zA-Z0-9_-]+)"',  # Open Graph meta tag
-                r'<link[^>]*href="[^"]*channel/([a-zA-Z0-9_-]+)"[^>]*>',  # Link tag
-                r'"browseEndpoint"[^}]*"browseId":"([a-zA-Z0-9_-]+)"',  # Browse endpoint
-                r'"channelMetadataRenderer"[^}]*"channelUrl":"[^"]*channel/([a-zA-Z0-9_-]+)"',  # Channel metadata
-                r'"ownerChannelName":"[^"]*","channelId":"([a-zA-Z0-9_-]+)"',  # Owner channel info
-                r'/channel/([a-zA-Z0-9_-]+)',  # Any mention of /channel/ID
-            ]
-            
-            for i, pattern in enumerate(channel_id_patterns, 1):
-                try:
-                    channel_id_match = re.search(pattern, html_content, re.IGNORECASE)
-                    if channel_id_match:
-                        channel_id = channel_id_match.group(1)
-                        
-                        # Validate channel ID format (YouTube channel IDs are typically 24 chars)
-                        if len(channel_id) >= 20 and channel_id.startswith(('UC', 'UU', 'UL', 'LL')):
-                            logger.info(f"✅ Successfully resolved user/{username} to channel ID: {channel_id} (pattern {i})")
-                            return channel_id
-                        else:
-                            logger.warning(f"Pattern {i} found potential ID '{channel_id}' but doesn't match expected format")
-                            continue
-                            
-                except Exception as e:
-                    logger.warning(f"Error with pattern {i} for user/{username}: {e}")
-                    continue
-            
-            logger.warning(f"All {len(channel_id_patterns)} patterns failed to find valid channel ID for user/{username}")
-            
-            # DEBUG: Log part of HTML response to help diagnose
-            if len(html_content) > 100:
-                logger.info(f"HTML response sample (first 500 chars): {html_content[:500]}")
-            else:
-                logger.warning(f"HTML response was very short ({len(html_content)} chars): {html_content}")
+        for url in url_formats:
+            logger.debug(f"Trying to resolve channel ID from: {url}")
+            try:
+                response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
                 
-        else:
-            logger.error(f"HTTP {response.status_code} when resolving YouTube username {username}")
+                if response.status_code == 200:
+                    html_content = response.text
+                    
+                    # Multiple patterns for extracting channel ID from YouTube HTML
+                    channel_id_patterns = [
+                        r'"channelId":"([a-zA-Z0-9_-]+)"',  # Original pattern
+                        r'"externalId":"([a-zA-Z0-9_-]+)"',  # Alternative JSON field
+                        r'property="og:url"\s+content="[^"]*channel/([a-zA-Z0-9_-]+)"',  # Open Graph meta tag
+                        r'<link[^>]*href="[^"]*channel/([a-zA-Z0-9_-]+)"[^>]*>',  # Link tag
+                        r'"browseEndpoint"[^}]*"browseId":"([a-zA-Z0-9_-]+)"',  # Browse endpoint
+                        r'"channelMetadataRenderer"[^}]*"channelUrl":"[^"]*channel/([a-zA-Z0-9_-]+)"',  # Channel metadata
+                        r'"ownerChannelName":"[^"]*","channelId":"([a-zA-Z0-9_-]+)"',  # Owner channel info
+                        r'/channel/([a-zA-Z0-9_-]+)',  # Any mention of /channel/ID
+                    ]
+                    
+                    for i, pattern in enumerate(channel_id_patterns, 1):
+                        try:
+                            channel_id_match = re.search(pattern, html_content, re.IGNORECASE)
+                            if channel_id_match:
+                                channel_id = channel_id_match.group(1)
+                                
+                                # Validate channel ID format (YouTube channel IDs are typically 24 chars)
+                                if len(channel_id) >= 20 and channel_id.startswith(('UC', 'UU', 'UL', 'LL')):
+                                    logger.info(f"✅ Successfully resolved {url} to channel ID: {channel_id} (pattern {i})")
+                                    return channel_id
+                                else:
+                                    logger.debug(f"Pattern {i} found potential ID '{channel_id}' but doesn't match expected format")
+                                    continue
+                                    
+                        except Exception as e:
+                            logger.debug(f"Error with pattern {i} for {url}: {e}")
+                            continue
+                    
+                    logger.debug(f"No valid channel ID found in {url} HTML")
+                else:
+                    logger.debug(f"HTTP {response.status_code} for {url}")
+                    
+            except requests.RequestException as e:
+                logger.debug(f"Request failed for {url}: {e}")
+                continue  # Try next URL format
+        
+        # If all URL formats failed
+        logger.warning(f"Could not resolve channel ID for '{username}' using any URL format")
+        return None
             
     except Exception as e:
         logger.error(f"Error resolving YouTube username {username}: {e}")
@@ -648,7 +702,7 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                             logger.info(f"   ✅ Found make '{make_lower}' in title!")
                             for model_var in model_variations:
                                 logger.info(f"   🔍 Checking for model variation: '{model_var}'")
-                                if model_var in title_lower:
+                                if flexible_model_match(title_lower, model_var):
                                     logger.info(f"🎯 ScrapFly found relevant video: {video['title']}")
                                     relevant_videos.append(video)
                                     break

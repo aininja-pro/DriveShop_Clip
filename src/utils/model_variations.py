@@ -79,7 +79,7 @@ def generate_model_variations(make: str, model: str) -> List[str]:
     # 6. Common automotive abbreviations and alternate forms (be more selective)
     abbreviation_maps = {
         'turbo': ['t'],
-        'hybrid': ['h'],
+        # Removed 'h' abbreviation for hybrid - it's too ambiguous and causes issues
         'electric': ['ev', 'e'],
         'awd': ['all wheel drive', '4wd'],
         'suv': ['sport utility'],

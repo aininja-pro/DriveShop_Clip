@@ -7,7 +7,7 @@ GPT analysis is skipped during ingestion to save costs - it will be run later in
 import os
 import asyncio
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urlparse
@@ -456,7 +456,13 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
             
             return True  # Return True because we DID process it (even if no clips found)
 
-async def process_loans_database_concurrent(loans: List[Dict[str, Any]], db, run_id: str, outlets_mapping: dict = None) -> Dict[str, int]:
+async def process_loans_database_concurrent(
+    loans: List[Dict[str, Any]], 
+    db, 
+    run_id: str, 
+    outlets_mapping: dict = None,
+    progress_callback: Optional[Callable] = None
+) -> Dict[str, int]:
     """
     Process multiple loans concurrently with database storage and smart retry logic.
     
@@ -482,24 +488,34 @@ async def process_loans_database_concurrent(loans: List[Dict[str, Any]], db, run
         for loan in loans
     ]
     
-    # Wait for all tasks to complete
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Count results
+    # Process tasks and track progress
     processed_count = 0
     skipped_count = 0
     error_count = 0
+    total_loans = len(loans)
     
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            loan = loans[i]
-            work_order = loan.get('work_order', 'Unknown')
-            logger.error(f"Error processing loan {work_order}: {result}")
+    # Process tasks as they complete for progress tracking
+    results = []
+    for i, task in enumerate(asyncio.as_completed(tasks)):
+        try:
+            result = await task
+            results.append(result)
+            
+            if result is True:
+                processed_count += 1
+            elif result is False:
+                skipped_count += 1
+                
+            # Update progress callback every 2 records or at milestones for smoother updates
+            completed = i + 1
+            if progress_callback and (completed % 2 == 0 or completed == total_loans or completed == 1):
+                progress_callback(completed, total_loans)
+                
+        except Exception as e:
+            results.append(e)
             error_count += 1
-        elif result is True:
-            processed_count += 1
-        elif result is False:
-            skipped_count += 1
+            # Find which loan failed
+            logger.error(f"Error processing loan: {e}")
     
     # Get success count from database (clips that were actually stored)
     clips_stored = db.get_pending_clips(run_id)
@@ -570,7 +586,7 @@ def run_ingest_database(
         outlets_mapping = load_person_outlets_mapping()
         
         # Process loans with database storage and smart retry logic
-        stats = asyncio.run(process_loans_database_concurrent(loans, db, run_id, outlets_mapping))
+        stats = asyncio.run(process_loans_database_concurrent(loans, db, run_id, outlets_mapping, None))
         
         # Update processing run with final statistics
         db.finish_processing_run(
@@ -605,7 +621,8 @@ def run_ingest_database(
 def run_ingest_database_with_filters(
     filtered_loans: List[Dict[str, Any]],
     limit: int = 0,
-    run_name: Optional[str] = None
+    run_name: Optional[str] = None,
+    progress_callback: Optional[Callable] = None
 ) -> bool:
     """
     Run database ingestion with pre-filtered loans (from dashboard).
@@ -648,7 +665,9 @@ def run_ingest_database_with_filters(
         outlets_mapping = load_person_outlets_mapping()
         
         # Process loans
-        stats = asyncio.run(process_loans_database_concurrent(loans_to_process, db, run_id, outlets_mapping))
+        stats = asyncio.run(process_loans_database_concurrent(
+            loans_to_process, db, run_id, outlets_mapping, progress_callback
+        ))
         
         # Update processing run
         db.finish_processing_run(

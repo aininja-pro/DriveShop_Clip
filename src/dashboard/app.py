@@ -51,6 +51,24 @@ if 'env_vars_logged' not in st.session_state:
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
+# Helper functions for progress tracking
+def update_progress(current, total):
+    """Update progress in session state"""
+    if 'processing_progress' in st.session_state:
+        st.session_state['processing_progress']['current'] = current
+        st.session_state['processing_progress']['total'] = total
+
+def format_time(seconds):
+    """Format seconds into human-readable time"""
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        return f"{int(seconds // 60)}m {int(seconds % 60)}s"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        return f"{hours}h {minutes}m"
+
 # Import local modules
 try:
     from src.ingest.ingest_database import run_ingest_database, run_ingest_database_with_filters
@@ -1942,7 +1960,23 @@ with st.sidebar:
         if st.button("Process Filtered", key='process_from_url_filtered'):
             # Only proceed if data has been loaded and filtered
             if 'filtered_df' in locals() and not filtered_df.empty:
-                with st.spinner(f"Processing filtered records... This may take a while."):
+                # Create progress tracking containers
+                progress_container = st.container()
+                with progress_container:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    time_text = st.empty()
+                    spinner_placeholder = st.empty()
+                    
+                    # Store progress tracking in session state
+                    st.session_state['processing_progress'] = {
+                        'current': 0,
+                        'total': len(filtered_df),
+                        'start_time': time.time()
+                    }
+                    
+                    status_text.text(f"Processing 0 of {len(filtered_df)} records...")
+                    
                     from src.ingest.ingest_database import run_ingest_database_with_filters
                     
                     # Convert filtered dataframe to list of records
@@ -1969,15 +2003,42 @@ with st.sidebar:
                             'office': record.get('Office')
                         })
                     
-                    # Add a debug expander to show exactly what's being sent
-                    with st.expander("DEBUG: Data sent to backend"):
-                        st.json(remapped_records)
+                    # Debug information can be logged instead of shown in UI
+                    logger.debug(f"Sending {len(remapped_records)} records to backend")
 
-                    # Call the backend with the pre-filtered and correctly mapped data
-                    success = run_ingest_database_with_filters(
-                        filtered_loans=remapped_records, 
-                        limit=limit_records
-                    )
+                    # Show initial status
+                    total_records = len(remapped_records)
+                    status_text.text(f"Starting to process {total_records} records...")
+                    time_text.text("This may take several minutes. Progress may appear uneven due to varying processing times.")
+                    
+                    # Add a spinner to show continuous activity
+                    with spinner_placeholder.container():
+                        with st.spinner('🔄 Processing records... (this may take a while)'):
+                            # Define progress callback that updates the UI
+                            def progress_update(current, total):
+                                # Update progress bar
+                                progress = current / total if total > 0 else 0
+                                progress_bar.progress(progress)
+                                
+                                # Update status text - just show count, no time estimates
+                                status_text.text(f"Completed {current} of {total} records ({int(progress * 100)}%)")
+                                
+                                # Show elapsed time only (no predictions)
+                                elapsed = time.time() - st.session_state['processing_progress']['start_time']
+                                time_text.text(f"Time elapsed: {format_time(elapsed)}")
+                            
+                            # Call the backend with progress tracking
+                            success = run_ingest_database_with_filters(
+                                filtered_loans=remapped_records, 
+                                limit=limit_records,
+                                progress_callback=progress_update
+                            )
+                    
+                    # Update to show completion
+                    progress_bar.progress(1.0)
+                    status_text.text(f"✅ Completed processing {total_records} records!")
+                    elapsed = time.time() - st.session_state['processing_progress']['start_time']
+                    time_text.text(f"Total time: {format_time(elapsed)}")
                     
                     if success:
                         # Store batch processing info for next batch suggestion
@@ -2009,6 +2070,8 @@ with st.sidebar:
                                         }
                         
                         st.session_state.last_run_timestamp = datetime.now()
+                        # Clear cache so Bulk Review shows new clips
+                        st.cache_data.clear()
                         st.rerun()
                     else:
                         st.error("❌ Filtered processing failed.")
@@ -2035,6 +2098,8 @@ with st.sidebar:
                 success = run_ingest_database(input_file=temp_file_path)
                 if success:
                     st.success("✅ Done!")
+                    # Clear cache so Bulk Review shows new clips
+                    st.cache_data.clear()
                     st.rerun() # Refresh the page
                 else:
                     st.error("❌ Failed")
@@ -2048,6 +2113,8 @@ with st.sidebar:
             success = run_ingest_database(input_file=default_file)
             if success:
                 st.success("✅ Done!")
+                # Clear cache so Bulk Review shows new clips
+                st.cache_data.clear()
                 st.rerun() # Refresh the page
             else:
                 st.error("❌ Failed")
