@@ -2576,14 +2576,11 @@ with bulk_review_tab:
                     print(f"❌ No match found for '{affiliation}'")
                     return ''  # Return empty if no match
                 
-                # Use database values if they exist, otherwise use smart matching
+                # Use database values if they exist, otherwise leave empty for dropdown
                 if 'Media Outlet' in display_df.columns:
-                    clean_df['Media Outlet'] = display_df.apply(
-                        lambda row: row.get('Media Outlet', '') or smart_outlet_matching(row), 
-                        axis=1
-                    )
+                    clean_df['Media Outlet'] = display_df['Media Outlet'].fillna('')
                 else:
-                    clean_df['Media Outlet'] = display_df.apply(smart_outlet_matching, axis=1)
+                    clean_df['Media Outlet'] = ''  # Empty for dropdown to show "Select Media Outlet"
                 
                 # Override with saved Media Outlet values from session state
                 for idx, row in clean_df.iterrows():

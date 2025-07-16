@@ -392,8 +392,8 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                     'extracted_content': clip_result.get('extracted_content'),
                     'published_date': clip_result.get('published_date').isoformat() if clip_result.get('published_date') else None,
                     'attribution_strength': clip_result.get('attribution_strength'),
-                    'byline_author': clip_result.get('byline_author'),
-                    'tier_used': clip_result.get('processing_method', 'Unknown'),
+                    'byline_author': clip_result.get('byline_author') or clip_result.get('channel_name'),  # Handle YouTube channel names
+                    'tier_used': clip_result.get('processing_method', 'Unknown') or clip_result.get('tier_used', 'Unknown'),  # Handle both field names
                     'relevance_score': clip_result.get('relevance_score', 0.0),
                     'status': 'pending_review',  # No GPT analysis yet
                     'workflow_stage': 'found'

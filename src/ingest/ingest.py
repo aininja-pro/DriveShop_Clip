@@ -538,12 +538,14 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
             
             if transcript:
                 title = metadata.get('title', f"YouTube Video {video_id}") if metadata else f"YouTube Video {video_id}"
+                channel_name = metadata.get('channel_name', '') if metadata else ''
                 
                 return {
                     'url': url,
                     'content': transcript,
                     'content_type': 'video',
                     'title': title,
+                    'channel_name': channel_name,
                     'published_date': video_date
                 }
             else:
@@ -679,11 +681,16 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                             transcript = get_transcript(video_id)
                             
                             if transcript:
+                                # Get metadata to extract channel name
+                                metadata = get_video_metadata_fallback(video_id)
+                                channel_name = metadata.get('channel_name', '') if metadata else ''
+                                
                                 return {
                                     'url': video['url'],
                                     'content': transcript,
                                     'content_type': 'video',
                                     'title': video['title'],
+                                    'channel_name': channel_name,
                                     'published_date': video_date
                                 }
                             else:
@@ -746,11 +753,16 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                         transcript = get_transcript(video_id)
                         if transcript:
                             logger.info(f"✅ ScrapFly + transcript success: {video_info['title']}")
+                            # Get metadata to extract channel name
+                            metadata_for_channel = get_video_metadata_fallback(video_id)
+                            channel_name = metadata_for_channel.get('channel_name', '') if metadata_for_channel else ''
+                            
                             return {
                                 'url': video_info['url'],
                                 'content': transcript,
                                 'content_type': 'video',
                                 'title': video_info['title'],
+                                'channel_name': channel_name,
                                 'published_date': video_info.get('published_date')
                             }
             else:
