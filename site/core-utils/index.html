@@ -1,0 +1,2091 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://aininja-pro.github.io/DriveShop_Clip/core-utils/">
+      
+      
+        <link rel="prev" href="../api-utils/">
+      
+      
+        <link rel="next" href="../crawler/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
+    
+    
+      
+        <title>Core Utilities - DriveShop Clip Tracking System</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/custom.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#core-utilities-documentation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="DriveShop Clip Tracking System" class="md-header__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DriveShop Clip Tracking System
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Core Utilities
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="DriveShop Clip Tracking System" class="md-nav__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    DriveShop Clip Tracking System
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Overview
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Project Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Modules
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ingest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ingest
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Analysis
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Core Utilities
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core Utilities
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsdatabasepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/database.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/database.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#databasemanager-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      DatabaseManager Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Operations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#processing-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Processing Runs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Clip Management
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smart-retry-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Smart Retry Logic
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Strategy
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retry Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#retry-intervals-by-failure-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Intervals by Failure Type
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-decision-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Decision Logic
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsconfigpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/config.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/config.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-configuration-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Configuration Sections
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Configuration Sections">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#domain-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Domain Management
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      Content Discovery
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      API Configurations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crawler-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Crawler Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Patterns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsloggerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/logger.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/logger.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setup-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setup Function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-logger-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default Logger Instance
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Details
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      File Structure
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-patterns_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Patterns
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-specific-logger" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module-Specific Logger
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      Direct Import
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Considerations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crawler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crawler-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler Utils
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creatoriq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CreatorIQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../other-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Other Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment & Support
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment & Support
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Setup Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/future.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Future Enhancements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/support.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Support & Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsdatabasepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/database.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/database.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Classes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#databasemanager-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      DatabaseManager Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Operations
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Core Operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#processing-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Processing Runs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Clip Management
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smart-retry-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Smart Retry Logic
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Strategy
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retry Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#retry-intervals-by-failure-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Intervals by Failure Type
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-decision-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Decision Logic
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsconfigpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/config.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/config.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-configuration-sections" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Configuration Sections
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Configuration Sections">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#domain-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Domain Management
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      Content Discovery
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      API Configurations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crawler-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Crawler Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Patterns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsloggerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/logger.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/logger.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setup-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setup Function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-logger-instance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default Logger Instance
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration Details
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      File Structure
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-patterns_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Patterns
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-specific-logger" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module-Specific Logger
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#direct-import" class="md-nav__link">
+    <span class="md-ellipsis">
+      Direct Import
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Considerations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="core-utilities-documentation">Core Utilities Documentation</h1>
+<h2 id="module-srcutilsdatabasepy">Module: <code>src/utils/database.py</code></h2>
+<h3 id="purpose">Purpose</h3>
+<p>The Database module provides a comprehensive interface to the Supabase PostgreSQL database, managing all data persistence for the clip tracking system. It implements intelligent retry logic, workflow management, and provides analytics capabilities while maintaining a singleton pattern for efficient connection management.</p>
+<h3 id="key-functionsclasses">Key Functions/Classes</h3>
+<h4 id="data-classes">Data Classes</h4>
+<pre><code class="language-python">@dataclass
+class ProcessingRun:
+    &quot;&quot;&quot;
+    Tracks batch processing metadata.
+    Attributes: id, started_at, completed_at, total_loans, 
+                successful_clips, failed_clips
+    &quot;&quot;&quot;
+
+@dataclass  
+class ClipData:
+    &quot;&quot;&quot;
+    Comprehensive clip data model.
+    Includes: loan info, content, sentiment analysis, workflow status,
+              UI display data, media outlet mapping
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="databasemanager-class">DatabaseManager Class</h4>
+<pre><code class="language-python">class DatabaseManager:
+    &quot;&quot;&quot;
+    Singleton database manager for all Supabase operations.
+    Groups operations by functionality: runs, clips, retry logic, analytics.
+    &quot;&quot;&quot;
+
+    def __init__(self, supabase_url: str, supabase_key: str):
+        &quot;&quot;&quot;Initialize Supabase client with credentials.&quot;&quot;&quot;
+</code></pre>
+<h4 id="core-operations">Core Operations</h4>
+<h5 id="processing-runs">Processing Runs</h5>
+<pre><code class="language-python">def create_processing_run(self) -&gt; str:
+    &quot;&quot;&quot;Create new processing run, returns UUID.&quot;&quot;&quot;
+
+def update_processing_run(self, run_id: str, total_loans: int, 
+                         successful: int, failed: int):
+    &quot;&quot;&quot;Update run statistics upon completion.&quot;&quot;&quot;
+</code></pre>
+<h5 id="clip-management">Clip Management</h5>
+<pre><code class="language-python">def store_clip(self, clip_data: ClipData) -&gt; bool:
+    &quot;&quot;&quot;Store found clip with all metadata.&quot;&quot;&quot;
+
+def get_pending_clips(self, filters: Dict = None) -&gt; List[Dict]:
+    &quot;&quot;&quot;Retrieve clips awaiting review with optional filters.&quot;&quot;&quot;
+
+def update_clip_status(self, wo_number: str, status: str) -&gt; bool:
+    &quot;&quot;&quot;Update clip workflow status (pending/approved/rejected).&quot;&quot;&quot;
+
+def update_clip_sentiment(self, wo_number: str, sentiment_data: Dict) -&gt; bool:
+    &quot;&quot;&quot;Store comprehensive GPT sentiment analysis.&quot;&quot;&quot;
+</code></pre>
+<h5 id="smart-retry-logic">Smart Retry Logic</h5>
+<pre><code class="language-python">def store_failed_attempt(self, loan_data: Dict, reason: str, 
+                        run_id: str) -&gt; bool:
+    &quot;&quot;&quot;Record failed search attempt with retry scheduling.&quot;&quot;&quot;
+
+def should_retry_wo(self, wo_number: str) -&gt; Tuple[bool, Optional[str]]:
+    &quot;&quot;&quot;
+    Intelligent retry decision based on:
+    - Failure type and count
+    - Time since last attempt
+    - Configured retry intervals
+    &quot;&quot;&quot;
+
+def get_smart_retry_summary(self) -&gt; Dict:
+    &quot;&quot;&quot;Analytics on retry patterns and success rates.&quot;&quot;&quot;
+</code></pre>
+<h3 id="expected-inputsoutputs">Expected Inputs/Outputs</h3>
+<h4 id="inputs">Inputs</h4>
+<ol>
+<li>
+<p><strong>Environment Configuration</strong>:
+   <code>bash
+   SUPABASE_URL=https://xxx.supabase.co
+   SUPABASE_ANON_KEY=eyJhbGc...</code></p>
+</li>
+<li>
+<p><strong>Clip Data Structure</strong>:
+   <code>python
+   ClipData(
+       wo_number="WO12345",
+       model="Honda Accord",
+       clip_url="https://...",
+       content="Article text...",
+       relevance_score=85,
+       sentiment_data={...},
+       status="pending",
+       run_id="uuid-123",
+       media_outlet="Car and Driver"
+   )</code></p>
+</li>
+</ol>
+<h4 id="outputs">Outputs</h4>
+<ol>
+<li><strong>Database Records</strong>: Direct storage to Supabase tables</li>
+<li><strong>Query Results</strong>: Lists of dictionaries with clip data</li>
+<li><strong>Analytics</strong>: Aggregated statistics and summaries</li>
+<li><strong>Retry Decisions</strong>: Tuple of (should_retry: bool, reason: str)</li>
+</ol>
+<h3 id="dependencies">Dependencies</h3>
+<pre><code class="language-python"># External
+from supabase import create_client, Client
+import pandas as pd
+from datetime import datetime, timedelta
+
+# Internal
+from src.utils.logger import logger
+</code></pre>
+<h3 id="retry-strategy">Retry Strategy</h3>
+<h4 id="retry-intervals-by-failure-type">Retry Intervals by Failure Type</h4>
+<ul>
+<li><strong>No Content Found</strong>: 7 days</li>
+<li><strong>Technical Issues</strong>: 1 day  </li>
+<li><strong>Timeout</strong>: 2 days</li>
+<li><strong>Access Denied</strong>: 14 days</li>
+<li><strong>Default</strong>: 3 days</li>
+</ul>
+<h4 id="retry-decision-logic">Retry Decision Logic</h4>
+<ol>
+<li>Check last attempt timestamp</li>
+<li>Apply interval based on failure reason</li>
+<li>Consider failure count (max retries)</li>
+<li>Return decision with explanation</li>
+</ol>
+<h3 id="error-handling">Error Handling</h3>
+<ul>
+<li>All operations wrapped in try-except</li>
+<li>Detailed error logging with context</li>
+<li>Graceful degradation (returns empty/False)</li>
+<li>Connection testing available</li>
+<li>No exceptions propagated to caller</li>
+</ul>
+<hr />
+<h2 id="module-srcutilsconfigpy">Module: <code>src/utils/config.py</code></h2>
+<h3 id="purpose_1">Purpose</h3>
+<p>The Config module centralizes all configuration constants for the web crawling system, including domain-specific strategies, content discovery patterns, and API configurations. It provides a single source of truth for all scraping-related settings.</p>
+<h3 id="key-configuration-sections">Key Configuration Sections</h3>
+<h4 id="domain-management">Domain Management</h4>
+<pre><code class="language-python">API_SCRAPER_DOMAINS = [
+    'motortrend.com',
+    'caranddriver.com',
+    'autoblog.com',
+    # ... domains requiring API scraping
+]
+
+GENERIC_INDEX_PATTERNS = [
+    r'/category/',
+    r'/tag/',
+    r'/page/\d+',
+    # ... patterns indicating index pages
+]
+</code></pre>
+<h4 id="content-discovery">Content Discovery</h4>
+<pre><code class="language-python">ARTICLE_INDICATORS = ['review', 'test', 'drive', 'first-look']
+
+MODEL_CLEANUP_PATTERNS = {
+    r'\s+hybrid$': '',
+    r'\s+phev$': '',
+    r'^20\d{2}\s+': '',
+    # ... model name normalization
+}
+
+SEARCH_QUERY_TEMPLATES = [
+    '&quot;{journalist}&quot; {make} {model} review',
+    'site:{domain} {make} {model}',
+    # ... search query formats
+]
+</code></pre>
+<h4 id="api-configurations">API Configurations</h4>
+<pre><code class="language-python">SCRAPINGBEE_CONFIG = {
+    'render_js': True,
+    'premium_proxy': True,
+    'country_code': 'us',
+    'timeout': 30000
+}
+
+GOOGLE_SEARCH_CONFIG = {
+    'max_results': 10,
+    'safe_search': 'off',
+    'search_type': 'web'
+}
+
+CACHE_CONFIG = {
+    'enabled': True,
+    'ttl_hours': 168,  # 7 days
+    'max_size_mb': 500
+}
+</code></pre>
+<h4 id="crawler-configuration">Crawler Configuration</h4>
+<pre><code class="language-python">CRAWLER_TIERS = {
+    'tier1': {'delay': 1, 'timeout': 30},
+    'tier2': {'delay': 2, 'timeout': 45},
+    'tier3': {'delay': 3, 'timeout': 60},
+    'tier4': {'premium_proxy': True},
+    'tier5': {'js_scenario': True},
+    'tier6': {'stealth_mode': True}
+}
+
+USER_AGENTS = {
+    'chrome': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...',
+    'firefox': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15)...',
+    'mobile': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1)...'
+}
+</code></pre>
+<h3 id="expected-inputsoutputs_1">Expected Inputs/Outputs</h3>
+<h4 id="inputs_1">Inputs</h4>
+<ul>
+<li>No inputs (pure configuration module)</li>
+<li>Values are hardcoded constants</li>
+</ul>
+<h4 id="outputs_1">Outputs</h4>
+<ul>
+<li>Configuration dictionaries and lists</li>
+<li>Used via imports: <code>from src.utils.config import API_SCRAPER_DOMAINS</code></li>
+</ul>
+<h3 id="dependencies_1">Dependencies</h3>
+<p>None (pure Python module)</p>
+<h3 id="usage-patterns">Usage Patterns</h3>
+<pre><code class="language-python">from src.utils.config import CRAWLER_TIERS, SCRAPINGBEE_CONFIG
+
+# Use tier configuration
+tier_config = CRAWLER_TIERS['tier3']
+delay = tier_config['delay']
+
+# Use API configuration
+api_params = SCRAPINGBEE_CONFIG.copy()
+api_params['url'] = target_url
+</code></pre>
+<hr />
+<h2 id="module-srcutilsloggerpy">Module: <code>src/utils/logger.py</code></h2>
+<h3 id="purpose_2">Purpose</h3>
+<p>The Logger module provides standardized logging configuration across the entire application. It ensures consistent log formatting, creates necessary directory structures, and provides both console and file output for debugging and monitoring.</p>
+<h3 id="key-functionsclasses_1">Key Functions/Classes</h3>
+<h4 id="setup-function">Setup Function</h4>
+<pre><code class="language-python">def setup_logger(name: str, level=logging.INFO) -&gt; logging.Logger:
+    &quot;&quot;&quot;
+    Create a configured logger instance.
+
+    Args:
+        name: Logger name (typically __name__)
+        level: Logging level (default: INFO)
+
+    Returns:
+        Configured logger instance
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="default-logger-instance">Default Logger Instance</h4>
+<pre><code class="language-python"># Pre-configured logger for immediate use
+logger = setup_logger('clip_tracking')
+</code></pre>
+<h3 id="expected-inputsoutputs_2">Expected Inputs/Outputs</h3>
+<h4 id="inputs_2">Inputs</h4>
+<ol>
+<li><strong>Logger Name</strong>: Module name or custom identifier</li>
+<li><strong>Log Level</strong>: <code>logging.DEBUG</code>, <code>logging.INFO</code>, <code>logging.WARNING</code>, etc.</li>
+</ol>
+<h4 id="outputs_2">Outputs</h4>
+<ol>
+<li><strong>Console Output</strong>: Formatted log messages to stdout</li>
+<li><strong>File Output</strong>: Logs written to <code>logs/app.log</code></li>
+<li><strong>Logger Instance</strong>: Configured Python logger object</li>
+</ol>
+<h3 id="dependencies_2">Dependencies</h3>
+<pre><code class="language-python">import logging
+import os
+from pathlib import Path
+</code></pre>
+<h3 id="configuration-details">Configuration Details</h3>
+<h4 id="log-format">Log Format</h4>
+<pre><code>%(asctime)s - %(name)s - %(levelname)s - %(message)s
+</code></pre>
+<p>Example output:</p>
+<pre><code>2024-01-20 10:30:45 - clip_tracking - INFO - Processing started
+2024-01-20 10:30:46 - database - ERROR - Connection failed: timeout
+</code></pre>
+<h4 id="file-structure">File Structure</h4>
+<pre><code>project_root/
+├── logs/
+│   └── app.log
+└── src/
+    └── utils/
+        └── logger.py
+</code></pre>
+<h3 id="usage-patterns_1">Usage Patterns</h3>
+<h4 id="module-specific-logger">Module-Specific Logger</h4>
+<pre><code class="language-python">from src.utils.logger import setup_logger
+
+# Create module-specific logger
+logger = setup_logger(__name__)
+
+# Use in module
+logger.info(&quot;Starting processing&quot;)
+logger.error(f&quot;Failed to process: {error}&quot;)
+logger.debug(f&quot;Debug info: {data}&quot;)
+</code></pre>
+<h4 id="direct-import">Direct Import</h4>
+<pre><code class="language-python">from src.utils.logger import logger
+
+# Use pre-configured logger
+logger.info(&quot;Quick logging without setup&quot;)
+</code></pre>
+<h3 id="error-handling_1">Error Handling</h3>
+<ul>
+<li>Creates log directory if missing</li>
+<li>Prevents duplicate handlers</li>
+<li>Handles file permission issues gracefully</li>
+<li>Falls back to console only if file logging fails</li>
+</ul>
+<h3 id="performance-considerations">Performance Considerations</h3>
+<ul>
+<li>Single file handler shared across loggers</li>
+<li>Automatic log rotation not implemented (consider for production)</li>
+<li>No async logging (synchronous writes)</li>
+<li>Log level filtering at handler level</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": [{"navigation.tabs": false}], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      
+    
+  </body>
+</html>

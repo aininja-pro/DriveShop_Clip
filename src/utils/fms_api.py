@@ -78,7 +78,9 @@ class FMSAPIClient:
         
         try:
             logger.info(f"Sending {len(clips)} clips to FMS API ({self.environment})")
-            logger.debug(f"API URL: {self.api_url}")
+            logger.info(f"API URL: {self.api_url}")
+            logger.info(f"Sample clip data: {json.dumps(clips[0] if clips else {}, indent=2)}")
+            logger.debug(f"Full payload: {json.dumps(payload, indent=2, default=str)}")
             
             response = requests.post(
                 self.api_url,

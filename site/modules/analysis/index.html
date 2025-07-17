@@ -1,0 +1,1209 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://aininja-pro.github.io/DriveShop_Clip/modules/analysis/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
+    
+    
+      
+        <title>Analysis Module Documentation - DriveShop Clip Tracking System</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/custom.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#analysis-module-documentation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DriveShop Clip Tracking System" class="md-header__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DriveShop Clip Tracking System
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Analysis Module Documentation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DriveShop Clip Tracking System" class="md-nav__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    DriveShop Clip Tracking System
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Overview
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../module_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Project Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Modules
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ingest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ingest
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Analysis
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crawler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crawler-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler Utils
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../creatoriq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CreatorIQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../other-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Other Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment & Support
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment & Support
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Setup Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/future.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Future Enhancements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/support.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Support & Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcanalysisgpt_analysispy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/analysis/gpt_analysis.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/analysis/gpt_analysis.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-analysis-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Analysis Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#json-parsing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      JSON Parsing Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#helper-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Helper Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gptanalyzer-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      GPTAnalyzer Class
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-optimization-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cost Optimization Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cost Optimization Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pre-filters-save-api-costs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pre-Filters (Save API Costs)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#processing-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Processing Optimizations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prompt-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      Prompt Templates
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prompt Templates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#youtube-video-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      YouTube Video Analysis
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-article-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Web Article Analysis
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategic-analysis-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Strategic Analysis Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Strategic Analysis Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#marketing-intelligence" class="md-nav__link">
+    <span class="md-ellipsis">
+      Marketing Intelligence
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#competitive-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Competitive Analysis
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creatorpublication-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creator/Publication Analysis
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Considerations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security Considerations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="analysis-module-documentation">Analysis Module Documentation</h1>
+<h2 id="module-srcanalysisgpt_analysispy">Module: <code>src/analysis/gpt_analysis.py</code></h2>
+<h3 id="purpose">Purpose</h3>
+<p>The Analysis module provides AI-powered content analysis using OpenAI's GPT-4 Turbo model to evaluate media clips for relevance, sentiment, and brand alignment. It implements sophisticated parsing strategies, cost-optimization through pre-filtering, and specialized prompts for different content types (YouTube videos vs. web articles). The module is designed to extract strategic marketing insights from automotive media content while maintaining cost efficiency.</p>
+<h3 id="key-functionsclasses">Key Functions/Classes</h3>
+<h4 id="core-analysis-functions">Core Analysis Functions</h4>
+<pre><code class="language-python">def analyze_clip(content: str, make: str, model: str, 
+                max_retries: int = 3, url: str = None) -&gt; Dict[str, Any]:
+    &quot;&quot;&quot;
+    Comprehensive automotive sentiment analysis using GPT-4.
+    Implements pre-filters to save API costs and specialized prompts.
+    Returns detailed analysis with marketing insights or None if fails.
+    &quot;&quot;&quot;
+
+def analyze_clip_relevance_only(content: str, make: str, model: str) -&gt; Dict[str, Any]:
+    &quot;&quot;&quot;
+    Cost-optimized analysis for relevance scoring only.
+    Skips detailed sentiment analysis to reduce API costs.
+    Used in database ingestion pipeline.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="json-parsing-functions">JSON Parsing Functions</h4>
+<pre><code class="language-python">def parse_json_with_fallbacks(response_text: str) -&gt; dict:
+    &quot;&quot;&quot;
+    Robust JSON parsing with 4 escalating strategies:
+    1. Clean and parse normally
+    2. Aggressive comma fixing
+    3. Manual field extraction with regex
+    4. Return None (no fallback data)
+    &quot;&quot;&quot;
+
+def clean_json_response(response_text: str) -&gt; str:
+    &quot;&quot;&quot;
+    Cleans GPT responses by removing markdown blocks and fixing JSON issues.
+    Handles edge cases that commonly cause parsing failures.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="helper-functions">Helper Functions</h4>
+<pre><code class="language-python">def get_openai_key() -&gt; Optional[str]:
+    &quot;&quot;&quot;
+    Retrieves OpenAI API key from environment variables.
+    Returns None if not configured.
+    &quot;&quot;&quot;
+
+def flexible_model_match(title: str, model: str) -&gt; bool:
+    &quot;&quot;&quot;
+    Intelligent vehicle model matching in content.
+    Handles variations like &quot;X5&quot; matching &quot;BMW X5&quot;, &quot;2024 X5&quot;, etc.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="gptanalyzer-class">GPTAnalyzer Class</h4>
+<pre><code class="language-python">class GPTAnalyzer:
+    &quot;&quot;&quot;
+    Class-based analyzer for content using OpenAI's GPT-4 Turbo.
+    Handles API calls with retry logic and rate limiting.
+    &quot;&quot;&quot;
+
+    def analyze_content(self, content: str, vehicle_make: str, 
+                       vehicle_model: str, max_retries: int = 3,
+                       timeout: int = 60) -&gt; Dict[str, Any]:
+        &quot;&quot;&quot;
+        Analyzes content for relevance, sentiment, and brand messaging.
+        Includes retry logic and rate limiting.
+        &quot;&quot;&quot;
+</code></pre>
+<h3 id="expected-inputsoutputs">Expected Inputs/Outputs</h3>
+<h4 id="inputs">Inputs</h4>
+<ol>
+<li><strong>Content Analysis</strong>:</li>
+<li><code>content</code>: Article text or YouTube transcript (HTML or plain text)</li>
+<li><code>make</code>: Vehicle manufacturer (e.g., "Honda")</li>
+<li><code>model</code>: Vehicle model (e.g., "Accord")</li>
+<li><code>url</code>: Optional URL for content type detection</li>
+<li>
+<p><code>max_retries</code>: Number of retry attempts (default: 3)</p>
+</li>
+<li>
+<p><strong>Pre-Filter Thresholds</strong>:</p>
+</li>
+<li>Minimum content length: 200 characters</li>
+<li>Printable character ratio: &gt;80%</li>
+<li>Generic page indicators: &lt;2 matches</li>
+</ol>
+<h4 id="outputs">Outputs</h4>
+<ol>
+<li>
+<p><strong>Comprehensive Analysis</strong> (analyze_clip):
+   <code>json
+   {
+     "relevance_score": 0-10,
+     "overall_score": 0-10,
+     "overall_sentiment": "positive/neutral/negative",
+     "brand_alignment": true/false,
+     "summary": "Executive summary for CMO briefing",
+     "recommendation": "Strategic marketing recommendation",
+     "aspects": {
+       "performance": {"score": 0-10, "note": "..."},
+       "exterior_design": {"score": 0-10, "note": "..."},
+       "interior_comfort": {"score": 0-10, "note": "..."},
+       "technology": {"score": 0-10, "note": "..."},
+       "value": {"score": 0-10, "note": "..."}
+     },
+     "pros": ["key positive 1", "key positive 2"],
+     "cons": ["key concern 1", "key concern 2"],
+     "key_mentions": ["topic 1", "topic 2"],
+     "video_quotes": ["memorable quote 1", "memorable quote 2"]
+   }</code></p>
+</li>
+<li>
+<p><strong>Relevance-Only Analysis</strong>:
+   <code>json
+   {
+     "relevance_score": 0-10
+   }</code></p>
+</li>
+<li>
+<p><strong>Failure Response</strong>: <code>None</code> (no mock data)</p>
+</li>
+</ol>
+<h3 id="dependencies">Dependencies</h3>
+<pre><code class="language-python"># External Libraries
+import openai  # Version 0.27.0 (older client format)
+from dotenv import load_dotenv
+
+# Internal Modules
+from src.utils.logger import setup_logger
+from src.utils.rate_limiter import rate_limiter
+from src.utils.content_extractor import extract_article_content
+</code></pre>
+<h3 id="cost-optimization-features">Cost Optimization Features</h3>
+<h4 id="pre-filters-save-api-costs">Pre-Filters (Save API Costs)</h4>
+<ol>
+<li><strong>Content Length Check</strong>: Skip if &lt;200 characters</li>
+<li><strong>Keyword Validation</strong>: Must mention make OR model</li>
+<li><strong>Content Quality Check</strong>: &gt;80% printable characters</li>
+<li><strong>Generic Page Detection</strong>: Avoid category/index pages</li>
+</ol>
+<h4 id="processing-optimizations">Processing Optimizations</h4>
+<ul>
+<li>Content truncation at 12,000 characters</li>
+<li>Relevance-only mode for batch processing</li>
+<li>Caching in upstream modules</li>
+<li>Smart retry with exponential backoff</li>
+</ul>
+<h3 id="prompt-templates">Prompt Templates</h3>
+<h4 id="youtube-video-analysis">YouTube Video Analysis</h4>
+<ul>
+<li>Strategic marketing focus</li>
+<li>Creator intelligence (influence tier, audience archetype)</li>
+<li>Competitive intelligence</li>
+<li>Purchase intent signals</li>
+<li>Viral potential assessment</li>
+<li>Action items for marketing team</li>
+</ul>
+<h4 id="web-article-analysis">Web Article Analysis</h4>
+<ul>
+<li>Publication credibility assessment</li>
+<li>SEO/Digital influence factor</li>
+<li>Editorial stance detection</li>
+<li>Media relationship strategy</li>
+<li>Brand narrative impact</li>
+<li>Shareable quote extraction</li>
+</ul>
+<h3 id="error-handling">Error Handling</h3>
+<ol>
+<li><strong>API Key Missing</strong>: Returns <code>None</code> instead of mock data</li>
+<li><strong>JSON Parsing Failures</strong>: </li>
+<li>4 escalating strategies</li>
+<li>Manual field extraction fallback</li>
+<li>No fake data on complete failure</li>
+<li><strong>API Errors</strong>:</li>
+<li>Rate limit handling with 30s wait</li>
+<li>Timeout retry with 5s wait</li>
+<li>Exponential backoff (2^attempt seconds)</li>
+<li><strong>Content Issues</strong>:</li>
+<li>HTML extraction for web articles</li>
+<li>Truncation for oversized content</li>
+<li>Graceful handling of corrupted data</li>
+</ol>
+<h3 id="strategic-analysis-features">Strategic Analysis Features</h3>
+<h4 id="marketing-intelligence">Marketing Intelligence</h4>
+<ul>
+<li><strong>Impact Scoring</strong>: 1-10 scale for CMO attention</li>
+<li><strong>Brand Perception</strong>: Ascending/Stable/Declining trajectory</li>
+<li><strong>Messaging Opportunities</strong>: Extracted from content</li>
+<li><strong>Risk Identification</strong>: Brand vulnerabilities</li>
+</ul>
+<h4 id="competitive-analysis">Competitive Analysis</h4>
+<ul>
+<li>Positioning vs. competitors</li>
+<li>Market advantages highlighted</li>
+<li>Vulnerabilities exposed</li>
+<li>Differentiation opportunities</li>
+</ul>
+<h4 id="creatorpublication-analysis">Creator/Publication Analysis</h4>
+<ul>
+<li><strong>YouTube</strong>: Influence tier, audience archetype, credibility</li>
+<li><strong>Articles</strong>: Publication credibility, reach, editorial stance</li>
+<li>Relationship recommendations (Engage/Monitor/Ignore)</li>
+</ul>
+<h3 id="performance-considerations">Performance Considerations</h3>
+<ul>
+<li><strong>Token Usage</strong>: ~4,000 tokens per analysis</li>
+<li><strong>API Costs</strong>: $0.01-$0.03 per call</li>
+<li><strong>Response Time</strong>: 2-10 seconds typical</li>
+<li><strong>Retry Strategy</strong>: Max 3 attempts with backoff</li>
+<li><strong>Rate Limiting</strong>: Integrated with global limiter</li>
+</ul>
+<h3 id="security-considerations">Security Considerations</h3>
+<ul>
+<li>API key stored in environment variables</li>
+<li>No sensitive data logged</li>
+<li>Content sanitization before processing</li>
+<li>Secure API communication</li>
+<li>No data persistence in module</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": [{"navigation.tabs": false}], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      
+    
+  </body>
+</html>

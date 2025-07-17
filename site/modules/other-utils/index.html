@@ -1,0 +1,1708 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://aininja-pro.github.io/DriveShop_Clip/modules/other-utils/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
+    
+    
+      
+        <title>Other Utilities Documentation - DriveShop Clip Tracking System</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/custom.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#other-utilities-documentation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DriveShop Clip Tracking System" class="md-header__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DriveShop Clip Tracking System
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Other Utilities Documentation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DriveShop Clip Tracking System" class="md-nav__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    DriveShop Clip Tracking System
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Overview
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../module_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Project Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Modules
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ingest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ingest
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Analysis
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crawler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crawler-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler Utils
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../creatoriq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CreatorIQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../other-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Other Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment & Support
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment & Support
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Setup Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/future.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Future Enhancements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/support.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Support & Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilssentiment_analysispy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/sentiment_analysis.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/sentiment_analysis.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sentimentanalyzer-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      SentimentAnalyzer Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#utility-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Utility Functions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#processing-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Processing Features
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsnotificationspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/notifications.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/notifications.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Function
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#message-formatting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Message Formatting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsrate_limiterpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/rate_limiter.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/rate_limiter.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ratelimiter-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      RateLimiter Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-rate-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default Rate Limits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-bucket-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      Token Bucket Algorithm
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilscache_managerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/cache_manager.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/cache_manager.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cachemanager-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      CacheManager Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      Database Schema
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsmodel_variationspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/model_variations.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/model_variations.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-function_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Function
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variation-strategies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Variation Strategies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#variation-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Variation Examples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Design Decisions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="other-utilities-documentation">Other Utilities Documentation</h1>
+<h2 id="module-srcutilssentiment_analysispy">Module: <code>src/utils/sentiment_analysis.py</code></h2>
+<h3 id="purpose">Purpose</h3>
+<p>The Sentiment Analysis module provides a high-level interface for analyzing automotive media clips using GPT-4. It wraps the core analysis functionality with batch processing capabilities, progress tracking, and both synchronous and asynchronous execution patterns for UI integration.</p>
+<h3 id="key-functionsclasses">Key Functions/Classes</h3>
+<h4 id="sentimentanalyzer-class">SentimentAnalyzer Class</h4>
+<pre><code class="language-python">class SentimentAnalyzer:
+    &quot;&quot;&quot;
+    High-level sentiment analysis for automotive clips.
+    Supports batch processing with progress tracking.
+    &quot;&quot;&quot;
+
+    def __init__(self):
+        &quot;&quot;&quot;Initialize analyzer (placeholder for future config).&quot;&quot;&quot;
+</code></pre>
+<h4 id="core-methods">Core Methods</h4>
+<pre><code class="language-python">async def analyze_clip_sentiment(self, clip_data: Dict) -&gt; Dict:
+    &quot;&quot;&quot;
+    Analyze single clip asynchronously.
+    Returns comprehensive sentiment analysis.
+    &quot;&quot;&quot;
+
+def analyze_clips_sync(self, clips: List[Dict], 
+                      progress_callback=None) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Synchronous batch analysis with progress updates.
+    Processes in batches of 5 to respect rate limits.
+    &quot;&quot;&quot;
+
+async def analyze_clips_batch(self, clips: List[Dict],
+                            batch_size: int = 5) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Asynchronous batch processing.
+    Implements concurrent processing with rate limiting.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="utility-functions">Utility Functions</h4>
+<pre><code class="language-python">def run_sentiment_analysis(clips: List[Dict], 
+                          progress_callback=None) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Main entry point for sentiment analysis.
+    Handles async loop creation for sync callers.
+    &quot;&quot;&quot;
+
+def calculate_relevance_score_gpt(content: str, make: str, 
+                                model: str) -&gt; float:
+    &quot;&quot;&quot;
+    Calculate relevance score using GPT.
+    Cost-optimized version for database pipeline.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="expected-inputsoutputs">Expected Inputs/Outputs</h3>
+<h4 id="inputs">Inputs</h4>
+<pre><code class="language-python"># Single clip
+{
+    'content': 'Article or transcript text...',
+    'url': 'https://example.com/review',
+    'make': 'Honda',
+    'model': 'Accord'
+}
+
+# Batch processing
+clips = [clip1, clip2, clip3, ...]
+progress_callback = lambda current, total: print(f&quot;{current}/{total}&quot;)
+</code></pre>
+<h4 id="outputs">Outputs</h4>
+<pre><code class="language-python">{
+    'relevance_score': 85,
+    'overall_score': 8,
+    'overall_sentiment': 'positive',
+    'brand_alignment': True,
+    'summary': 'Comprehensive review highlighting...',
+    'aspects': {
+        'performance': {'score': 9, 'note': 'Excellent acceleration'},
+        'design': {'score': 7, 'note': 'Conservative but elegant'},
+        # ... other aspects
+    },
+    'pros': ['Fuel efficiency', 'Reliability', 'Tech features'],
+    'cons': ['Road noise', 'Firm suspension'],
+    'recommendation': 'Strong buy for family sedan buyers'
+}
+</code></pre>
+<h3 id="dependencies">Dependencies</h3>
+<pre><code class="language-python">import asyncio
+from typing import List, Dict, Optional, Callable
+
+from src.analysis.gpt_analysis import analyze_clip
+from src.utils.logger import setup_logger
+</code></pre>
+<h3 id="processing-features">Processing Features</h3>
+<ol>
+<li><strong>Batch Size Management</strong>: Processes 5 clips at a time to avoid rate limits</li>
+<li><strong>Progress Tracking</strong>: Real-time updates for UI progress bars</li>
+<li><strong>Error Resilience</strong>: Continues processing even if individual clips fail</li>
+<li><strong>Async/Sync Bridge</strong>: Handles async operations for sync callers</li>
+<li><strong>Delay Management</strong>: 1-second delay between batches</li>
+</ol>
+<hr />
+<h2 id="module-srcutilsnotificationspy">Module: <code>src/utils/notifications.py</code></h2>
+<h3 id="purpose_1">Purpose</h3>
+<p>The Notifications module provides Slack webhook integration for sending real-time alerts and status updates. It implements retry logic with exponential backoff and supports formatted messages for better visibility in Slack channels.</p>
+<h3 id="key-functionsclasses_1">Key Functions/Classes</h3>
+<h4 id="core-function">Core Function</h4>
+<pre><code class="language-python">def send_slack_message(message: str, webhook_url: str = None, 
+                      max_retries: int = 3) -&gt; bool:
+    &quot;&quot;&quot;
+    Send notification to Slack channel.
+    Implements retry with exponential backoff.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="message-formatting">Message Formatting</h3>
+<ol>
+<li><strong>Status Prefixes</strong>:</li>
+<li><code>"approved"</code> → ✅ prefix</li>
+<li><code>"rejected"</code> → ❌ prefix</li>
+<li>
+<p>Others → no prefix</p>
+</li>
+<li>
+<p><strong>Block Format</strong>:
+   <code>json
+   {
+       "blocks": [{
+           "type": "section",
+           "text": {
+               "type": "mrkdwn",
+               "text": "✅ Clip approved for Honda Accord"
+           }
+       }]
+   }</code></p>
+</li>
+</ol>
+<h3 id="expected-inputsoutputs_1">Expected Inputs/Outputs</h3>
+<h4 id="inputs_1">Inputs</h4>
+<pre><code class="language-python"># Simple message
+send_slack_message(&quot;Processing completed&quot;)
+
+# Status message
+send_slack_message(&quot;Clip approved for Honda Accord&quot;)
+
+# Custom webhook
+send_slack_message(&quot;Alert!&quot;, webhook_url=&quot;https://hooks.slack.com/...&quot;)
+</code></pre>
+<h4 id="outputs_1">Outputs</h4>
+<ul>
+<li><code>True</code>: Message sent successfully</li>
+<li><code>False</code>: Failed after all retries</li>
+</ul>
+<h3 id="dependencies_1">Dependencies</h3>
+<pre><code class="language-python">import os
+import json
+import time
+import requests
+from src.utils.logger import setup_logger
+</code></pre>
+<h3 id="configuration">Configuration</h3>
+<pre><code class="language-bash"># Environment variable
+export SLACK_WEBHOOK_URL=&quot;https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX&quot;
+</code></pre>
+<h3 id="error-handling">Error Handling</h3>
+<ol>
+<li><strong>Retry Strategy</strong>: 3 attempts with exponential backoff (1s, 2s, 4s)</li>
+<li><strong>HTTP Errors</strong>: Catches and logs all request exceptions</li>
+<li><strong>Missing Webhook</strong>: Returns False with warning log</li>
+<li><strong>Non-blocking</strong>: Never raises exceptions to caller</li>
+</ol>
+<hr />
+<h2 id="module-srcutilsrate_limiterpy">Module: <code>src/utils/rate_limiter.py</code></h2>
+<h3 id="purpose_2">Purpose</h3>
+<p>The Rate Limiter implements a token bucket algorithm to enforce rate limits on external API calls. It provides per-domain rate limiting with automatic domain detection and thread-safe operation for concurrent requests.</p>
+<h3 id="key-functionsclasses_2">Key Functions/Classes</h3>
+<h4 id="ratelimiter-class">RateLimiter Class</h4>
+<pre><code class="language-python">class RateLimiter:
+    &quot;&quot;&quot;
+    Token bucket rate limiter with per-domain limits.
+    Thread-safe implementation for concurrent access.
+    &quot;&quot;&quot;
+
+    def __init__(self):
+        &quot;&quot;&quot;Initialize with default rate configurations.&quot;&quot;&quot;
+</code></pre>
+<h4 id="core-methods_1">Core Methods</h4>
+<pre><code class="language-python">def wait_if_needed(self, url_or_domain: str, 
+                  custom_rate: float = None,
+                  custom_per: float = None):
+    &quot;&quot;&quot;
+    Wait if rate limit would be exceeded.
+    Automatically detects and normalizes domains.
+    &quot;&quot;&quot;
+
+def _ensure_bucket_exists(self, domain: str, rate: float, per: float):
+    &quot;&quot;&quot;
+    Create token bucket for new domain.
+    Initializes with full token capacity.
+    &quot;&quot;&quot;
+
+def _refill_bucket(self, domain: str):
+    &quot;&quot;&quot;
+    Refill tokens based on elapsed time.
+    Implements token bucket algorithm.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="default-rate-limits">Default Rate Limits</h3>
+<pre><code class="language-python">default_rates = {
+    'openai.com': (5, 60),      # 5 requests per minute
+    'youtube.com': (10, 60),    # 10 requests per minute
+    'googleapis.com': (10, 60), # 10 requests per minute
+    # Unknown domains: 1 request per 2 seconds
+}
+</code></pre>
+<h3 id="expected-inputsoutputs_2">Expected Inputs/Outputs</h3>
+<h4 id="inputs_2">Inputs</h4>
+<pre><code class="language-python"># URL-based (auto-detects domain)
+rate_limiter.wait_if_needed(&quot;https://api.openai.com/v1/completions&quot;)
+
+# Domain-based
+rate_limiter.wait_if_needed(&quot;openai.com&quot;)
+
+# Custom rate
+rate_limiter.wait_if_needed(&quot;custom-api.com&quot;, custom_rate=100, custom_per=60)
+</code></pre>
+<h4 id="outputs_2">Outputs</h4>
+<ul>
+<li>No return value</li>
+<li>Blocks (sleeps) if rate limit would be exceeded</li>
+<li>Logs wait times when blocking</li>
+</ul>
+<h3 id="dependencies_2">Dependencies</h3>
+<pre><code class="language-python">import time
+import threading
+from urllib.parse import urlparse
+from src.utils.logger import setup_logger
+</code></pre>
+<h3 id="token-bucket-algorithm">Token Bucket Algorithm</h3>
+<ol>
+<li><strong>Bucket Capacity</strong>: Equal to rate limit (e.g., 5 tokens)</li>
+<li><strong>Refill Rate</strong>: Based on configured rate/period</li>
+<li><strong>Token Consumption</strong>: 1 token per request</li>
+<li><strong>Blocking</strong>: Waits for next token if bucket empty</li>
+<li><strong>Thread Safety</strong>: Uses locks for concurrent access</li>
+</ol>
+<hr />
+<h2 id="module-srcutilscache_managerpy">Module: <code>src/utils/cache_manager.py</code></h2>
+<h3 id="purpose_3">Purpose</h3>
+<p>The Cache Manager provides SQLite-based caching for web scraping results with automatic expiration. <strong>IMPORTANT: Caching is currently DISABLED</strong> - the <code>get_cached_result</code> method always returns None to ensure fresh data retrieval.</p>
+<h3 id="key-functionsclasses_3">Key Functions/Classes</h3>
+<h4 id="cachemanager-class">CacheManager Class</h4>
+<pre><code class="language-python">class CacheManager:
+    &quot;&quot;&quot;
+    SQLite-based cache for scraping results.
+    Currently DISABLED - always returns cache miss.
+    &quot;&quot;&quot;
+
+    def __init__(self, db_path: str = None):
+        &quot;&quot;&quot;Initialize SQLite database with schema.&quot;&quot;&quot;
+</code></pre>
+<h4 id="core-methods_2">Core Methods</h4>
+<pre><code class="language-python">def get_cached_result(self, person_id: str, domain: str,
+                     make: str, model: str) -&gt; Optional[Dict]:
+    &quot;&quot;&quot;
+    Check for cached result. 
+    CURRENTLY DISABLED - always returns None.
+    &quot;&quot;&quot;
+
+def store_result(self, person_id: str, domain: str, make: str,
+                model: str, url: str, content: str,
+                metadata: Dict = None) -&gt; bool:
+    &quot;&quot;&quot;
+    Store scraping result with 24-hour TTL.
+    Still functional for future use.
+    &quot;&quot;&quot;
+
+def cleanup_expired(self) -&gt; int:
+    &quot;&quot;&quot;
+    Remove expired cache entries.
+    Returns count of deleted entries.
+    &quot;&quot;&quot;
+
+def get_cache_stats(self) -&gt; Dict:
+    &quot;&quot;&quot;
+    Get cache statistics.
+    Returns entry counts and sizes.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="database-schema">Database Schema</h3>
+<pre><code class="language-sql">CREATE TABLE scraping_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    person_id TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    make TEXT NOT NULL,
+    model TEXT NOT NULL,
+    url TEXT NOT NULL,
+    content TEXT NOT NULL,
+    metadata TEXT,  -- JSON string
+    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    UNIQUE(person_id, domain, make, model)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_cache_lookup ON scraping_cache(person_id, domain, make, model);
+CREATE INDEX idx_cache_expiry ON scraping_cache(expires_at);
+</code></pre>
+<h3 id="configuration_1">Configuration</h3>
+<ul>
+<li><strong>Database Path</strong>: <code>data/scraping_cache.db</code></li>
+<li><strong>TTL</strong>: 24 hours (86,400 seconds)</li>
+<li><strong>Cache Status</strong>: DISABLED for reliability</li>
+</ul>
+<h3 id="dependencies_3">Dependencies</h3>
+<pre><code class="language-python">import sqlite3
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+from src.utils.logger import setup_logger
+</code></pre>
+<hr />
+<h2 id="module-srcutilsmodel_variationspy">Module: <code>src/utils/model_variations.py</code></h2>
+<h3 id="purpose_4">Purpose</h3>
+<p>The Model Variations module generates multiple formatting variations of vehicle model names to improve search coverage across different automotive websites. It handles common patterns like hyphenation, spacing, and make-model combinations.</p>
+<h3 id="key-functionsclasses_4">Key Functions/Classes</h3>
+<h4 id="core-function_1">Core Function</h4>
+<pre><code class="language-python">def generate_model_variations(make: str, model: str) -&gt; List[str]:
+    &quot;&quot;&quot;
+    Generate model name variations for better search coverage.
+    Handles spacing, hyphenation, and make combinations.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="variation-strategies">Variation Strategies</h3>
+<ol>
+<li><strong>Space/Hyphen Variations</strong>:</li>
+<li>"CX-90" → ["cx-90", "cx 90", "cx90"]</li>
+<li>
+<p>Handles both directions: with/without spaces/hyphens</p>
+</li>
+<li>
+<p><strong>Make Prefix Combinations</strong>:</p>
+</li>
+<li>Adds make name: "accord" → "honda accord"</li>
+<li>
+<p>Both spaced and unspaced versions</p>
+</li>
+<li>
+<p><strong>Numeric Patterns</strong>:</p>
+</li>
+<li>"3 Series" ↔ "3series"</li>
+<li>
+<p>"ES 350" ↔ "ES350"</p>
+</li>
+<li>
+<p><strong>Abbreviation Handling</strong>:</p>
+</li>
+<li>Very limited due to ambiguity concerns</li>
+<li>Only complete word matches</li>
+</ol>
+<h3 id="expected-inputsoutputs_3">Expected Inputs/Outputs</h3>
+<h4 id="inputs_3">Inputs</h4>
+<pre><code class="language-python">generate_model_variations(&quot;Mazda&quot;, &quot;CX-90&quot;)
+</code></pre>
+<h4 id="outputs_3">Outputs</h4>
+<pre><code class="language-python">[
+    &quot;cx-90&quot;,
+    &quot;cx 90&quot;, 
+    &quot;cx90&quot;,
+    &quot;mazda cx-90&quot;,
+    &quot;mazda cx 90&quot;,
+    &quot;mazda cx90&quot;,
+    &quot;mazdacx-90&quot;,
+    &quot;mazdacx 90&quot;,
+    &quot;mazdacx90&quot;
+]
+</code></pre>
+<h3 id="dependencies_4">Dependencies</h3>
+<pre><code class="language-python">import re
+from typing import List
+</code></pre>
+<h3 id="variation-examples">Variation Examples</h3>
+<table>
+<thead>
+<tr>
+<th>Make</th>
+<th>Model</th>
+<th>Key Variations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lexus</td>
+<td>ES 350</td>
+<td>es350, lexus es 350</td>
+</tr>
+<tr>
+<td>BMW</td>
+<td>3 Series</td>
+<td>3series, bmw 3 series</td>
+</tr>
+<tr>
+<td>Honda</td>
+<td>CR-V</td>
+<td>cr-v, crv, cr v, honda crv</td>
+</tr>
+<tr>
+<td>Tesla</td>
+<td>Model 3</td>
+<td>model3, tesla model 3</td>
+</tr>
+</tbody>
+</table>
+<h3 id="design-decisions">Design Decisions</h3>
+<ol>
+<li><strong>Conservative Approach</strong>: Avoids aggressive abbreviations</li>
+<li><strong>Case Insensitive</strong>: All variations in lowercase</li>
+<li><strong>De-duplication</strong>: Uses sets to prevent duplicates</li>
+<li><strong>Performance</strong>: Pre-compiled regex patterns</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": [{"navigation.tabs": false}], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -3990,6 +3990,58 @@ with approved_queue_tab:
             st.session_state.approved_queue_filter = 'recent_complete'
             st.rerun()
     
+    # Add a container div to help with CSS targeting
+    st.markdown('<div id="approved-queue-filters"></div>', unsafe_allow_html=True)
+    
+    # Custom CSS to style the Ready to Export button with light blue instead of red
+    st.markdown("""
+    <style>
+    /* Custom styling for Approved Queue filter buttons */
+    /* This targets all primary buttons but we'll make Ready to Export blue */
+    
+    /* First, override ALL primary buttons in this area to be blue */
+    #approved-queue-filters + div button[kind="primary"] {
+        background-color: #5b9bd5 !important;  /* Light blue */
+        border-color: #5b9bd5 !important;
+        color: white !important;
+    }
+    
+    /* Target buttons that contain the export emoji */
+    button:has(p:contains("📤")) {
+        background-color: #5b9bd5 !important;
+        border-color: #5b9bd5 !important;
+    }
+    
+    /* Use the data-testid for columns approach */
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child button {
+        background-color: #5b9bd5 !important;
+        border-color: #5b9bd5 !important;
+        color: white !important;
+    }
+    
+    /* Alternative: Target all buttons and then override */
+    .stButton > button {
+        transition: all 0.2s ease;
+    }
+    
+    /* Specific override for buttons with Ready to Export text */
+    .stButton > button[aria-label*="Ready to Export"] {
+        background-color: #5b9bd5 !important;
+        border-color: #5b9bd5 !important;
+    }
+    
+    /* Last resort: target by partial text match */
+    button {
+        position: relative;
+    }
+    
+    button[kind="primary"]:not([aria-label*="Complete"]) {
+        background-color: #5b9bd5 !important;
+        border-color: #5b9bd5 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Load clips based on selected filter
     try:
         # Use cached database connection
@@ -4137,6 +4189,13 @@ with approved_queue_tab:
                          f"📋 {x.replace('_', ' ').title()}"
             ) if 'workflow_stage' in approved_df.columns else 'Unknown'
             
+            # Add FMS Export Status for Ready to Export tab
+            if st.session_state.approved_queue_filter == 'ready_to_export':
+                clean_df['Export Status'] = approved_df.apply(
+                    lambda row: "✅ Exported to FMS" if pd.notna(row.get('fms_export_date')) else "📤 Ready",
+                    axis=1
+                )
+            
             # Configure ADVANCED AgGrid for approved queue (same as Bulk Review)
             gb = GridOptionsBuilder.from_dataframe(clean_df)
             
@@ -4177,6 +4236,10 @@ with approved_queue_tab:
             gb.configure_column("Date", minWidth=100)
             gb.configure_column("Sentiment", minWidth=140)
             gb.configure_column("Stage", minWidth=120)
+            
+            # Configure Export Status column if present
+            if st.session_state.approved_queue_filter == 'ready_to_export' and 'Export Status' in clean_df.columns:
+                gb.configure_column("Export Status", minWidth=160)
             
             # Hide raw URL column and database ID
             gb.configure_column("Clip URL", hide=True)
@@ -4410,32 +4473,9 @@ with approved_queue_tab:
                         help="Download the JSON file to your computer",
                         use_container_width=True
                     ):
-                        # Update clips to exported status after download
-                        clips_to_export = st.session_state.fms_clips_to_export
-                        export_timestamp = st.session_state.fms_export_timestamp
-                        exported_count = 0
-                        
-                        for clip in clips_to_export:
-                            result = db.supabase.table('clips').update({
-                                'workflow_stage': 'exported',
-                                'fms_export_date': export_timestamp
-                            }).eq('id', clip['id']).execute()
-                            
-                            if result.data:
-                                exported_count += 1
-                        
-                        # Clear session state
-                        st.session_state.fms_export_ready = False
-                        st.session_state.fms_export_json = None
-                        st.session_state.fms_export_filename = None
-                        st.session_state.fms_clips_to_export = None
-                        st.session_state.fms_export_timestamp = None
-                        
-                        # Show success and refresh
-                        st.success(f"✅ Downloaded and moved {exported_count} clips to Recent Complete!")
-                        st.cache_data.clear()
-                        time.sleep(1)
-                        st.rerun()
+                        # Just show success message - don't move to exported
+                        st.success("✅ JSON file downloaded successfully!")
+                        st.info("💡 Clips remain in Ready to Export. Use 'Mark as Complete' when finished.")
                         
                 with col2:
                     if st.button("🚀 Send to FMS", key="send_to_fms_api", help="Send clips directly to FMS API", type="primary", use_container_width=True):
@@ -4451,33 +4491,33 @@ with approved_queue_tab:
                                 result = fms_client.send_clips(clips_data)
                             
                             if result["success"]:
-                                # Update clips to exported status after successful API send
+                                # Mark clips as sent to FMS (but keep in Ready to Export)
                                 clips_to_export = st.session_state.fms_clips_to_export
                                 export_timestamp = st.session_state.fms_export_timestamp
-                                exported_count = 0
+                                marked_count = 0
                                 
                                 for clip in clips_to_export:
+                                    # Update clip to show it's been sent to FMS (using existing field)
                                     update_result = db.supabase.table('clips').update({
-                                        'workflow_stage': 'exported',
-                                        'fms_export_date': export_timestamp
+                                        'fms_export_date': export_timestamp,
+                                        # Keep workflow_stage as sentiment_analyzed so it stays in Ready to Export
+                                        'workflow_stage': 'sentiment_analyzed'
                                     }).eq('id', clip['id']).execute()
                                     
                                     if update_result.data:
-                                        exported_count += 1
+                                        marked_count += 1
                                 
-                                # Clear session state
-                                st.session_state.fms_export_ready = False
-                                st.session_state.fms_export_json = None
-                                st.session_state.fms_export_filename = None
-                                st.session_state.fms_clips_to_export = None
-                                st.session_state.fms_export_timestamp = None
-                                
-                                # Show success and refresh
+                                # Show success and ask if user wants to mark as complete
                                 st.success(f"✅ Successfully sent {result['sent_count']} clips to FMS API!")
-                                st.info(f"Updated {exported_count} clips to 'exported' status")
+                                if marked_count > 0:
+                                    st.info(f"📊 {marked_count} clips marked as 'Exported' - they remain in Ready to Export until marked complete")
+                                
+                                # Store success state for confirmation dialog
+                                st.session_state.fms_send_successful = True
+                                st.session_state.fms_result = result
+                                
+                                # Clear cache to refresh the table
                                 st.cache_data.clear()
-                                time.sleep(2)
-                                st.rerun()
                             else:
                                 st.error(f"❌ Failed to send to FMS API: {result.get('error', 'Unknown error')}")
                                 if result.get('validation_errors'):
@@ -4500,6 +4540,39 @@ with approved_queue_tab:
                         st.info("Export cancelled")
                         st.rerun()
                         
+                # Add Mark as Complete button
+                with col4:
+                    if st.button("✅ Mark as Complete", key="mark_complete", use_container_width=True,
+                                 help="Move clips to Recent Complete"):
+                        # Update clips to exported status
+                        clips_to_export = st.session_state.fms_clips_to_export
+                        export_timestamp = st.session_state.fms_export_timestamp
+                        exported_count = 0
+                        
+                        for clip in clips_to_export:
+                            result = db.supabase.table('clips').update({
+                                'workflow_stage': 'exported',
+                                'fms_export_date': export_timestamp
+                            }).eq('id', clip['id']).execute()
+                            
+                            if result.data:
+                                exported_count += 1
+                        
+                        # Clear session state
+                        st.session_state.fms_export_ready = False
+                        st.session_state.fms_export_json = None
+                        st.session_state.fms_export_filename = None
+                        st.session_state.fms_clips_to_export = None
+                        st.session_state.fms_export_timestamp = None
+                        st.session_state.fms_send_successful = False
+                        st.session_state.fms_result = None
+                        
+                        # Show success and refresh
+                        st.success(f"✅ Moved {exported_count} clips to Recent Complete!")
+                        st.cache_data.clear()
+                        time.sleep(1)
+                        st.rerun()
+                        
                 # Show API environment info
                 st.markdown("---")
                 api_env = os.getenv("FMS_API_ENVIRONMENT", "staging")
@@ -4507,6 +4580,50 @@ with approved_queue_tab:
                     st.info(f"🔧 FMS API Environment: **{api_env.upper()}** (Testing)")
                 else:
                     st.warning(f"🚨 FMS API Environment: **{api_env.upper()}** (Live System)")
+                    
+                # Show confirmation dialog if FMS send was successful
+                if st.session_state.get('fms_send_successful', False):
+                    st.markdown("---")
+                    st.markdown("### 🎉 FMS Send Successful!")
+                    st.info("Would you like to mark these clips as complete?")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Yes, Mark Complete", key="confirm_complete", type="primary", use_container_width=True):
+                            # Update clips to exported status
+                            clips_to_export = st.session_state.fms_clips_to_export
+                            export_timestamp = st.session_state.fms_export_timestamp
+                            exported_count = 0
+                            
+                            for clip in clips_to_export:
+                                result = db.supabase.table('clips').update({
+                                    'workflow_stage': 'exported',
+                                    'fms_export_date': export_timestamp
+                                }).eq('id', clip['id']).execute()
+                                
+                                if result.data:
+                                    exported_count += 1
+                            
+                            # Clear session state
+                            st.session_state.fms_export_ready = False
+                            st.session_state.fms_export_json = None
+                            st.session_state.fms_export_filename = None
+                            st.session_state.fms_clips_to_export = None
+                            st.session_state.fms_export_timestamp = None
+                            st.session_state.fms_send_successful = False
+                            st.session_state.fms_result = None
+                            
+                            # Show success and refresh
+                            st.success(f"✅ Moved {exported_count} clips to Recent Complete!")
+                            st.cache_data.clear()
+                            time.sleep(1)
+                            st.rerun()
+                            
+                    with col2:
+                        if st.button("No, Keep in Export", key="keep_export", use_container_width=True):
+                            st.session_state.fms_send_successful = False
+                            st.info("Clips remain in Ready to Export")
+                            st.rerun()
         
         else:
             # No clips found for current filter
