@@ -1743,7 +1743,7 @@ with st.sidebar:
         del st.session_state.mapping_update_msg
 
     st.markdown("**🔄 Update Person-Outlets Mapping**")
-    default_mapping_url = "https://reports.driveshop.com/?report-file=/home/deploys/creatoriq-reports/45805/driveshop_media_outlet_list.csv"
+    default_mapping_url = "https://reports.driveshop.com/?report=file:%2Fhome%2Fdeployer%2Freports%2Fclips%2Fmedia_outlet_list.rpt&init=csv&exportreportdataonly=true&columnnames=true"
     mapping_url = st.text_input(
         "Paste mapping CSV URL here:",
         value=default_mapping_url,
