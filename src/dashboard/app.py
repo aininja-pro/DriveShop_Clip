@@ -2800,7 +2800,8 @@ with bulk_review_tab:
                     except:
                         return '—'
 
-                clean_df['✍️ Attribution'] = display_df.apply(format_attribution_strength, axis=1)
+                # Attribution logic kept in code but column hidden from UI
+                # clean_df['✍️ Attribution'] = display_df.apply(format_attribution_strength, axis=1)
                 clean_df['📝 Byline Author'] = display_df.apply(get_actual_byline, axis=1)
                 
                 # Override with saved Byline Author values from session state
