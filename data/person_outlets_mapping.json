@@ -8565,6 +8565,12 @@
         "outlet_url": "Instagram: instagram.com/thesmokingtire",
         "outlet_id": "3095",
         "impressions": 245000
+      },
+      {
+        "outlet_name": "Road & Track",
+        "outlet_url": "https://www.roadandtrack.com",
+        "outlet_id": "51",
+        "impressions": 500000
       }
     ]
   },
@@ -30283,7 +30289,7 @@
         "outlet_name": "Paul's Place",
         "outlet_url": "https://www.youtube.com/@PaulsPlace/videos",
         "outlet_id": "6495",
-        "impressions": 148000
+        "impressions": 19100
       }
     ]
   },
@@ -31602,6 +31608,17 @@
         "outlet_url": "https://www.instagram.com/thesnacksensei/reels/?hl=en",
         "outlet_id": "4612",
         "impressions": 234000
+      }
+    ]
+  },
+  "18833": {
+    "reporter_name": "Janelle Rupkalvis",
+    "outlets": [
+      {
+        "outlet_name": "Instagram",
+        "outlet_url": "https://www.instagram.com/janelleonajet/?hl=en",
+        "outlet_id": "3095",
+        "impressions": 58300
       }
     ]
   }

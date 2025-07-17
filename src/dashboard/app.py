@@ -2559,7 +2559,8 @@ with bulk_review_tab:
                     affiliation = str(row.get('Affiliation', ''))
                     person_id = str(row.get('Person_ID', ''))
                     
-                    if not affiliation or not person_id or not person_outlets_mapping:
+                    # Handle 'None' string explicitly
+                    if not affiliation or not person_id or not person_outlets_mapping or affiliation == 'None' or affiliation == 'nan':
                         return ''  # Return empty for dropdown
                     
                     # Get available outlet options for this person
@@ -3663,13 +3664,33 @@ with bulk_review_tab:
                                     # Get database connection
                                     db = get_database()
                                     
-                                    # First, approve the clips
+                                    # First, approve the clips with Media Outlet data
                                     approved_clips = []
                                     for wo_number in selected_wos:
-                                        result = db.supabase.table('clips').update({
+                                        # Get Media Outlet data from session state
+                                        update_data = {
                                             'status': 'approved',
                                             'workflow_stage': 'found'  # Keep as 'found' for now
-                                        }).eq('wo_number', wo_number).execute()
+                                        }
+                                        
+                                        # Add Media Outlet if selected
+                                        if wo_number in st.session_state.last_saved_outlets:
+                                            media_outlet = st.session_state.last_saved_outlets[wo_number]
+                                            update_data['media_outlet'] = media_outlet
+                                            
+                                            # Get outlet_id and impressions from mapping
+                                            if wo_number in st.session_state.outlet_data_mapping:
+                                                outlet_data_dict = st.session_state.outlet_data_mapping[wo_number]
+                                                if media_outlet in outlet_data_dict:
+                                                    outlet_info = outlet_data_dict[media_outlet]
+                                                    update_data['media_outlet_id'] = outlet_info.get('outlet_id', '')
+                                                    update_data['impressions'] = outlet_info.get('impressions', 0)
+                                        
+                                        # Add Byline Author if available
+                                        if wo_number in st.session_state.last_saved_bylines:
+                                            update_data['byline_author'] = st.session_state.last_saved_bylines[wo_number]
+                                        
+                                        result = db.supabase.table('clips').update(update_data).eq('wo_number', wo_number).execute()
                                         
                                         if result.data:
                                             approved_clips.extend(result.data)

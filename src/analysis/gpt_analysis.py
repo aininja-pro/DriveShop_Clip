@@ -349,10 +349,14 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
     
     # Check if either make OR model is mentioned (conservative approach)
     make_found = bool(make_lower) and (make_lower in content_lower)
-    model_found = bool(model_lower) and (model_lower in content_lower)
+    
+    # For model, check for the base model name (first word) to handle variants
+    # e.g., "Elantra Hybrid Limited" -> check for "elantra"
+    model_base = model_lower.split()[0] if model_lower else ""
+    model_found = bool(model_lower) and (model_lower in content_lower or (model_base and model_base in content_lower))
     
     if not make_found and not model_found:
-        logger.info(f"💰 PRE-FILTER: Neither '{make}' nor '{model}' found in content - skipping GPT analysis")
+        logger.info(f"💰 PRE-FILTER: Neither '{make}' nor '{model}' (or '{model_base}') found in content - skipping GPT analysis")
         return None
     
     # Filter 3: Binary/Corrupted Content Detection (avoid analyzing garbage data)
