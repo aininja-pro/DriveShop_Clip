@@ -4221,7 +4221,7 @@ with approved_queue_tab:
                 gridOptions=grid_options,
                 allow_unsafe_jscode=True,
                 update_mode=GridUpdateMode.SELECTION_CHANGED,
-                height=650,  # Same height as Bulk Review
+                height=400,  # Match Bulk Review height
                 fit_columns_on_grid_load=True,
                 columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',  # Auto-size all columns
                 theme="alpine",
@@ -4233,15 +4233,20 @@ with approved_queue_tab:
             
             if st.session_state.approved_queue_filter == 'ready_to_export':
                 # Actions for Ready to Export
-                col1, col2 = st.columns(2)
+                # Count selected rows from AgGrid
+                selected_count = len(selected_clips.selected_rows) if hasattr(selected_clips, 'selected_rows') and selected_clips.selected_rows is not None else 0
+                
+                col1, col2, col3, col4 = st.columns([1, 1.5, 1.5, 1])
                 
                 with col1:
-                    # Count selected rows from AgGrid
-                    selected_count = len(selected_clips.selected_rows) if hasattr(selected_clips, 'selected_rows') and selected_clips.selected_rows is not None else 0
                     st.metric("Selected", f"{selected_count}/{len(clean_df)}")
                 
                 with col2:
-                    if st.button(f"📤 FMS Export ({selected_count})", disabled=selected_count == 0, help="Export selected clips to FMS JSON"):
+                    if st.button(f"📤 Export to FMS ({selected_count})", 
+                                 disabled=selected_count == 0, 
+                                 help="Export selected clips to FMS",
+                                 use_container_width=True,
+                                 type="primary"):
                         # Handle FMS Export
                         # Get selected rows from AgGrid response
                         selected_rows = []
@@ -4323,7 +4328,7 @@ with approved_queue_tab:
                                     st.session_state.fms_clips_to_export = clips_to_export
                                     st.session_state.fms_export_timestamp = export_timestamp
                                     
-                                    st.success(f"✅ Export prepared for {len(clips_to_export)} clips! Click the download button below.")
+                                    st.success(f"✅ Export prepared for {len(clips_to_export)} clips!")
                                     st.rerun()
                                     
                                 else:
@@ -4333,6 +4338,58 @@ with approved_queue_tab:
                                 logger.error(f"FMS export error: {e}")
                         else:
                             st.warning("Please select clips for FMS export")
+                
+                with col3:
+                    if st.button(f"↩️ Move to Bulk Review ({selected_count})",
+                                 disabled=selected_count == 0,
+                                 help="Move selected clips back to Bulk Review",
+                                 use_container_width=True):
+                        # Handle moving clips back to Bulk Review
+                        selected_rows = []
+                        if hasattr(selected_clips, 'selected_rows'):
+                            selected_data = selected_clips.selected_rows
+                            if selected_data is not None:
+                                if hasattr(selected_data, 'to_dict'):
+                                    selected_rows = selected_data.to_dict('records')
+                                elif isinstance(selected_data, list):
+                                    selected_rows = selected_data
+                                else:
+                                    selected_rows = []
+                        
+                        if selected_rows and len(selected_rows) > 0:
+                            try:
+                                moved_count = 0
+                                for row in selected_rows:
+                                    clip_id = row.get('id')
+                                    if clip_id:
+                                        # Update workflow stage back to 'found'
+                                        result = db.supabase.table('clips').update({
+                                            'workflow_stage': 'found',  # Use valid workflow stage
+                                            'status': 'pending_review',  # Use valid status value
+                                            'overall_sentiment': None,
+                                            'pros': None,
+                                            'cons': None,
+                                            'overall_score': None,
+                                            'relevance_score': None,
+                                            'brand_narrative': None,
+                                            'summary': None
+                                        }).eq('id', clip_id).execute()
+                                        
+                                        if result.data:
+                                            moved_count += 1
+                                
+                                if moved_count > 0:
+                                    st.success(f"✅ Moved {moved_count} clips back to Bulk Review!")
+                                    st.cache_data.clear()
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to move clips")
+                            except Exception as e:
+                                st.error(f"❌ Error moving clips: {e}")
+                                logger.error(f"Move to bulk review error: {e}")
+                        else:
+                            st.warning("Please select clips to move")
             
             # Show download button if export is ready
             if st.session_state.get('fms_export_ready', False):
@@ -4341,7 +4398,7 @@ with approved_queue_tab:
                 # Show export options
                 st.markdown("### 📤 Export Options")
                 
-                col1, col2, col3 = st.columns([1, 1, 1])
+                col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
                 
                 with col1:
                     if st.download_button(
@@ -4350,7 +4407,8 @@ with approved_queue_tab:
                         file_name=st.session_state.fms_export_filename,
                         mime="application/json",
                         key="download_fms_json",
-                        help="Download the JSON file to your computer"
+                        help="Download the JSON file to your computer",
+                        use_container_width=True
                     ):
                         # Update clips to exported status after download
                         clips_to_export = st.session_state.fms_clips_to_export
@@ -4380,7 +4438,7 @@ with approved_queue_tab:
                         st.rerun()
                         
                 with col2:
-                    if st.button("🚀 Send to FMS API", key="send_to_fms_api", help="Send clips directly to FMS API"):
+                    if st.button("🚀 Send to FMS", key="send_to_fms_api", help="Send clips directly to FMS API", type="primary", use_container_width=True):
                         try:
                             # Initialize FMS API client
                             fms_client = FMSAPIClient()
@@ -4432,7 +4490,7 @@ with approved_queue_tab:
                             logger.error(f"FMS API send error: {e}", exc_info=True)
                             
                 with col3:
-                    if st.button("❌ Cancel Export", key="cancel_export"):
+                    if st.button("❌ Cancel", key="cancel_export", use_container_width=True):
                         # Clear session state without updating clips
                         st.session_state.fms_export_ready = False
                         st.session_state.fms_export_json = None
