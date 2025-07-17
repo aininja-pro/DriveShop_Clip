@@ -245,6 +245,69 @@ def apply_custom_sidebar_styling():
     """Apply custom CSS styling for black sidebar with white logo"""
     st.markdown("""
     <style>
+    /* Force light mode appearance */
+    :root {
+        color-scheme: light !important;
+    }
+    
+    html[data-theme="dark"] {
+        color-scheme: light !important;
+    }
+    
+    .stApp {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    /* Force light theme on all elements */
+    * {
+        color-scheme: light !important;
+    }
+    
+    /* Main content area styling */
+    .main .block-container {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    /* Tab styling */
+    .stTabs {
+        background-color: #ffffff !important;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #f0f2f6 !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border-bottom-color: #ff4b4b !important;
+    }
+    
+    /* Fix tab text visibility */
+    .stTabs [data-baseweb="tab"] p {
+        color: #000000 !important;
+    }
+    
+    /* Ensure all text is black in main content */
+    .main .block-container p,
+    .main .block-container span,
+    .main .block-container div,
+    .main .block-container label {
+        color: #000000 !important;
+    }
+    
+    /* Headers in main content */
+    .main h1, .main h2, .main h3, .main h4, .main h5, .main h6 {
+        color: #000000 !important;
+    }
+    
     /* Black sidebar styling */
     .css-1d391kg, .css-1lcbmhc, .css-17lntkn, .css-1y4p8pa, 
     .stSidebar > div:first-child, .css-12oz5g7, .css-1cypcdb {
@@ -1339,6 +1402,41 @@ st.title("DriveShop Clip Tracking Dashboard")
 # Custom CSS for better styling
 st.markdown("""
 <style>
+    /* Force light mode appearance */
+    :root {
+        color-scheme: light !important;
+    }
+    
+    html[data-theme="dark"] {
+        color-scheme: light !important;
+    }
+    
+    .stApp {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    /* Tab styling for light mode */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #f0f2f6 !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    /* Fix tab text visibility */
+    .stTabs [data-baseweb="tab"] p,
+    .stTabs [data-baseweb="tab"] span {
+        color: #000000 !important;
+    }
+    
     /* ULTRA COMPACT layout - maximum table space */
     .main > div {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
