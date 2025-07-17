@@ -4310,6 +4310,9 @@ with approved_queue_tab:
             clean_df['Clip URL'] = approved_df['clip_url'] if 'clip_url' in approved_df.columns else ''
             clean_df['📄 View'] = clean_df['Clip URL']
             
+            # Add activity_id as a hidden column for hyperlink functionality
+            clean_df['Activity_ID'] = approved_df['activity_id'] if 'activity_id' in approved_df.columns else ''
+            
             # Add sentiment status indicator
             if 'sentiment_completed' in approved_df.columns:
                 clean_df['Sentiment'] = approved_df.apply(
@@ -4365,11 +4368,11 @@ with approved_queue_tab:
             if st.session_state.approved_queue_filter == 'ready_to_export':
                 gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
                 # Add checkbox selection to first column for Ready to Export
-                gb.configure_column("WO #", minWidth=100, pinned='left', checkboxSelection=True, headerCheckboxSelection=True)
+                gb.configure_column("WO #", minWidth=100, pinned='left', checkboxSelection=True, headerCheckboxSelection=True, cellRenderer=cellRenderer_wo)
             else:
                 # Recent Complete is read-only
                 gb.configure_selection('single', use_checkbox=False)
-                gb.configure_column("WO #", minWidth=100, pinned='left')
+                gb.configure_column("WO #", minWidth=100, pinned='left', cellRenderer=cellRenderer_wo)
             gb.configure_column("Office", minWidth=100)
             gb.configure_column("Make", minWidth=120)
             gb.configure_column("Model", minWidth=150)
@@ -4387,6 +4390,7 @@ with approved_queue_tab:
             # Hide raw URL column and database ID
             gb.configure_column("Clip URL", hide=True)
             gb.configure_column("id", hide=True)  # Hide database ID but keep in data
+            gb.configure_column("Activity_ID", hide=True)  # Hide the activity ID column
             
             # Configure View column with URL renderer (same as Bulk Review)
             cellRenderer_view = JsCode("""
@@ -4399,6 +4403,41 @@ with approved_queue_tab:
                 this.eGui.style.color = '#1f77b4';
                 this.eGui.style.textDecoration = 'underline';
                 this.eGui.style.cursor = 'pointer';
+              }
+
+              getGui() {
+                return this.eGui;
+              }
+
+              refresh(params) {
+                return false;
+              }
+            }
+            """)
+            
+            # Create cell renderer for WO # column with hyperlink to FMS activity
+            cellRenderer_wo = JsCode("""
+            class WoCellRenderer {
+              init(params) {
+                const woNumber = params.value;
+                const activityId = params.data['Activity_ID'];
+                
+                this.eGui = document.createElement('div');
+                
+                if (activityId && activityId !== '') {
+                  // Create hyperlink to FMS activity
+                  this.link = document.createElement('a');
+                  this.link.innerText = woNumber;
+                  this.link.href = `https://fms.driveshop.com/activities/edit/${activityId}`;
+                  this.link.target = '_blank';
+                  this.link.style.color = '#1f77b4';
+                  this.link.style.textDecoration = 'underline';
+                  this.link.style.cursor = 'pointer';
+                  this.eGui.appendChild(this.link);
+                } else {
+                  // No activity ID, just show the WO number as plain text
+                  this.eGui.innerText = woNumber;
+                }
               }
 
               getGui() {
