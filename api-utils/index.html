@@ -1,0 +1,2111 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../analysis/">
+      
+      
+        <link rel="next" href="../core-utils/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
+    
+    
+      
+        <title>API Utilities - DriveShop Clip Tracking System</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-utilities-documentation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="DriveShop Clip Tracking System" class="md-header__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DriveShop Clip Tracking System
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API Utilities
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="DriveShop Clip Tracking System" class="md-nav__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    DriveShop Clip Tracking System
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Overview
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Project Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Modules
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ingest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ingest
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Analysis
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    API Utilities
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Utilities
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsyoutube_apipy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/youtube_api.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/youtube_api.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#youtubeapiclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      YouTubeAPIClient Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#helper-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Helper Methods
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-integration-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      API Integration Patterns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsyoutube_handlerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/youtube_handler.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/youtube_handler.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transcript-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Transcript Extraction
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-extraction-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Content Extraction Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsgoogle_searchpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/google_search.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/google_search.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-search-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Search Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#result-processing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Result Processing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Search Strategy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      API Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsscraping_beepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/scraping_bee.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/scraping_bee.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scrapingbeeclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScrapingBeeClient Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#domain-specific-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Domain-Specific Configurations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Strategy
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsscrapfly_clientpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/scrapfly_client.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/scrapfly_client.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scrapflyclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScrapFlyClient Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#circuit-breaker-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Circuit Breaker Implementation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Features
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling-sophistication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling Sophistication
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Metrics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crawler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crawler-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler Utils
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creatoriq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CreatorIQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../other-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Other Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment & Support
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment & Support
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Setup Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/future.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Future Enhancements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/support.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Support & Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsyoutube_apipy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/youtube_api.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/youtube_api.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#youtubeapiclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      YouTubeAPIClient Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#helper-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Helper Methods
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-integration-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      API Integration Patterns
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsyoutube_handlerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/youtube_handler.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/youtube_handler.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transcript-extraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Transcript Extraction
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-extraction-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Content Extraction Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsgoogle_searchpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/google_search.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/google_search.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-search-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Search Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#result-processing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Result Processing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#search-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Search Strategy
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      API Configuration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsscraping_beepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/scraping_bee.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/scraping_bee.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scrapingbeeclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScrapingBeeClient Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#domain-specific-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Domain-Specific Configurations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retry-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Retry Strategy
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcutilsscrapfly_clientpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/utils/scrapfly_client.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/utils/scrapfly_client.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scrapflyclient-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      ScrapFlyClient Class
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-methods_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#circuit-breaker-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Circuit Breaker Implementation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Features
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling-sophistication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling Sophistication
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Metrics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="api-utilities-documentation">API Utilities Documentation</h1>
+<h2 id="module-srcutilsyoutube_apipy">Module: <code>src/utils/youtube_api.py</code></h2>
+<h3 id="purpose">Purpose</h3>
+<p>The YouTube API module provides a clean interface to YouTube Data API v3 for searching and retrieving video information. It implements intelligent search strategies with model variations, date filtering, and comprehensive error handling while respecting API quotas.</p>
+<h3 id="key-functionsclasses">Key Functions/Classes</h3>
+<h4 id="youtubeapiclient-class">YouTubeAPIClient Class</h4>
+<pre><code class="language-python">class YouTubeAPIClient:
+    &quot;&quot;&quot;
+    YouTube Data API v3 client with rate limiting and error handling.
+    Provides video search and channel video listing capabilities.
+    &quot;&quot;&quot;
+
+    def __init__(self):
+        &quot;&quot;&quot;Initialize with API key from environment.&quot;&quot;&quot;
+</code></pre>
+<h4 id="core-methods">Core Methods</h4>
+<pre><code class="language-python">def search_videos(self, make: str, model: str, journalist_name: str = None,
+                 start_date: str = None, end_date: str = None) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Search YouTube videos with intelligent query building.
+    Implements model variations for better matching.
+    &quot;&quot;&quot;
+
+def get_channel_videos(self, channel_id: str, max_results: int = 10) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Retrieve latest videos from a specific channel.
+    Used for RSS feed alternative.
+    &quot;&quot;&quot;
+
+def get_video_details(self, video_id: str) -&gt; Optional[Dict]:
+    &quot;&quot;&quot;
+    Get detailed information for a specific video.
+    Includes duration, views, likes, etc.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="helper-methods">Helper Methods</h4>
+<pre><code class="language-python">def generate_model_variations(model: str) -&gt; List[str]:
+    &quot;&quot;&quot;
+    Generate search variations for vehicle models.
+    Example: &quot;X5&quot; → [&quot;X5&quot;, &quot;BMW X5&quot;, &quot;X5 BMW&quot;]
+    &quot;&quot;&quot;
+
+def _make_api_request(self, endpoint: str, params: Dict) -&gt; Optional[Dict]:
+    &quot;&quot;&quot;
+    Internal method for API requests with rate limiting.
+    Handles errors and returns parsed JSON.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="expected-inputsoutputs">Expected Inputs/Outputs</h3>
+<h4 id="inputs">Inputs</h4>
+<pre><code class="language-python"># Video search
+{
+    'make': 'Honda',
+    'model': 'Accord',
+    'journalist_name': 'Doug DeMuro',
+    'start_date': '2024-01-01',
+    'end_date': '2024-01-31'
+}
+
+# Channel videos
+{
+    'channel_id': 'UC123abc...',
+    'max_results': 10
+}
+</code></pre>
+<h4 id="outputs">Outputs</h4>
+<pre><code class="language-python"># Video data structure
+{
+    'video_id': 'dQw4w9WgXcQ',
+    'title': '2024 Honda Accord Review',
+    'channel': 'Car Reviews',
+    'channel_id': 'UC123...',
+    'published_at': '2024-01-15T10:00:00Z',
+    'description': 'Full review of...',
+    'thumbnail': 'https://i.ytimg.com/...',
+    'url': 'https://youtube.com/watch?v=...'
+}
+</code></pre>
+<h3 id="dependencies">Dependencies</h3>
+<pre><code class="language-python">import os
+import requests
+from datetime import datetime
+from typing import List, Dict, Optional
+
+from src.utils.logger import logger
+from src.utils.rate_limiter import rate_limiter
+</code></pre>
+<h3 id="api-integration-patterns">API Integration Patterns</h3>
+<ol>
+<li><strong>Rate Limiting</strong>: Centralized rate limiter before each API call</li>
+<li><strong>Error Handling</strong>: Graceful degradation with empty results</li>
+<li><strong>Query Building</strong>: Progressive search from specific to general</li>
+<li><strong>Pagination</strong>: Handles up to 50 results per request</li>
+<li><strong>Quota Management</strong>: Efficient API usage with targeted queries</li>
+</ol>
+<hr />
+<h2 id="module-srcutilsyoutube_handlerpy">Module: <code>src/utils/youtube_handler.py</code></h2>
+<h3 id="purpose_1">Purpose</h3>
+<p>The YouTube Handler provides comprehensive YouTube content extraction using multiple methods including RSS feeds, direct scraping, and API fallbacks. It specializes in extracting video metadata and transcripts without requiring API keys for most operations.</p>
+<h3 id="key-functionsclasses_1">Key Functions/Classes</h3>
+<h4 id="core-functions">Core Functions</h4>
+<pre><code class="language-python">def extract_youtube_content(url: str, make: str = None, model: str = None,
+                          journalist_name: str = None,
+                          start_date: str = None, end_date: str = None) -&gt; Dict:
+    &quot;&quot;&quot;
+    Main extraction function with multiple fallback methods.
+    Attempts RSS → Direct scraping → API.
+    &quot;&quot;&quot;
+
+def extract_channel_videos_from_rss(channel_url: str, limit: int = 10) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Extract videos via YouTube RSS feed (no API needed).
+    Fast and reliable for recent videos.
+    &quot;&quot;&quot;
+
+def extract_channel_id(channel_url: str) -&gt; Optional[str]:
+    &quot;&quot;&quot;
+    Extract channel ID using multiple methods.
+    Handles various YouTube URL formats.
+    &quot;&quot;&quot;
+
+def check_model_in_title(title: str, model: str) -&gt; bool:
+    &quot;&quot;&quot;
+    Flexible model matching in video titles.
+    Handles variations and partial matches.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="transcript-extraction">Transcript Extraction</h4>
+<pre><code class="language-python">def get_video_transcript(video_id: str) -&gt; Optional[str]:
+    &quot;&quot;&quot;
+    Extract video transcript/captions.
+    Falls back to metadata if transcript unavailable.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="content-extraction-methods">Content Extraction Methods</h3>
+<ol>
+<li><strong>RSS Feed Method</strong> (Preferred)</li>
+<li>No API key required</li>
+<li>Returns latest 15 videos</li>
+<li>Structured XML data</li>
+<li>
+<p>Very fast and reliable</p>
+</li>
+<li>
+<p><strong>Direct Scraping</strong></p>
+</li>
+<li>BeautifulSoup HTML parsing</li>
+<li>Pattern matching for data extraction</li>
+<li>
+<p>Works when RSS unavailable</p>
+</li>
+<li>
+<p><strong>API Fallback</strong></p>
+</li>
+<li>Uses YouTube API client</li>
+<li>Only when other methods fail</li>
+<li>Preserves API quota</li>
+</ol>
+<h3 id="expected-inputsoutputs_1">Expected Inputs/Outputs</h3>
+<h4 id="inputs_1">Inputs</h4>
+<pre><code class="language-python">{
+    'url': 'https://youtube.com/watch?v=abc123',
+    'make': 'Toyota',
+    'model': 'Camry',
+    'journalist_name': 'Alex on Autos',
+    'start_date': '2024-01-01',
+    'end_date': '2024-01-31'
+}
+</code></pre>
+<h4 id="outputs_1">Outputs</h4>
+<pre><code class="language-python">{
+    'content': 'Video transcript or description...',
+    'title': '2024 Toyota Camry Review',
+    'url': 'https://youtube.com/watch?v=abc123',
+    'published_date': '2024-01-15',
+    'channel': 'Alex on Autos',
+    'views': '50000',
+    'duration': 'PT15M30S'
+}
+</code></pre>
+<hr />
+<h2 id="module-srcutilsgoogle_searchpy">Module: <code>src/utils/google_search.py</code></h2>
+<h3 id="purpose_2">Purpose</h3>
+<p>The Google Search module provides web search capabilities using Google Custom Search API with Bing as a fallback. It implements intelligent query building, result filtering, and attribution verification for finding automotive journalism content.</p>
+<h3 id="key-functionsclasses_2">Key Functions/Classes</h3>
+<h4 id="core-search-functions">Core Search Functions</h4>
+<pre><code class="language-python">def search_google(query: str, site: str = None, num_results: int = 10) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Search using Google Custom Search API.
+    Supports site-specific searches.
+    &quot;&quot;&quot;
+
+def search_for_article(make: str, model: str, journalist_name: str,
+                      media_outlet: str = None, start_date: str = None,
+                      end_date: str = None) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Comprehensive article search with multiple strategies.
+    Implements fallback from Google to Bing.
+    &quot;&quot;&quot;
+
+async def search_for_article_async(make: str, model: str, 
+                                  journalist_name: str, **kwargs) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Async version for concurrent searches.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="result-processing">Result Processing</h4>
+<pre><code class="language-python">def filter_and_score_results(results: List[Dict], make: str, model: str,
+                           journalist_name: str, start_date: str = None) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Score and filter search results.
+    Implements relevance scoring algorithm.
+    &quot;&quot;&quot;
+
+def verify_author_attribution(url: str, content: str, 
+                            journalist_name: str) -&gt; Dict:
+    &quot;&quot;&quot;
+    Verify if content is actually by the journalist.
+    Returns attribution strength.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="search-strategy">Search Strategy</h3>
+<ol>
+<li><strong>Query Building Hierarchy</strong>:</li>
+<li>Full query: <code>"John Doe" Honda Accord review site:example.com</code></li>
+<li>Without quotes: <code>John Doe Honda Accord review</code></li>
+<li>Model only: <code>Honda Accord review site:example.com</code></li>
+<li>
+<p>Broad search: <code>Honda Accord</code></p>
+</li>
+<li>
+<p><strong>Result Scoring Algorithm</strong>:</p>
+</li>
+<li>URL keyword matches (+3 per keyword)</li>
+<li>Title matches for make/model/journalist</li>
+<li>Domain restrictions</li>
+<li>
+<p>Date filtering</p>
+</li>
+<li>
+<p><strong>Attribution Verification</strong>:</p>
+</li>
+<li>Byline extraction</li>
+<li>Author meta tag checking</li>
+<li>Name proximity to article markers</li>
+</ol>
+<h3 id="api-configuration">API Configuration</h3>
+<pre><code class="language-python"># Google Custom Search
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+GOOGLE_SEARCH_ENGINE_ID = os.getenv('GOOGLE_SEARCH_ENGINE_ID')
+
+# Bing Search (Fallback)
+BING_API_KEY = os.getenv('BING_SEARCH_API_KEY')
+</code></pre>
+<hr />
+<h2 id="module-srcutilsscraping_beepy">Module: <code>src/utils/scraping_bee.py</code></h2>
+<h3 id="purpose_3">Purpose</h3>
+<p>The ScrapingBee module provides integration with ScrapingBee API for handling JavaScript-heavy sites and bypassing anti-bot measures. It implements domain-specific configurations and intelligent retry mechanisms.</p>
+<h3 id="key-functionsclasses_3">Key Functions/Classes</h3>
+<h4 id="scrapingbeeclient-class">ScrapingBeeClient Class</h4>
+<pre><code class="language-python">class ScrapingBeeClient:
+    &quot;&quot;&quot;
+    ScrapingBee API client with retry logic and domain configurations.
+    Handles JavaScript rendering and premium proxies.
+    &quot;&quot;&quot;
+
+    def __init__(self, api_key: str = None):
+        &quot;&quot;&quot;Initialize with API key validation.&quot;&quot;&quot;
+</code></pre>
+<h4 id="core-methods_1">Core Methods</h4>
+<pre><code class="language-python">def scrape(self, url: str, render_js: bool = True, 
+          premium_proxy: bool = False, **kwargs) -&gt; Optional[str]:
+    &quot;&quot;&quot;
+    Scrape URL with configurable options.
+    Implements retry with exponential backoff.
+    &quot;&quot;&quot;
+
+def get_credits_used(self) -&gt; Dict[str, int]:
+    &quot;&quot;&quot;
+    Check API credit usage.
+    Returns used and remaining credits.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="domain-specific-configurations">Domain-Specific Configurations</h3>
+<pre><code class="language-python"># YouTube configuration
+if 'youtube.com' in url:
+    params.update({
+        'block_ads': True,
+        'wait': 3000,
+        'wait_for': '#description'
+    })
+
+# Spotlight configuration  
+if 'spotlightautomotive.com' in url:
+    params.update({
+        'wait': 5000,
+        'screenshot': False
+    })
+</code></pre>
+<h3 id="retry-strategy">Retry Strategy</h3>
+<ol>
+<li><strong>Max Retries</strong>: 3 attempts</li>
+<li><strong>Exponential Backoff</strong>: 1s → 2s → 4s</li>
+<li><strong>Error-Specific Handling</strong>:</li>
+<li>403: Upgrade to premium proxy</li>
+<li>422: Validation error (no retry)</li>
+<li>429: Rate limit (longer wait)</li>
+<li>500: Server error (retry)</li>
+</ol>
+<hr />
+<h2 id="module-srcutilsscrapfly_clientpy">Module: <code>src/utils/scrapfly_client.py</code></h2>
+<h3 id="purpose_4">Purpose</h3>
+<p>The ScrapFly module provides the most sophisticated web scraping integration with circuit breaker pattern, advanced rate limiting, and comprehensive error handling. It serves as the primary premium scraping service.</p>
+<h3 id="key-functionsclasses_4">Key Functions/Classes</h3>
+<h4 id="scrapflyclient-class">ScrapFlyClient Class</h4>
+<pre><code class="language-python">class ScrapFlyClient:
+    &quot;&quot;&quot;
+    ScrapFly API client with circuit breaker and rate limiting.
+    Most robust scraping solution in the stack.
+    &quot;&quot;&quot;
+
+    def __init__(self):
+        &quot;&quot;&quot;Initialize with API key and circuit breaker state.&quot;&quot;&quot;
+</code></pre>
+<h4 id="core-methods_2">Core Methods</h4>
+<pre><code class="language-python">def scrape(self, url: str, render_js: bool = True,
+          country: str = &quot;US&quot;, **kwargs) -&gt; Optional[str]:
+    &quot;&quot;&quot;
+    Scrape with circuit breaker protection.
+    Implements sophisticated rate limiting.
+    &quot;&quot;&quot;
+
+def extract_scrapfly_content(self, url: str, config: Dict = None) -&gt; Optional[str]:
+    &quot;&quot;&quot;
+    Main extraction method with fallback strategies.
+    Handles retries and circuit breaker logic.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="circuit-breaker-implementation">Circuit Breaker Implementation</h4>
+<pre><code class="language-python">def _check_circuit_breaker(self) -&gt; bool:
+    &quot;&quot;&quot;Check if circuit breaker is open.&quot;&quot;&quot;
+
+def _update_circuit_breaker(self, success: bool):
+    &quot;&quot;&quot;Update circuit breaker state based on result.&quot;&quot;&quot;
+
+def _reset_circuit_breaker(self):
+    &quot;&quot;&quot;Reset circuit breaker after timeout.&quot;&quot;&quot;
+</code></pre>
+<h3 id="advanced-features">Advanced Features</h3>
+<ol>
+<li><strong>Circuit Breaker Pattern</strong>:</li>
+<li>Opens after 3 consecutive failures</li>
+<li>5-minute timeout before reset</li>
+<li>
+<p>Prevents cascading failures</p>
+</li>
+<li>
+<p><strong>Rate Limiting</strong>:</p>
+</li>
+<li>Minimum 2-second delay between requests</li>
+<li>Retry-after header parsing</li>
+<li>
+<p>Progressive backoff on rate limits</p>
+</li>
+<li>
+<p><strong>Configuration Options</strong>:
+   <code>python
+   {
+       'asp': True,           # Anti-bot bypass
+       'country': 'US',       # Geo-location
+       'rendering_wait': 3000, # JS wait time
+       'retry': False,        # Internal retry
+       'cache': True,         # Response caching
+       'debug': True          # Debug info
+   }</code></p>
+</li>
+</ol>
+<h3 id="error-handling-sophistication">Error Handling Sophistication</h3>
+<ol>
+<li><strong>Rate Limit Detection</strong>:
+   ```python
+   # Parses multiple rate limit formats</li>
+<li>"Request rate limit exceeded (2/sec)"</li>
+<li>"API rate limit exceeded"</li>
+<li>
+<p>Retry-After headers
+   ```</p>
+</li>
+<li>
+<p><strong>Progressive Degradation</strong>:</p>
+</li>
+<li>
+<p>Standard request → ASP mode → Country change → Circuit break</p>
+</li>
+<li>
+<p><strong>Credit Monitoring</strong>:</p>
+</li>
+<li>Tracks usage in response headers</li>
+<li>Logs credit consumption</li>
+<li>Warns on low credits</li>
+</ol>
+<h3 id="performance-metrics">Performance Metrics</h3>
+<ul>
+<li><strong>Success Rate</strong>: ~99.9% with ASP enabled</li>
+<li><strong>Average Response Time</strong>: 3-5 seconds</li>
+<li><strong>Circuit Breaker Recovery</strong>: 5 minutes</li>
+<li><strong>Rate Limit Compliance</strong>: Automatic</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": [{"navigation.tabs": false}], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1697 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../dashboard/">
+      
+      
+        <link rel="next" href="../analysis/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
+    
+    
+      
+        <title>Ingest - DriveShop Clip Tracking System</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ingest-module-documentation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="DriveShop Clip Tracking System" class="md-header__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DriveShop Clip Tracking System
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Ingest
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="DriveShop Clip Tracking System" class="md-nav__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    DriveShop Clip Tracking System
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Overview
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Project Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Modules
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Ingest
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ingest
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcingestingestpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/ingest/ingest.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/ingest/ingest.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-loading-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Loading Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-processing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Processing Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-extraction-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Content Extraction Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analysis Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#main-entry-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main Entry Points
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#processing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      Processing Pipeline
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcingestingest_databasepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/ingest/ingest_database.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/ingest/ingest_database.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-processing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Database Processing Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Validation Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scoring-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scoring Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#main-entry-points_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main Entry Points
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smart-retry-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Smart Retry Logic
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-schema-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Database Schema Integration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Optimizations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Analysis
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crawler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crawler-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler Utils
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creatoriq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CreatorIQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../other-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Other Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment & Support
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment & Support
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Setup Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/future.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Future Enhancements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/support.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Support & Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcingestingestpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/ingest/ingest.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/ingest/ingest.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-loading-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Loading Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-processing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Core Processing Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-extraction-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Content Extraction Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#analysis-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analysis Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#main-entry-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main Entry Points
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#processing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      Processing Pipeline
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcingestingest_databasepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/ingest/ingest_database.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/ingest/ingest_database.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-processing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Database Processing Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Validation Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scoring-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scoring Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#main-entry-points_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main Entry Points
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smart-retry-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      Smart Retry Logic
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-schema-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Database Schema Integration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-optimizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Optimizations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="ingest-module-documentation">Ingest Module Documentation</h1>
+<h2 id="module-srcingestingestpy">Module: <code>src/ingest/ingest.py</code></h2>
+<h3 id="purpose">Purpose</h3>
+<p>The CSV-based ingest module processes loan data from CSV/Excel files to find and analyze media clips (articles and videos) about loaned vehicles. It implements concurrent processing for efficiency and outputs results to CSV files for dashboard consumption. This module maintains a guaranteed contract for the core <code>process_loan()</code> function to ensure consistent processing.</p>
+<h3 id="key-functionsclasses">Key Functions/Classes</h3>
+<h4 id="data-loading-functions">Data Loading Functions</h4>
+<pre><code class="language-python">def load_loans_data(file_path: str) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Loads loan data from CSV or Excel file.
+    Returns: List of dictionaries containing loan information
+    &quot;&quot;&quot;
+
+def load_loans_data_from_url(url: str) -&gt; List[Dict]:
+    &quot;&quot;&quot;
+    Loads loan data from a URL endpoint.
+    Handles authentication and CSV parsing.
+    Returns: List of loan dictionaries
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="core-processing-functions">Core Processing Functions</h4>
+<pre><code class="language-python">def process_loan(loan: dict) -&gt; Optional[dict]:
+    &quot;&quot;&quot;
+    PROTECTED CONTRACT: Processes a single loan to find media clips.
+    Must return dictionary with specific structure or None.
+
+    Contract Requirements:
+    - Must handle both YouTube and web URLs
+    - Must validate content dates
+    - Must return only the best clip per loan
+    - Must include all required fields in output
+    &quot;&quot;&quot;
+
+async def process_loan_async(loan: dict, semaphore: asyncio.Semaphore) -&gt; Optional[dict]:
+    &quot;&quot;&quot;
+    Async wrapper for process_loan with semaphore control.
+    Enables concurrent processing with rate limiting.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="content-extraction-functions">Content Extraction Functions</h4>
+<pre><code class="language-python">def process_youtube_url(url: str, model: str, journalist_name: str, 
+                       start_date: datetime, end_date: datetime) -&gt; Optional[dict]:
+    &quot;&quot;&quot;
+    Extracts content from YouTube videos.
+    Attempts transcript extraction, falls back to metadata.
+    Applies flexible model matching for video titles.
+    &quot;&quot;&quot;
+
+def process_web_url(url: str, model: str, journalist_name: str,
+                   start_date: datetime, end_date: datetime) -&gt; Optional[dict]:
+    &quot;&quot;&quot;
+    Crawls web articles and extracts content.
+    Uses multi-tier escalation strategy for difficult sites.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="analysis-functions">Analysis Functions</h4>
+<pre><code class="language-python">def analyze_clip(content: str, model: str, journalist_name: str, 
+                source_url: str) -&gt; dict:
+    &quot;&quot;&quot;
+    Analyzes clip content using GPT-4.
+    Returns relevance score, sentiment, and AI insights.
+    &quot;&quot;&quot;
+
+def flexible_model_match(title: str, model: str) -&gt; bool:
+    &quot;&quot;&quot;
+    Intelligent matching for vehicle models in content.
+    Handles variations like &quot;X5&quot; matching &quot;BMW X5&quot;, &quot;2024 X5&quot;, etc.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="main-entry-points">Main Entry Points</h4>
+<pre><code class="language-python">def run_ingest_concurrent(loans_data: List[dict], max_workers: int = 10) -&gt; tuple:
+    &quot;&quot;&quot;
+    Main entry point for concurrent processing.
+    Returns: (successful_results, rejected_loans)
+    &quot;&quot;&quot;
+
+def run_ingest_test(file_path: str):
+    &quot;&quot;&quot;
+    Test entry point for development.
+    Processes first 5 loans from a file.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="expected-inputsoutputs">Expected Inputs/Outputs</h3>
+<h4 id="inputs">Inputs</h4>
+<ol>
+<li>
+<p><strong>Loan Data Structure</strong>:
+   <code>python
+   {
+       'Work Order Number': 'WO12345',
+       'First Name': 'John',
+       'Last Name': 'Doe',
+       'Media Outlet': 'Car Magazine',
+       'Model': 'BMW X5',
+       'Start Date': '2024-01-15',
+       'End Date': '2024-01-22',
+       'URL 1': 'https://youtube.com/watch?v=...',
+       'URL 2': 'https://carmagazine.com/review/...'
+   }</code></p>
+</li>
+<li>
+<p><strong>Configuration</strong>:</p>
+</li>
+<li>Date range fallback: 90 days → 180 days</li>
+<li>Concurrent workers: 10 (configurable)</li>
+<li>Content length limits for GPT analysis</li>
+</ol>
+<h4 id="outputs">Outputs</h4>
+<ol>
+<li>
+<p><strong>loan_results.csv</strong>:
+   <code>csv
+   Work Order Number,Model,Clip Link,AI Relevance Score,AI Insights,Sentiment Score,...
+   WO12345,BMW X5,https://...,85,"Comprehensive review focusing on...",0.8,...</code></p>
+</li>
+<li>
+<p><strong>rejected_clips.csv</strong>:
+   <code>csv
+   Work Order Number,First Name,Last Name,Rejection Reason
+   WO12346,Jane,Smith,"No valid clips found within date range"</code></p>
+</li>
+</ol>
+<h3 id="dependencies">Dependencies</h3>
+<pre><code class="language-python"># External Libraries
+import pandas as pd
+import asyncio
+import aiohttp
+from datetime import datetime, timedelta
+from dateutil import parser as date_parser
+from typing import List, Dict, Optional
+
+# Internal Modules
+from src.utils.logger import get_logger
+from src.utils.youtube_handler import extract_youtube_content
+from src.utils.crawler_manager import EnhancedCrawlerManager
+from src.utils.date_extractor import extract_published_date
+from src.analysis.gpt_analysis import analyze_content_gpt
+</code></pre>
+<h3 id="processing-pipeline">Processing Pipeline</h3>
+<ol>
+<li><strong>Load Data</strong> → Parse CSV/Excel into loan dictionaries</li>
+<li><strong>Concurrent Processing</strong> → Process multiple loans simultaneously</li>
+<li><strong>For Each Loan</strong>:</li>
+<li>Extract URLs from loan data</li>
+<li>Process each URL based on type (YouTube/Web)</li>
+<li>Validate content publication date</li>
+<li>Analyze content with GPT</li>
+<li>Select best clip (highest relevance)</li>
+<li><strong>Output Results</strong> → Save to CSV files</li>
+</ol>
+<h3 id="error-handling">Error Handling</h3>
+<ul>
+<li><strong>Date Range Fallback</strong>: Extends from 90 to 180 days if no content found</li>
+<li><strong>YouTube Fallback</strong>: Transcript → Metadata only</li>
+<li><strong>Web Crawling Escalation</strong>: Basic → Enhanced → Headless browser</li>
+<li><strong>Graceful Failures</strong>: Logs errors and continues processing</li>
+<li><strong>Rejection Tracking</strong>: Detailed reasons for failed loans</li>
+</ul>
+<hr />
+<h2 id="module-srcingestingest_databasepy">Module: <code>src/ingest/ingest_database.py</code></h2>
+<h3 id="purpose_1">Purpose</h3>
+<p>The database-integrated ingest module provides similar functionality to the CSV version but stores results directly in Supabase. It implements smart retry logic to avoid reprocessing recent attempts and defers full GPT analysis to save costs. This module is designed for production use with real-time dashboard integration.</p>
+<h3 id="key-functionsclasses_1">Key Functions/Classes</h3>
+<h4 id="database-processing-functions">Database Processing Functions</h4>
+<pre><code class="language-python">def process_loan_for_database(loan: dict, db: DatabaseManager, 
+                            outlets_mapping: dict, run_id: str) -&gt; tuple:
+    &quot;&quot;&quot;
+    Processes a loan and stores results in database.
+    Returns: (success_count, failure_count)
+    &quot;&quot;&quot;
+
+async def process_loan_database_async(loan: dict, db: DatabaseManager,
+                                    outlets_mapping: dict, run_id: str,
+                                    semaphore: asyncio.Semaphore,
+                                    progress_callback=None) -&gt; tuple:
+    &quot;&quot;&quot;
+    Async version with progress callback support.
+    Enables real-time UI updates during processing.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="validation-functions">Validation Functions</h4>
+<pre><code class="language-python">def is_url_from_authorized_outlet(url: str, journalist_name: str, 
+                                 outlets_mapping: dict) -&gt; bool:
+    &quot;&quot;&quot;
+    Validates if URL belongs to journalist's authorized outlets.
+    Prevents processing unauthorized media sources.
+    &quot;&quot;&quot;
+
+def load_person_outlets_mapping() -&gt; dict:
+    &quot;&quot;&quot;
+    Loads person-to-outlet authorization mapping.
+    Returns: Dict mapping person names to authorized outlets
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="scoring-functions">Scoring Functions</h4>
+<pre><code class="language-python">def calculate_relevance_score(content: str, model: str, 
+                            use_gpt: bool = False) -&gt; float:
+    &quot;&quot;&quot;
+    Calculates content relevance score.
+    Can use GPT or fallback to keyword matching.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="main-entry-points_1">Main Entry Points</h4>
+<pre><code class="language-python">def run_ingest_database(data_source: str):
+    &quot;&quot;&quot;
+    Main entry point for database ingestion.
+    Processes loans from file or URL.
+    &quot;&quot;&quot;
+
+def run_ingest_database_with_filters(loans_data: List[dict], 
+                                   progress_callback=None) -&gt; dict:
+    &quot;&quot;&quot;
+    Processes pre-filtered loans from dashboard.
+    Supports real-time progress updates.
+    Returns: Processing statistics
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="expected-inputsoutputs_1">Expected Inputs/Outputs</h3>
+<h4 id="inputs_1">Inputs</h4>
+<ul>
+<li>Same loan data structure as CSV version</li>
+<li><strong>Additional Requirements</strong>:</li>
+<li>Person-to-outlet mapping JSON</li>
+<li>Database connection credentials</li>
+<li>Processing run ID for tracking</li>
+</ul>
+<h4 id="outputs_1">Outputs</h4>
+<ol>
+<li>
+<p><strong>Database Records</strong> (clips table):
+   <code>sql
+   INSERT INTO clips (
+       wo_number, first_name, last_name, media_outlet,
+       model, start_date, end_date, url, content,
+       published_date, relevance_score, sentiment,
+       ai_insights, status, run_id, created_at
+   )</code></p>
+</li>
+<li>
+<p><strong>Failed Attempts</strong> (clips table with status='failed'):</p>
+</li>
+<li>Stored with rejection reasons</li>
+<li>
+<p>Used for smart retry logic</p>
+</li>
+<li>
+<p><strong>Processing Run Statistics</strong>:
+   <code>python
+   {
+       'processed': 50,
+       'successful': 45,
+       'failed': 5,
+       'duration': 120.5
+   }</code></p>
+</li>
+</ol>
+<h3 id="dependencies_1">Dependencies</h3>
+<pre><code class="language-python"># Database Integration
+from src.utils.database import DatabaseManager
+
+# Reused from CSV Version
+from src.ingest.ingest import (
+    process_youtube_url,
+    process_web_url,
+    flexible_model_match,
+    is_content_within_date_range
+)
+
+# Additional Utilities
+from src.utils.content_extractor import ContentExtractor
+from src.utils.sentiment_analysis import calculate_relevance_score_gpt
+</code></pre>
+<h3 id="smart-retry-logic">Smart Retry Logic</h3>
+<ol>
+<li><strong>Check Recent Attempts</strong>: Skip if processed in last 24 hours</li>
+<li><strong>Track Failed URLs</strong>: Store failure reasons in database</li>
+<li><strong>Homepage Detection</strong>: Filter out index/homepage URLs</li>
+<li><strong>Outlet Authorization</strong>: Only process authorized outlets</li>
+</ol>
+<h3 id="database-schema-integration">Database Schema Integration</h3>
+<pre><code class="language-sql">-- Processing Runs Table
+CREATE TABLE processing_runs (
+    id UUID PRIMARY KEY,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    total_loans INTEGER,
+    successful_clips INTEGER,
+    failed_clips INTEGER
+);
+
+-- Clips Table
+CREATE TABLE clips (
+    id SERIAL PRIMARY KEY,
+    wo_number VARCHAR,
+    url VARCHAR,
+    content TEXT,
+    relevance_score FLOAT,
+    status VARCHAR, -- 'pending', 'approved', 'rejected', 'failed'
+    run_id UUID REFERENCES processing_runs(id),
+    rejection_reason TEXT,
+    created_at TIMESTAMP
+);
+</code></pre>
+<h3 id="performance-optimizations">Performance Optimizations</h3>
+<ul>
+<li><strong>Concurrent Processing</strong>: Default 5 workers (configurable)</li>
+<li><strong>Smart Retry</strong>: Avoids redundant API calls</li>
+<li><strong>Deferred Analysis</strong>: Only relevance scoring, full GPT on demand</li>
+<li><strong>Batch Operations</strong>: Efficient database inserts</li>
+<li><strong>Progress Callbacks</strong>: Real-time UI updates without polling</li>
+</ul>
+<h3 id="error-handling_1">Error Handling</h3>
+<ul>
+<li><strong>Database Failures</strong>: Automatic reconnection with exponential backoff</li>
+<li><strong>Duplicate Detection</strong>: Checks existing clips before processing</li>
+<li><strong>Transaction Safety</strong>: Rollback on errors</li>
+<li><strong>Comprehensive Logging</strong>: All failures tracked in database</li>
+<li><strong>Graceful Degradation</strong>: Continues processing on individual failures</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": [{"navigation.tabs": false}], "search": "../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      
+    
+  </body>
+</html>

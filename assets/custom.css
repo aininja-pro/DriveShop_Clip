@@ -1,0 +1,14 @@
+/* Force top nav bar (header) to black */
+.md-header {
+    background-color: #000 !important;
+    color: white !important;
+  }
+  
+  /* Make nav title and icons white */
+  .md-header__title,
+  .md-header__button,
+  .md-header a,
+  .md-search__input {
+    color: white !important;
+  }
+  

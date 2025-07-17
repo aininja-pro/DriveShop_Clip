@@ -1,0 +1,1194 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.15">
+    
+    
+      
+        <title>Dashboard Module Documentation - DriveShop Clip Tracking System</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.342714a4.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dashboard-module-documentation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DriveShop Clip Tracking System" class="md-header__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DriveShop Clip Tracking System
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dashboard Module Documentation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DriveShop Clip Tracking System" class="md-nav__button md-logo" aria-label="DriveShop Clip Tracking System" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    DriveShop Clip Tracking System
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Overview
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Overview
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../module_overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Project Overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Modules
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ingest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Ingest
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Analysis
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    API Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crawler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../crawler-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Crawler Utils
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../creatoriq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CreatorIQ
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../other-utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Other Utilities
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Deployment & Support
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment & Support
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/setup.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Setup Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/future.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Future Enhancements
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/support.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Support & Troubleshooting
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#module-srcdashboardapppy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Module: src/dashboard/app.py
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Module: src/dashboard/app.py">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      Purpose
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-functionsclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Functions/Classes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Functions/Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#main-application-function" class="md-nav__link">
+    <span class="md-ellipsis">
+      Main Application Function
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-loading-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Loading Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ui-helper-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      UI Helper Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-processing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data Processing Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#export-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Export Functions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-interaction-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Database Interaction Functions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#expected-inputsoutputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Expected Inputs/Outputs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Expected Inputs/Outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inputs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outputs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dependencies
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependencies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#external-libraries" class="md-nav__link">
+    <span class="md-ellipsis">
+      External Libraries
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      Internal Modules
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Environment Variables
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#session-state-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      Session State Management
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance Considerations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      Security
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="dashboard-module-documentation">Dashboard Module Documentation</h1>
+<h2 id="module-srcdashboardapppy">Module: <code>src/dashboard/app.py</code></h2>
+<h3 id="purpose">Purpose</h3>
+<p>The Dashboard module provides a comprehensive Streamlit-based web interface for the DriveShop Clip Tracking System. It serves as the central hub for reviewing, approving, and managing media clips discovered through automated crawling and analysis. The dashboard enables users to process loans without clips, review AI-analyzed content, manage journalist-outlet relationships, and export formatted reports for stakeholders.</p>
+<h3 id="key-functionsclasses">Key Functions/Classes</h3>
+<h4 id="main-application-function">Main Application Function</h4>
+<pre><code class="language-python">def main():
+    &quot;&quot;&quot;
+    Entry point for the Streamlit dashboard application.
+    Handles authentication, UI layout, and orchestrates all dashboard functionality.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="data-loading-functions">Data Loading Functions</h4>
+<pre><code class="language-python">def load_person_outlets_mapping():
+    &quot;&quot;&quot;
+    Loads Person_ID to Media Outlets mapping from JSON file.
+    Returns: Dict mapping Person_ID to list of outlet data with impressions
+    &quot;&quot;&quot;
+
+def load_loans_data_for_filtering(url: str):
+    &quot;&quot;&quot;
+    Fetches and caches loans data from URL for filtering.
+    Returns: DataFrame with loan records or None if error
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="ui-helper-functions">UI Helper Functions</h4>
+<pre><code class="language-python">def apply_custom_sidebar_styling():
+    &quot;&quot;&quot;
+    Applies comprehensive black sidebar CSS styling to the Streamlit app.
+    Includes hover effects, custom colors, and professional appearance.
+    &quot;&quot;&quot;
+
+def update_progress(current: int, total: int, message: str):
+    &quot;&quot;&quot;
+    Updates processing progress in session state.
+    Used for real-time progress tracking during batch operations.
+    &quot;&quot;&quot;
+
+def format_time(seconds: float) -&gt; str:
+    &quot;&quot;&quot;
+    Formats seconds into human-readable time string.
+    Example: 125 seconds -&gt; &quot;2 minutes 5 seconds&quot;
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="data-processing-functions">Data Processing Functions</h4>
+<pre><code class="language-python">def create_reporter_name_to_id_mapping(person_outlets_data: dict) -&gt; dict:
+    &quot;&quot;&quot;
+    Creates mapping of reporter full names to Person_IDs.
+    Handles name variations and duplicates.
+    &quot;&quot;&quot;
+
+def get_outlet_options_for_person(person_id: str, person_outlets_data: dict) -&gt; list:
+    &quot;&quot;&quot;
+    Returns list of outlet names associated with a Person_ID.
+    Used for dropdown population in the UI.
+    &quot;&quot;&quot;
+
+def parse_url_tracking(wo_tracking: str) -&gt; dict:
+    &quot;&quot;&quot;
+    Parses URL tracking data from database JSON string.
+    Extracts discovered URLs and their processing status.
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="export-functions">Export Functions</h4>
+<pre><code class="language-python">def create_client_excel_report(clips_df: pd.DataFrame, 
+                             rejected_df: pd.DataFrame,
+                             selected_office: str,
+                             selected_makes: list,
+                             date_range: tuple) -&gt; BytesIO:
+    &quot;&quot;&quot;
+    Creates professional multi-sheet Excel report.
+    Includes Executive Summary, Detailed Results, Rejected Loans, and Approved Clips.
+    Returns: BytesIO object containing the Excel file
+    &quot;&quot;&quot;
+</code></pre>
+<h4 id="database-interaction-functions">Database Interaction Functions</h4>
+<pre><code class="language-python">def update_person_outlets_mapping_from_url(url: str):
+    &quot;&quot;&quot;
+    Updates local person-outlets mapping from remote URL.
+    Refreshes both JSON and CSV versions for consistency.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="expected-inputsoutputs">Expected Inputs/Outputs</h3>
+<h4 id="inputs">Inputs</h4>
+<ol>
+<li><strong>Loans Data Source</strong>:</li>
+<li>Live URL: <code>https://driveshop.mystagingwebsite.com/reports/media-and-pr/loans-without-clips/download/csv</code></li>
+<li>
+<p>File Upload: CSV/XLSX files with columns:</p>
+<ul>
+<li><code>Work Order Number</code>, <code>First Name</code>, <code>Last Name</code>, <code>Media Outlet</code></li>
+<li><code>Model</code>, <code>Start Date</code>, <code>End Date</code>, <code>Office</code>, <code>Make</code></li>
+</ul>
+</li>
+<li>
+<p><strong>User Interactions</strong>:</p>
+</li>
+<li>Filter selections (Office, Make, Reporter, Outlet, Date Range)</li>
+<li>Approval/Rejection checkboxes in AgGrid</li>
+<li>Media Outlet dropdown selections</li>
+<li>Byline Author text inputs</li>
+<li>
+<p>Sentiment analysis triggers</p>
+</li>
+<li>
+<p><strong>Configuration Files</strong>:</p>
+</li>
+<li><code>data/person_outlets_mapping.json</code>: Journalist-outlet associations</li>
+<li>Environment variables via <code>.env</code> file</li>
+</ol>
+<h4 id="outputs">Outputs</h4>
+<ol>
+<li><strong>Database Updates</strong>:</li>
+<li>Clip status updates (approved/rejected)</li>
+<li>UI state persistence</li>
+<li>Media outlet associations</li>
+<li>
+<p>Byline modifications</p>
+</li>
+<li>
+<p><strong>Export Files</strong>:</p>
+</li>
+<li><strong>Excel Reports</strong> (.xlsx):<ul>
+<li>Executive Summary sheet</li>
+<li>Detailed Results sheet</li>
+<li>Rejected Loans sheet</li>
+<li>Approved Clips sheet (FMS format)</li>
+</ul>
+</li>
+<li>
+<p><strong>JSON Files</strong>: Timestamped approved clips data</p>
+</li>
+<li>
+<p><strong>Visual Feedback</strong>:</p>
+</li>
+<li>Processing progress bars</li>
+<li>Success/error notifications</li>
+<li>Metrics display (total clips, approved, rejected)</li>
+<li>Real-time grid updates</li>
+</ol>
+<h3 id="dependencies">Dependencies</h3>
+<h4 id="external-libraries">External Libraries</h4>
+<pre><code class="language-python"># UI Framework
+import streamlit as st
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+
+# Data Processing
+import pandas as pd
+import numpy as np
+
+# File Handling
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
+# System &amp; Utilities
+import os
+import sys
+import json
+import io
+import time
+import pickle
+import requests
+from datetime import datetime, timedelta
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Image Processing
+from PIL import Image
+</code></pre>
+<h4 id="internal-modules">Internal Modules</h4>
+<pre><code class="language-python"># Database Operations
+from src.utils.database import DatabaseManager
+
+# Logging
+from src.utils.logger import get_logger
+
+# Processing Pipeline
+from src.ingest.ingest_database import (
+    process_loans_batch,
+    check_all_youtube_outlets_in_mapping
+)
+
+# Analysis
+from src.utils.sentiment_analysis import run_sentiment_analysis
+
+# CreatorIQ Integration
+from src.creatoriq.scrape_campaign_report import scrape_campaign_report
+from src.creatoriq.scrape_post_urls import scrape_posts_for_campaign
+</code></pre>
+<h3 id="configuration">Configuration</h3>
+<h4 id="environment-variables">Environment Variables</h4>
+<ul>
+<li><code>SUPABASE_URL</code>: Database connection URL</li>
+<li><code>SUPABASE_KEY</code>: Database authentication key</li>
+<li><code>STREAMLIT_PASSWORD</code>: Dashboard access password</li>
+<li><code>DATABASE_PASSWORD</code>: PostgreSQL password</li>
+</ul>
+<h4 id="session-state-management">Session State Management</h4>
+<pre><code class="language-python"># Tracking Sets
+st.session_state.viewed_records = set()      # Viewed WO numbers
+st.session_state.approved_records = set()    # Approved WO numbers
+st.session_state.rejected_records = set()    # Rejected WO numbers
+
+# Data Storage
+st.session_state.last_saved_outlets = {}     # Media outlet selections
+st.session_state.last_saved_bylines = {}     # Byline author edits
+st.session_state.outlet_data_mapping = {}    # Full outlet data
+
+# Processing State
+st.session_state.processing_progress = {...}  # Progress tracking
+st.session_state.loans_data_loaded = False   # Data load flag
+st.session_state.batch_info = {...}          # Batch processing info
+</code></pre>
+<h3 id="error-handling">Error Handling</h3>
+<ul>
+<li>Database connection failures handled with user-friendly messages</li>
+<li>File upload validation with size and format checks</li>
+<li>API rate limiting with exponential backoff</li>
+<li>Graceful degradation when external services unavailable</li>
+<li>Comprehensive logging for debugging</li>
+</ul>
+<h3 id="performance-considerations">Performance Considerations</h3>
+<ul>
+<li>Caching implemented for expensive operations (<code>@st.cache_data</code>)</li>
+<li>Batch processing for large datasets</li>
+<li>Pagination support in AgGrid for large result sets</li>
+<li>Optimized database queries with proper indexing</li>
+<li>Lazy loading for media outlet data</li>
+</ul>
+<h3 id="security">Security</h3>
+<ul>
+<li>Password protection for dashboard access</li>
+<li>Environment-based configuration (no hardcoded secrets)</li>
+<li>SQL injection prevention through parameterized queries</li>
+<li>XSS protection in user input handling</li>
+<li>Secure file upload with validation</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "../..", "features": [{"navigation.tabs": false}], "search": "../../assets/javascripts/workers/search.d50fe291.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.56ea9cef.min.js"></script>
+      
+    
+  </body>
+</html>
