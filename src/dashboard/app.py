@@ -9,6 +9,7 @@ import json
 from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUpdateMode
 from src.utils.logger import logger
 from src.utils.sentiment_analysis import run_sentiment_analysis
+from src.utils.fms_api import FMSAPIClient
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -4336,14 +4337,20 @@ with approved_queue_tab:
             # Show download button if export is ready
             if st.session_state.get('fms_export_ready', False):
                 st.markdown("---")
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
+                
+                # Show export options
+                st.markdown("### 📤 Export Options")
+                
+                col1, col2, col3 = st.columns([1, 1, 1])
+                
+                with col1:
                     if st.download_button(
-                        label="📥 Download FMS Export JSON",
+                        label="📥 Download JSON",
                         data=st.session_state.fms_export_json,
                         file_name=st.session_state.fms_export_filename,
                         mime="application/json",
-                        key="download_fms_json"
+                        key="download_fms_json",
+                        help="Download the JSON file to your computer"
                     ):
                         # Update clips to exported status after download
                         clips_to_export = st.session_state.fms_clips_to_export
@@ -4371,6 +4378,77 @@ with approved_queue_tab:
                         st.cache_data.clear()
                         time.sleep(1)
                         st.rerun()
+                        
+                with col2:
+                    if st.button("🚀 Send to FMS API", key="send_to_fms_api", help="Send clips directly to FMS API"):
+                        try:
+                            # Initialize FMS API client
+                            fms_client = FMSAPIClient()
+                            
+                            # Parse the JSON data
+                            clips_data = json.loads(st.session_state.fms_export_json)
+                            
+                            # Send to FMS API
+                            with st.spinner("Sending clips to FMS API..."):
+                                result = fms_client.send_clips(clips_data)
+                            
+                            if result["success"]:
+                                # Update clips to exported status after successful API send
+                                clips_to_export = st.session_state.fms_clips_to_export
+                                export_timestamp = st.session_state.fms_export_timestamp
+                                exported_count = 0
+                                
+                                for clip in clips_to_export:
+                                    update_result = db.supabase.table('clips').update({
+                                        'workflow_stage': 'exported',
+                                        'fms_export_date': export_timestamp
+                                    }).eq('id', clip['id']).execute()
+                                    
+                                    if update_result.data:
+                                        exported_count += 1
+                                
+                                # Clear session state
+                                st.session_state.fms_export_ready = False
+                                st.session_state.fms_export_json = None
+                                st.session_state.fms_export_filename = None
+                                st.session_state.fms_clips_to_export = None
+                                st.session_state.fms_export_timestamp = None
+                                
+                                # Show success and refresh
+                                st.success(f"✅ Successfully sent {result['sent_count']} clips to FMS API!")
+                                st.info(f"Updated {exported_count} clips to 'exported' status")
+                                st.cache_data.clear()
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Failed to send to FMS API: {result.get('error', 'Unknown error')}")
+                                if result.get('validation_errors'):
+                                    st.error("Validation errors:")
+                                    for error in result['validation_errors']:
+                                        st.error(f"  • {error}")
+                                        
+                        except Exception as e:
+                            st.error(f"❌ Error sending to FMS API: {str(e)}")
+                            logger.error(f"FMS API send error: {e}", exc_info=True)
+                            
+                with col3:
+                    if st.button("❌ Cancel Export", key="cancel_export"):
+                        # Clear session state without updating clips
+                        st.session_state.fms_export_ready = False
+                        st.session_state.fms_export_json = None
+                        st.session_state.fms_export_filename = None
+                        st.session_state.fms_clips_to_export = None
+                        st.session_state.fms_export_timestamp = None
+                        st.info("Export cancelled")
+                        st.rerun()
+                        
+                # Show API environment info
+                st.markdown("---")
+                api_env = os.getenv("FMS_API_ENVIRONMENT", "staging")
+                if api_env == "staging":
+                    st.info(f"🔧 FMS API Environment: **{api_env.upper()}** (Testing)")
+                else:
+                    st.warning(f"🚨 FMS API Environment: **{api_env.upper()}** (Live System)")
         
         else:
             # No clips found for current filter
