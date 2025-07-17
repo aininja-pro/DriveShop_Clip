@@ -2371,11 +2371,13 @@ with bulk_review_tab:
     if 'rejected_records' not in st.session_state:
         st.session_state.rejected_records = set()
     
-    # Initialize Media Outlet and Byline tracking
+    # Initialize Media Outlet, Byline, and Published Date tracking
     if 'last_saved_outlets' not in st.session_state:
         st.session_state.last_saved_outlets = {}
     if 'last_saved_bylines' not in st.session_state:
         st.session_state.last_saved_bylines = {}
+    if 'last_saved_dates' not in st.session_state:
+        st.session_state.last_saved_dates = {}
     # Add tracking for outlet data (id and impressions)
     if 'outlet_data_mapping' not in st.session_state:
         st.session_state.outlet_data_mapping = {}
@@ -3108,7 +3110,18 @@ with bulk_review_tab:
                 gb.configure_column("Media Outlet", minWidth=220)
                 gb.configure_column("Person_ID", minWidth=100)
                 gb.configure_column("Relevance", minWidth=110)
-                gb.configure_column("📅 Published Date", minWidth=150)
+                # Configure Published Date column as editable
+                gb.configure_column(
+                    "📅 Published Date",
+                    editable=True,
+                    cellEditor="agTextCellEditor",
+                    cellEditorParams={
+                        "maxLength": 50  # Limit input length for date
+                    },
+                    minWidth=150,
+                    sortable=True,
+                    filter=True
+                )
                 
                 # Configure Byline Author column as editable
                 gb.configure_column(
@@ -3451,6 +3464,57 @@ with bulk_review_tab:
                         except Exception as e:
                             st.session_state.byline_save_message = f"❌ Error saving Byline Author changes: {e}"
                             print(f"❌ Error saving byline changes: {e}")
+                    
+                    # 1.6. Handle Published Date changes (save to database)
+                    date_changed = False
+                    date_changed_count = 0
+                    date_changed_wos = []
+                    
+                    for idx, row in selected_rows["data"].iterrows():
+                        wo_num = str(row.get('WO #', ''))
+                        new_date = row.get('📅 Published Date', '')
+                        
+                        if wo_num and new_date:
+                            # Get the last saved value to avoid duplicate saves
+                            last_saved_date = st.session_state.last_saved_dates.get(wo_num, '')
+                            
+                            # Save if different from last saved
+                            if new_date != last_saved_date:
+                                date_changed = True
+                                date_changed_count += 1
+                                date_changed_wos.append(wo_num)
+                                st.session_state.last_saved_dates[wo_num] = new_date
+                                print(f"💾 Saving Published Date change for WO# {wo_num}: → '{new_date}'")
+                    
+                    # Save published date changes to database
+                    if date_changed:
+                        try:
+                            # Update clips in the database
+                            for wo_num in date_changed_wos:
+                                new_date = st.session_state.last_saved_dates[wo_num]
+                                try:
+                                    # Get database connection
+                                    db = get_database()
+                                    # Update the clip in database using the new method
+                                    success = db.update_clip_published_date(wo_num, new_date)
+                                    if success:
+                                        print(f"✅ Updated WO# {wo_num} published date to: {new_date}")
+                                    else:
+                                        print(f"⚠️ Failed to update WO# {wo_num} published date in database")
+                                except Exception as e:
+                                    print(f"❌ Error updating WO# {wo_num} published date: {e}")
+                            
+                            # Use session state to show success message
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            if date_changed_count == 1:
+                                st.session_state.date_save_message = f"💾 Published Date saved for WO# {date_changed_wos[0]} at {timestamp}"
+                            else:
+                                st.session_state.date_save_message = f"💾 {date_changed_count} Published Date edits saved at {timestamp}"
+                            print(f"✅ Updated database with {date_changed_count} Published Date changes")
+                        except Exception as e:
+                            st.session_state.date_save_message = f"❌ Error saving Published Date changes: {e}"
+                            print(f"❌ Error saving published date changes: {e}")
                     
                     # 2. Then handle approval/rejection checkboxes (stable tracking)
                     approved_rows = selected_rows["data"][selected_rows["data"]["✅ Approve"] == True]
