@@ -2912,6 +2912,9 @@ with bulk_review_tab:
                 # Store the full URL tracking data for popup (hidden column)
                 clean_df['URL_Tracking_Data'] = display_df.apply(lambda row: json.dumps(parse_url_tracking(row)), axis=1)
                 
+                # Add activity_id as a hidden column for hyperlink functionality
+                clean_df['Activity_ID'] = display_df['activity_id'] if 'activity_id' in display_df.columns else ''
+                
                 # Add mark viewed column - check session state for persistence
                 clean_df['👁️ Mark Viewed'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.viewed_records)
                 
@@ -3143,6 +3146,40 @@ with bulk_review_tab:
                 }
                 """)
                 
+                # Create cell renderer for WO # column with hyperlink to FMS activity
+                cellRenderer_wo = JsCode("""
+                class WoCellRenderer {
+                  init(params) {
+                    const woNumber = params.value;
+                    const activityId = params.data['Activity_ID'];
+                    
+                    this.eGui = document.createElement('div');
+                    
+                    if (activityId && activityId !== '') {
+                      // Create hyperlink to FMS activity
+                      this.link = document.createElement('a');
+                      this.link.innerText = woNumber;
+                      this.link.href = `https://fms.driveshop.com/activities/edit/${activityId}`;
+                      this.link.target = '_blank';
+                      this.link.style.color = '#1f77b4';
+                      this.link.style.textDecoration = 'underline';
+                      this.link.style.cursor = 'pointer';
+                      this.eGui.appendChild(this.link);
+                    } else {
+                      // No activity ID, just show the WO number as plain text
+                      this.eGui.innerText = woNumber;
+                    }
+                  }
+
+                  getGui() {
+                    return this.eGui;
+                  }
+
+                  refresh(params) {
+                    return false;
+                  }
+                }
+                """)
 
 
                 # Configure the grid
@@ -3171,6 +3208,8 @@ with bulk_review_tab:
                 gb.configure_column("Clip URL", hide=True)
                 gb.configure_column("URL_Tracking_Data", hide=True)
                 gb.configure_column("Viewed", hide=True)  # Hide the viewed status column
+                gb.configure_column("Activity_ID", hide=True)  # Hide the activity ID column
+                gb.configure_column("Outlet_Options", hide=True)  # Hide the outlet options column
                 
                 # Configure the View column with the custom renderer
                 gb.configure_column(
@@ -3203,7 +3242,7 @@ with bulk_review_tab:
                 
                 # Configure other columns with auto-sizing - increased minWidth and removed restrictive maxWidth
                 gb.configure_column("Office", minWidth=100)
-                gb.configure_column("WO #", minWidth=100)
+                gb.configure_column("WO #", minWidth=100, cellRenderer=cellRenderer_wo)
                 gb.configure_column("Make", minWidth=120)
                 gb.configure_column("Model", minWidth=150)
                 gb.configure_column("Contact", minWidth=180)
