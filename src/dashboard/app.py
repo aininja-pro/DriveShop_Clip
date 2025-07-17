@@ -4161,7 +4161,13 @@ with approved_queue_tab:
             clean_df['Contact'] = approved_df['contact'] if 'contact' in approved_df.columns else ''
             clean_df['Media Outlet'] = approved_df['media_outlet'] if 'media_outlet' in approved_df.columns else ''
             clean_df['Relevance'] = approved_df['relevance_score'].apply(lambda x: f"{x}/10" if pd.notna(x) and x != 'N/A' else 'N/A') if 'relevance_score' in approved_df.columns else 'N/A'
-            clean_df['Date'] = pd.to_datetime(approved_df['processed_date']).dt.strftime('%b %d') if 'processed_date' in approved_df.columns else ''
+            # Show published date (not processed date) - format as MMM DD, YYYY
+            if 'published_date' in approved_df.columns:
+                clean_df['Date'] = approved_df['published_date'].apply(
+                    lambda x: pd.to_datetime(x).strftime('%b %d, %Y') if pd.notna(x) else ''
+                )
+            else:
+                clean_df['Date'] = ''
             
             # Add View column for URLs
             clean_df['Clip URL'] = approved_df['clip_url'] if 'clip_url' in approved_df.columns else ''
@@ -4305,9 +4311,9 @@ with approved_queue_tab:
                     st.metric("Selected", f"{selected_count}/{len(clean_df)}")
                 
                 with col2:
-                    if st.button(f"📤 Export to FMS ({selected_count})", 
+                    if st.button(f"📤 Export Options ({selected_count})", 
                                  disabled=selected_count == 0, 
-                                 help="Export selected clips to FMS",
+                                 help="Export selected clips - Download JSON or Send to FMS",
                                  use_container_width=True,
                                  type="primary"):
                         # Handle FMS Export
