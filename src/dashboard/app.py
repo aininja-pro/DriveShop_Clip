@@ -4257,6 +4257,13 @@ with bulk_review_tab:
                             selected_rejected_wos = st.session_state.selected_for_rejection
                             if selected_rejected_wos:
                                 try:
+                                    # Get database instance
+                                    db = get_database()
+                                    if not db:
+                                        st.error("Database connection not available")
+                                        st.session_state.show_rejection_dialog = False
+                                        st.rerun()
+                                        
                                     # Update clips in database to rejected status
                                     rejected_count = 0
                                     for wo_number in selected_rejected_wos:
@@ -4274,6 +4281,9 @@ with bulk_review_tab:
                                     if rejected_count > 0:
                                         st.success(f"✅ Successfully rejected {rejected_count} clips!")
                                         st.info("📋 **Clips moved to Rejected/Issues tab**")
+                                        
+                                        # Clear the cache to force reload of updated data
+                                        st.cache_data.clear()
                                     else:
                                         st.error("❌ No clips were rejected - they may not exist in the database")
                                     
