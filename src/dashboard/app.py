@@ -3128,9 +3128,10 @@ with bulk_review_tab:
                     
                     this.checkbox.addEventListener('change', () => {
                       if (this.checkbox.checked) {
-                        // Validate Pub Date and Byline Author before allowing approval
+                        // Validate Pub Date, Byline Author, and Media Outlet before allowing approval
                         const pubDate = params.data['📅 Published Date'];
                         const bylineAuthor = params.data['📝 Byline Author'];
+                        const mediaOutlet = params.data['Media Outlet'];
                         
                         // Check if Pub Date is valid (not empty, null, or just whitespace)
                         const isValidDate = pubDate && pubDate.trim() !== '' && pubDate.trim() !== '-';
@@ -3138,7 +3139,10 @@ with bulk_review_tab:
                         // Check if Byline Author is valid (not empty, null, just whitespace, or just "-")
                         const isValidAuthor = bylineAuthor && bylineAuthor.trim() !== '' && bylineAuthor.trim() !== '-' && bylineAuthor.trim() !== '—';
                         
-                        if (!isValidDate || !isValidAuthor) {
+                        // Check if Media Outlet is valid (not empty, null, or just whitespace)
+                        const isValidOutlet = mediaOutlet && mediaOutlet.trim() !== '' && mediaOutlet.trim() !== '-';
+                        
+                        if (!isValidDate || !isValidAuthor || !isValidOutlet) {
                           // Prevent approval and show alert
                           this.checkbox.checked = false;
                           
@@ -3148,6 +3152,9 @@ with bulk_review_tab:
                           }
                           if (!isValidAuthor) {
                             errorMsg += '• Byline Author is missing or invalid\\n';
+                          }
+                          if (!isValidOutlet) {
+                            errorMsg += '• Media Outlet is missing or invalid\\n';
                           }
                           errorMsg += '\\nPlease fill in these fields before approving.';
                           
