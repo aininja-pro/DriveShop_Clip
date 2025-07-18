@@ -5454,7 +5454,18 @@ with rejected_tab:
             # Configure columns with auto-sizing (no fixed widths) for balanced layout
             if "Office" in display_columns:
                 gb.configure_column("Office", pinned='left')  # Keep pinned but auto-size
-            gb.configure_column("WO #", pinned='left')  # Keep pinned but auto-size
+            
+            # Configure WO # column with proper filter for string type
+            gb.configure_column(
+                "WO #", 
+                pinned='left',
+                filter='agTextColumnFilter',  # Use text filter for string columns
+                filterParams={
+                    'filterOptions': ['contains', 'notContains', 'equals', 'notEqual', 'startsWith', 'endsWith'],
+                    'defaultOption': 'contains',
+                    'caseSensitive': False
+                }
+            )
             
             # Configure the View column with the custom renderer (same as bulk review) 
             if "📄 View" in display_columns:
@@ -5520,25 +5531,34 @@ with rejected_tab:
                     if hasattr(selected_rows, 'to_dict'):
                         selected_rows = selected_rows.to_dict('records')
                     
-                    moved_count = 0
-                    for row in selected_rows:
-                        wo_number = str(row.get('WO #', ''))
-                        if wo_number:
-                            # Update status back to pending_review
-                            result = db.supabase.table('clips').update({
-                                'status': 'pending_review',
-                                'failure_reason': None  # Clear the rejection reason
-                            }).eq('wo_number', wo_number).execute()
-                            
-                            if result.data:
-                                moved_count += 1
-                                logger.info(f"✅ Moved WO #{wo_number} back to pending review")
-                    
-                    if moved_count > 0:
-                        st.success(f"✅ Moved {moved_count} clips back to Bulk Review")
-                        st.rerun()
+                    # Get database instance
+                    db = get_database()
+                    if not db:
+                        st.error("Database connection not available")
                     else:
-                        st.error("❌ Could not move any clips - they may not exist in the database")
+                        moved_count = 0
+                        for row in selected_rows:
+                            wo_number = str(row.get('WO #', ''))
+                            if wo_number:
+                                # Update status back to pending_review
+                                result = db.supabase.table('clips').update({
+                                    'status': 'pending_review',
+                                    'failure_reason': None  # Clear the rejection reason
+                                }).eq('wo_number', wo_number).execute()
+                                
+                                if result.data:
+                                    moved_count += 1
+                                    logger.info(f"✅ Moved WO #{wo_number} back to pending review")
+                        
+                        if moved_count > 0:
+                            st.success(f"✅ Moved {moved_count} clips back to Bulk Review")
+                            # Clear the cache to force reload of updated data
+                            st.cache_data.clear()
+                            # Use a small delay before rerun to ensure success message is visible
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ Could not move any clips - they may not exist in the database")
                 else:
                     st.warning("No records selected")
     else:
