@@ -4631,6 +4631,41 @@ with approved_queue_tab:
                 }
             )
             
+            # Create cell renderer for WO # column with hyperlink to FMS activity
+            cellRenderer_wo = JsCode("""
+            class WoCellRenderer {
+              init(params) {
+                const woNumber = params.value;
+                const activityId = params.data['Activity_ID'];
+                
+                this.eGui = document.createElement('div');
+                
+                if (activityId && activityId !== '') {
+                  // Create hyperlink to FMS activity
+                  this.link = document.createElement('a');
+                  this.link.innerText = woNumber;
+                  this.link.href = `https://fms.driveshop.com/activities/edit/${activityId}`;
+                  this.link.target = '_blank';
+                  this.link.style.color = '#1f77b4';
+                  this.link.style.textDecoration = 'underline';
+                  this.link.style.cursor = 'pointer';
+                  this.eGui.appendChild(this.link);
+                } else {
+                  // No activity ID, just show the WO number as plain text
+                  this.eGui.innerText = woNumber;
+                }
+              }
+
+              getGui() {
+                return this.eGui;
+              }
+
+              refresh(params) {
+                return false;
+              }
+            }
+            """)
+            
             # Enable selection for batch operations (only for Ready to Export)
             if st.session_state.approved_queue_filter == 'ready_to_export':
                 gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
@@ -4670,41 +4705,6 @@ with approved_queue_tab:
                 this.eGui.style.color = '#1f77b4';
                 this.eGui.style.textDecoration = 'underline';
                 this.eGui.style.cursor = 'pointer';
-              }
-
-              getGui() {
-                return this.eGui;
-              }
-
-              refresh(params) {
-                return false;
-              }
-            }
-            """)
-            
-            # Create cell renderer for WO # column with hyperlink to FMS activity
-            cellRenderer_wo = JsCode("""
-            class WoCellRenderer {
-              init(params) {
-                const woNumber = params.value;
-                const activityId = params.data['Activity_ID'];
-                
-                this.eGui = document.createElement('div');
-                
-                if (activityId && activityId !== '') {
-                  // Create hyperlink to FMS activity
-                  this.link = document.createElement('a');
-                  this.link.innerText = woNumber;
-                  this.link.href = `https://fms.driveshop.com/activities/edit/${activityId}`;
-                  this.link.target = '_blank';
-                  this.link.style.color = '#1f77b4';
-                  this.link.style.textDecoration = 'underline';
-                  this.link.style.cursor = 'pointer';
-                  this.eGui.appendChild(this.link);
-                } else {
-                  // No activity ID, just show the WO number as plain text
-                  this.eGui.innerText = woNumber;
-                }
               }
 
               getGui() {
