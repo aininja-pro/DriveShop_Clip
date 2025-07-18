@@ -10,11 +10,13 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUp
 from src.utils.logger import logger
 from src.utils.sentiment_analysis import run_sentiment_analysis
 from src.utils.fms_api import FMSAPIClient
+from src.utils.auth import SupabaseAuth
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 import requests
+from streamlit_extras.stylable_container import stylable_container
 
 # Add explicit .env loading with debug output
 from dotenv import load_dotenv
@@ -38,6 +40,9 @@ for env_path in possible_env_paths:
 
 if not env_loaded:
     print("WARNING: No .env file found!")
+
+# Initialize authentication
+auth = SupabaseAuth()
 
 # Debug: Print loaded environment variables (without exposing full API keys)
 # Only print on first load
@@ -1395,8 +1400,113 @@ with st.sidebar:
         print(f"Logo loading error: {e}")
         st.markdown("**DriveShop**")
 
-# DEVELOPMENT MODE: Skip password check
-# Main application
+# Check authentication
+if not auth.is_authenticated():
+    # Apply dark background for login page
+    st.markdown("""
+        <style>
+        /* Dark background for login page */
+        .stApp {
+            background-color: #0e1117;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # Display logo
+        logo_path = Path(__file__).parent.parent.parent / "docs" / "assets" / "Logo.png"
+        if logo_path.exists():
+            try:
+                logo = Image.open(logo_path)
+                st.image(logo, width=300)
+            except Exception:
+                st.markdown("# DriveShop", unsafe_allow_html=True)
+        else:
+            st.markdown("# DriveShop", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Login form with white background and black border
+        st.markdown("""
+            <div style="background-color: white; padding: 2rem; border-radius: 10px; border: 1px solid black; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                <h3 style="color: black; text-align: center; margin-bottom: 1rem;">Clip Tracking Dashboard</h3>
+                <h4 style="color: black; text-align: center; margin-bottom: 2rem;">Sign In</h4>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        with st.container():
+            st.markdown("""
+                <style>
+                div[data-testid="stForm"] {
+                    background-color: white;
+                    padding: 2rem;
+                    border-radius: 10px;
+                    border: 1px solid black;
+                    margin-top: -3rem;
+                    padding-top: 3rem;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            
+            with st.form("login_form", clear_on_submit=False):
+                email = st.text_input("Email", placeholder="admin@driveshop.com")
+                password = st.text_input("Password", type="password", placeholder="Enter password")
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Use stylable_container to make the button blue
+                with stylable_container(
+                    "blue_button",
+                    css_styles="""
+                    button {
+                        background-color: #5A8FDB !important;
+                        color: white !important;
+                        border: 2px solid #4A7BC7 !important;
+                        border-radius: 6px !important;
+                        font-weight: 600 !important;
+                        transition: all 0.3s ease !important;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+                    }
+                    button:hover {
+                        background-color: #4A7BC7 !important;
+                        color: white !important;
+                        border-color: #3A6BB7 !important;
+                        transform: translateY(-1px) !important;
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.25) !important;
+                    }
+                    """
+                ):
+                    submitted = st.form_submit_button("Login", use_container_width=True, type="primary")
+                
+                if submitted:
+                    if email and password:
+                        success, error = auth.login(email, password)
+                        if success:
+                            st.success("Login successful!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(error or "Invalid credentials")
+                    else:
+                        st.error("Please enter both email and password")
+    
+    # Stop here if not authenticated
+    st.stop()
+
+# Main application (only runs if authenticated)
+with st.sidebar:
+    if st.button("Logout", type="secondary", use_container_width=True):
+        auth.logout()
+        st.rerun()
+    
+    user = auth.get_current_user()
+    if user:
+        st.markdown(f"**Logged in as:** {user.email}")
+    
+    st.markdown("---")
+
 st.title("DriveShop Clip Tracking Dashboard")
 
 # Custom CSS for better styling
