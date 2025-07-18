@@ -3622,8 +3622,8 @@ with bulk_review_tab:
                 # Force column definitions in the exact order we want
                 grid_options['columnDefs'] = [
                     # Approve and Reject columns first with icon-only headers
-                    {'field': '✅ Approve', 'headerName': '✅', 'cellRenderer': cellRenderer_approve, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left'},
-                    {'field': '❌ Reject', 'headerName': '❌', 'cellRenderer': cellRenderer_reject, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left'},
+                    {'field': '✅ Approve', 'headerName': '✅', 'cellRenderer': cellRenderer_approve, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left', 'cellStyle': {'backgroundColor': '#f0f9f0'}},
+                    {'field': '❌ Reject', 'headerName': '❌', 'cellRenderer': cellRenderer_reject, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left', 'cellStyle': {'backgroundColor': '#fef0f0'}},
                     {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 100},
                     {'field': 'Contact', 'minWidth': 180},
                     {'field': 'Media Outlet', 'cellRenderer': cellRenderer_outlet_dropdown if person_outlets_mapping else None, 'minWidth': 220, 'editable': True, 'sortable': True, 'filter': True},
