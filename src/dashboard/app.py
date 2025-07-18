@@ -3115,10 +3115,10 @@ with bulk_review_tab:
                   init(params) {
                     this.eGui = document.createElement('div');
                     this.eGui.style.display = 'flex';
-                    this.eGui.style.justifyContent = 'flex-start';
+                    this.eGui.style.justifyContent = 'center';
                     this.eGui.style.alignItems = 'center';
                     this.eGui.style.height = '100%';
-                    this.eGui.style.paddingLeft = '8px';
+                    this.eGui.style.paddingLeft = '0px';
                     
                     this.checkbox = document.createElement('input');
                     this.checkbox.type = 'checkbox';
@@ -3162,10 +3162,10 @@ with bulk_review_tab:
                   init(params) {
                     this.eGui = document.createElement('div');
                     this.eGui.style.display = 'flex';
-                    this.eGui.style.justifyContent = 'flex-start';
+                    this.eGui.style.justifyContent = 'center';
                     this.eGui.style.alignItems = 'center';
                     this.eGui.style.height = '100%';
-                    this.eGui.style.paddingLeft = '8px';
+                    this.eGui.style.paddingLeft = '0px';
                     
                     this.checkbox = document.createElement('input');
                     this.checkbox.type = 'checkbox';
@@ -3621,7 +3621,9 @@ with bulk_review_tab:
                 
                 # Force column definitions in the exact order we want
                 grid_options['columnDefs'] = [
-                    {'field': '👁️ Mark Viewed', 'headerName': 'Viewed', 'cellRenderer': cellRenderer_mark_viewed, 'minWidth': 80, 'maxWidth': 100, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left'},
+                    # Approve and Reject columns first with icon-only headers
+                    {'field': '✅ Approve', 'headerName': '✅', 'cellRenderer': cellRenderer_approve, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left'},
+                    {'field': '❌ Reject', 'headerName': '❌', 'cellRenderer': cellRenderer_reject, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left'},
                     {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 100},
                     {'field': 'Contact', 'minWidth': 180},
                     {'field': 'Media Outlet', 'cellRenderer': cellRenderer_outlet_dropdown if person_outlets_mapping else None, 'minWidth': 220, 'editable': True, 'sortable': True, 'filter': True},
@@ -3631,9 +3633,8 @@ with bulk_review_tab:
                     {'field': '📅 Published Date', 'headerName': 'Pub Date', 'editable': True, 'minWidth': 100, 'sortable': True, 'filter': True, 'cellEditor': 'agTextCellEditor', 'cellEditorParams': {'maxLength': 8}},
                     {'field': '📝 Byline Author', 'headerName': 'Byline Author', 'editable': True, 'minWidth': 180, 'sortable': True, 'filter': True},
                     {'field': 'Relevance', 'headerName': 'Score', 'minWidth': 80},
-                    {'field': '✅ Approve', 'headerName': 'Approve', 'cellRenderer': cellRenderer_approve, 'minWidth': 90, 'editable': True, 'sortable': False, 'filter': False},
-                    {'field': '❌ Reject', 'headerName': 'Reject', 'cellRenderer': cellRenderer_reject, 'minWidth': 90, 'editable': True, 'sortable': False, 'filter': False},
                     # Hidden columns
+                    {'field': '👁️ Mark Viewed', 'hide': True},  # Hide but keep for functionality
                     {'field': 'Office', 'hide': True},
                     {'field': 'Person_ID', 'hide': True},
                     {'field': 'Clip URL', 'hide': True},
