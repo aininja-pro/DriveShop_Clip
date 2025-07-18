@@ -3128,6 +3128,33 @@ with bulk_review_tab:
                     
                     this.checkbox.addEventListener('change', () => {
                       if (this.checkbox.checked) {
+                        // Validate Pub Date and Byline Author before allowing approval
+                        const pubDate = params.data['📅 Published Date'];
+                        const bylineAuthor = params.data['📝 Byline Author'];
+                        
+                        // Check if Pub Date is valid (not empty, null, or just whitespace)
+                        const isValidDate = pubDate && pubDate.trim() !== '' && pubDate.trim() !== '-';
+                        
+                        // Check if Byline Author is valid (not empty, null, just whitespace, or just "-")
+                        const isValidAuthor = bylineAuthor && bylineAuthor.trim() !== '' && bylineAuthor.trim() !== '-' && bylineAuthor.trim() !== '—';
+                        
+                        if (!isValidDate || !isValidAuthor) {
+                          // Prevent approval and show alert
+                          this.checkbox.checked = false;
+                          
+                          let errorMsg = 'Cannot approve this record:\\n\\n';
+                          if (!isValidDate) {
+                            errorMsg += '• Published Date is missing or invalid\\n';
+                          }
+                          if (!isValidAuthor) {
+                            errorMsg += '• Byline Author is missing or invalid\\n';
+                          }
+                          errorMsg += '\\nPlease fill in these fields before approving.';
+                          
+                          alert(errorMsg);
+                          return;
+                        }
+                        
                         // If approve is checked, uncheck reject
                         const rowNode = params.node;
                         rowNode.setDataValue('❌ Reject', false);
