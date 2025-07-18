@@ -2730,13 +2730,18 @@ with bulk_review_tab:
                 # Display filtered results with AgGrid
                 display_df = df.copy()
                 
-                # Create the EXACT table structure from the working version (Image 1)
+                # Create the table structure with the new column order
                 clean_df = pd.DataFrame()
-                clean_df['Office'] = display_df['Office'] if 'Office' in display_df.columns else 'N/A'
+                
+                # First add the Mark Viewed column (will be first in display)
+                clean_df['👁️ Mark Viewed'] = display_df['WO #'].apply(lambda wo: str(wo) in st.session_state.viewed_records) if 'WO #' in display_df.columns else False
+                
+                # Then add columns in the requested order
                 clean_df['WO #'] = display_df['WO #'] if 'WO #' in display_df.columns else ''
-                clean_df['Make'] = display_df['Make'] if 'Make' in display_df.columns else ''
-                clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
                 clean_df['Contact'] = display_df['To'] if 'To' in display_df.columns else ''
+                
+                # Add hidden columns that are still needed
+                clean_df['Office'] = display_df['Office'] if 'Office' in display_df.columns else 'N/A'
                 
                 # --- FIX: Use a name-to-ID mapping to get the correct numeric Person_ID ---
                 reporter_name_to_id_map = create_reporter_name_to_id_mapping()
@@ -2813,6 +2818,10 @@ with bulk_review_tab:
                     if wo_num in st.session_state.last_saved_outlets:
                         clean_df.at[idx, 'Media Outlet'] = st.session_state.last_saved_outlets[wo_num]
                 
+                # Add Make and Model columns
+                clean_df['Make'] = display_df['Make'] if 'Make' in display_df.columns else ''
+                clean_df['Model'] = display_df['Model'] if 'Model' in display_df.columns else ''
+                
                 # Format relevance score as "8/10" format
                 if 'Relevance Score' in display_df.columns:
                     clean_df['Relevance'] = display_df['Relevance Score'].apply(lambda x: f"{x}/10" if pd.notna(x) and x != 'N/A' else 'N/A')
@@ -2852,7 +2861,7 @@ with bulk_review_tab:
                             try:
                                 import dateutil.parser
                                 parsed_date = dateutil.parser.parse(str(raw_date))
-                                return parsed_date.strftime('%b %d, %Y')
+                                return parsed_date.strftime('%m/%d/%y')
                             except:
                                 pass
                         
@@ -2873,7 +2882,7 @@ with bulk_review_tab:
                                         year, month, day = match.groups()
                                         from datetime import datetime
                                         date_obj = datetime(int(year), int(month), int(day))
-                                        return date_obj.strftime('%b %d, %Y')
+                                        return date_obj.strftime('%m/%d/%y')
                                     except:
                                         continue
                         
@@ -2886,7 +2895,7 @@ with bulk_review_tab:
                                 parsed_date = dateutil.parser.parse(str(processed_date))
                                 # Only use if within last 30 days (likely recent article)
                                 if (datetime.now() - parsed_date).days <= 30:
-                                    return parsed_date.strftime('%b %d, %Y')
+                                    return parsed_date.strftime('%m/%d/%y')
                             except:
                                 pass
                         
@@ -3025,8 +3034,7 @@ with bulk_review_tab:
                 # Add activity_id as a hidden column for hyperlink functionality
                 clean_df['Activity_ID'] = display_df['activity_id'] if 'activity_id' in display_df.columns else ''
                 
-                # Add mark viewed column - check session state for persistence
-                clean_df['👁️ Mark Viewed'] = clean_df['WO #'].apply(lambda wo: str(wo) in st.session_state.viewed_records)
+                # Note: Mark Viewed column already added at the beginning
                 
                 # Note: Saved checkbox states are already loaded at the beginning of the tab
                 
@@ -3314,14 +3322,30 @@ with bulk_review_tab:
                     }
                 )
                 
-                # Hide the original URL column and tracking data
-                gb.configure_column("Clip URL", hide=True)
-                gb.configure_column("URL_Tracking_Data", hide=True)
-                gb.configure_column("Viewed", hide=True)  # Hide the viewed status column
-                gb.configure_column("Activity_ID", hide=True)  # Hide the activity ID column
-                gb.configure_column("Outlet_Options", hide=True)  # Hide the outlet options column
+                # Now configure visible columns in the exact order needed
+                # 1. Viewed (Mark Viewed button)
+                gb.configure_column(
+                    "👁️ Mark Viewed",
+                    headerName="Viewed",
+                    cellRenderer=cellRenderer_mark_viewed,
+                    minWidth=80,
+                    maxWidth=100,
+                    editable=True,
+                    sortable=False,
+                    filter=False,
+                    pinned='left'  # Keep it visible when scrolling
+                )
                 
-                # Configure the View column with the custom renderer
+                # 2. Work Order #
+                gb.configure_column("WO #", minWidth=100, cellRenderer=cellRenderer_wo, headerName="Work Order #")
+                
+                # 3. Contact
+                gb.configure_column("Contact", minWidth=180)
+                
+                # 4. Media Outlet (configured here but renderer will be set later if dropdown is available)
+                gb.configure_column("Media Outlet", minWidth=220, editable=True, sortable=True, filter=True)
+                
+                # 5. View (clip link)
                 gb.configure_column(
                     "📄 View", 
                     cellRenderer=cellRenderer_view,
@@ -3331,50 +3355,67 @@ with bulk_review_tab:
                     filter=False
                 )
                 
-                # Add row styling for viewed records with better visibility
-                gb.configure_grid_options(
-                    getRowStyle=JsCode("""
-                    function(params) {
-                        if (params.data.Viewed === true) {
-                            return {
-                                'background-color': '#e8f5e8',
-                                'border-left': '4px solid #28a745',
-                                'opacity': '0.85'
-                            };
-                        }
-                        return {};
-                    }
-                    """)
-                )
-
-                # Configure selection
-                gb.configure_selection(selection_mode="multiple", use_checkbox=False)
-                
-                # Configure other columns with auto-sizing - increased minWidth and removed restrictive maxWidth
-                gb.configure_column("Office", minWidth=100)
-                gb.configure_column("WO #", minWidth=100, cellRenderer=cellRenderer_wo)
+                # 6. Make
                 gb.configure_column("Make", minWidth=120)
+                
+                # 7. Model
                 gb.configure_column("Model", minWidth=150)
-                gb.configure_column("Contact", minWidth=180)
-                gb.configure_column("Media Outlet", minWidth=220)
-                gb.configure_column("Person_ID", minWidth=100)
-                gb.configure_column("Relevance", minWidth=110)
-                # Configure Published Date column as editable
+                
+                # 8. Pub Date (Published Date)
                 gb.configure_column(
                     "📅 Published Date",
+                    headerName="Pub Date",
                     editable=True,
                     cellEditor="agTextCellEditor",
                     cellEditorParams={
-                        "maxLength": 50  # Limit input length for date
+                        "maxLength": 8  # MM/DD/YY is 8 characters
                     },
-                    minWidth=150,
+                    valueParser=JsCode("""
+                    function(params) {
+                        const value = params.newValue;
+                        if (!value || value === '—') return value;
+                        
+                        // Remove any non-numeric characters except /
+                        const cleaned = value.replace(/[^0-9/]/g, '');
+                        
+                        // Check if it matches MM/DD/YY format
+                        const dateRegex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{2}$/;
+                        if (dateRegex.test(cleaned)) {
+                            return cleaned;
+                        }
+                        
+                        // Try to parse and format the date
+                        const parts = cleaned.split('/');
+                        if (parts.length === 3) {
+                            const month = parts[0].padStart(2, '0');
+                            const day = parts[1].padStart(2, '0');
+                            const year = parts[2].length === 4 ? parts[2].substring(2) : parts[2].padStart(2, '0');
+                            
+                            const formatted = month + '/' + day + '/' + year;
+                            if (dateRegex.test(formatted)) {
+                                return formatted;
+                            }
+                        }
+                        
+                        // Return original value if can't parse
+                        return params.oldValue;
+                    }
+                    """),
+                    minWidth=100,
                     sortable=True,
-                    filter=True
+                    filter=True,
+                    tooltipField="📅 Published Date",
+                    tooltipValueGetter=JsCode("""
+                    function(params) {
+                        return "Enter date as MM/DD/YY";
+                    }
+                    """)
                 )
                 
-                # Configure Byline Author column as editable
+                # 9. Byline Author
                 gb.configure_column(
                     "📝 Byline Author",
+                    headerName="Byline Author",
                     editable=True,
                     cellEditor="agTextCellEditor",
                     cellEditorParams={
@@ -3385,25 +3426,27 @@ with bulk_review_tab:
                     filter=True
                 )
                 
+                # 10. Score (Relevance)
+                gb.configure_column("Relevance", minWidth=80, headerName="Score")
+
+                # Configure selection
+                gb.configure_selection(selection_mode="multiple", use_checkbox=False)
+                
+                # First, configure all hidden columns
+                gb.configure_column("Office", hide=True)
+                gb.configure_column("Person_ID", hide=True)
+                gb.configure_column("Clip URL", hide=True)
+                gb.configure_column("URL_Tracking_Data", hide=True)
+                gb.configure_column("Viewed", hide=True)  # Hide the viewed status column
+                gb.configure_column("Activity_ID", hide=True)  # Hide the activity ID column
+                gb.configure_column("Outlet_Options", hide=True)  # Hide the outlet options column
+                
+                
                 # Load Person_ID to Media Outlets mapping for dropdown
                 person_outlets_mapping = load_person_outlets_mapping()
                 
-                # Configure Media Outlet dropdown column if mapping is available
+                # Update Media Outlet column with dropdown if mapping is available
                 if person_outlets_mapping:
-                    # Media Outlet column already exists, just configure it as dropdown
-                    
-                    # Configure the Media Outlet dropdown column
-                    gb.configure_column(
-                        "Media Outlet",
-                        cellEditor="agSelectCellEditor",
-                        cellEditorParams={
-                            "values": []  # Will be populated dynamically per row
-                        },
-                        minWidth=220,
-                        editable=True,
-                        sortable=True,
-                        filter=True
-                    )
                     
                     # Create custom cell renderer for dynamic dropdown options
                     cellRenderer_outlet_dropdown = JsCode("""
@@ -3463,10 +3506,14 @@ with bulk_review_tab:
                     }
                     """)
                     
-                    # Configure the dropdown with custom renderer
+                    # Update the already configured Media Outlet column to add dropdown functionality
                     gb.configure_column(
                         "Media Outlet",
-                        cellRenderer=cellRenderer_outlet_dropdown,
+                        cellEditor="agSelectCellEditor",
+                        cellEditorParams={
+                            "values": []  # Will be populated dynamically per row
+                        },
+                        cellRenderer=cellRenderer_outlet_dropdown,  # Add the dropdown renderer
                         minWidth=220,
                         editable=True,
                         sortable=True,
@@ -3484,30 +3531,70 @@ with bulk_review_tab:
                     # Apply outlet options to each row
                     clean_df = clean_df.apply(add_outlet_options, axis=1)
                 
-                # Configure Mark Viewed button column
-                gb.configure_column(
-                    "👁️ Mark Viewed",
-                    cellRenderer=cellRenderer_mark_viewed,
-                    minWidth=130,
-                    editable=True,
-                    sortable=False,
-                    filter=False,
-                    pinned='left'  # Keep it visible when scrolling
+                # Reorder columns to match the requested sequence
+                column_order = [
+                    '👁️ Mark Viewed',  # Viewed
+                    'WO #',            # Work Order #
+                    'Contact',         # Contact
+                    'Media Outlet',    # Media Outlet
+                    '📄 View',         # View (clip link)
+                    'Make',            # Make
+                    'Model',           # Model
+                    '📅 Published Date',  # Pub Date
+                    '📝 Byline Author',   # Byline Author
+                    'Relevance',       # Score
+                    '✅ Approve',      # Approve
+                    '❌ Reject',       # Reject
+                    # Hidden columns
+                    'Office',
+                    'Person_ID',
+                    'Clip URL',
+                    'URL_Tracking_Data',
+                    'Viewed',
+                    'Activity_ID',
+                    'Outlet_Options'
+                ]
+                
+                # Ensure all columns exist before reordering
+                existing_columns = [col for col in column_order if col in clean_df.columns]
+                # Add any remaining columns not in the order list
+                remaining_columns = [col for col in clean_df.columns if col not in existing_columns]
+                clean_df = clean_df[existing_columns + remaining_columns]
+                
+                # Add row styling for viewed records with better visibility
+                gb.configure_grid_options(
+                    maintainColumnOrder=True,  # Maintain column order from DataFrame
+                    getRowStyle=JsCode("""
+                    function(params) {
+                        if (params.data.Viewed === true) {
+                            return {
+                                'background-color': '#e8f5e8',
+                                'border-left': '4px solid #28a745',
+                                'opacity': '0.85'
+                            };
+                        }
+                        return {};
+                    }
+                    """)
                 )
                 
-                # Configure Approve and Reject columns with checkbox renderers
+                # 11. Approve
                 gb.configure_column(
                     "✅ Approve", 
+                    headerName="Approve",
                     cellRenderer=cellRenderer_approve,
-                    minWidth=110,
+                    minWidth=90,
                     editable=True,
                     sortable=False,
                     filter=False
                 )
+                
+                # 12. Reject
                 gb.configure_column(
                     "❌ Reject", 
+                    headerName="Reject",
                     cellRenderer=cellRenderer_reject,
-                    minWidth=110,
+                    minWidth=90,
                     editable=True,
                     sortable=False,
                     filter=False
@@ -3516,6 +3603,7 @@ with bulk_review_tab:
                 # Configure grid auto-sizing
                 gb.configure_grid_options(
                     domLayout='normal',
+                    maintainColumnOrder=True,
                     onFirstDataRendered=JsCode("""
                     function(params) {
                         params.api.sizeColumnsToFit();
@@ -3530,6 +3618,30 @@ with bulk_review_tab:
                 
                 # Build grid options
                 grid_options = gb.build()
+                
+                # Force column definitions in the exact order we want
+                grid_options['columnDefs'] = [
+                    {'field': '👁️ Mark Viewed', 'headerName': 'Viewed', 'cellRenderer': cellRenderer_mark_viewed, 'minWidth': 80, 'maxWidth': 100, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left'},
+                    {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 100},
+                    {'field': 'Contact', 'minWidth': 180},
+                    {'field': 'Media Outlet', 'cellRenderer': cellRenderer_outlet_dropdown if person_outlets_mapping else None, 'minWidth': 220, 'editable': True, 'sortable': True, 'filter': True},
+                    {'field': '📄 View', 'cellRenderer': cellRenderer_view, 'minWidth': 80, 'maxWidth': 100, 'sortable': False, 'filter': False},
+                    {'field': 'Make', 'minWidth': 120},
+                    {'field': 'Model', 'minWidth': 150},
+                    {'field': '📅 Published Date', 'headerName': 'Pub Date', 'editable': True, 'minWidth': 100, 'sortable': True, 'filter': True, 'cellEditor': 'agTextCellEditor', 'cellEditorParams': {'maxLength': 8}},
+                    {'field': '📝 Byline Author', 'headerName': 'Byline Author', 'editable': True, 'minWidth': 180, 'sortable': True, 'filter': True},
+                    {'field': 'Relevance', 'headerName': 'Score', 'minWidth': 80},
+                    {'field': '✅ Approve', 'headerName': 'Approve', 'cellRenderer': cellRenderer_approve, 'minWidth': 90, 'editable': True, 'sortable': False, 'filter': False},
+                    {'field': '❌ Reject', 'headerName': 'Reject', 'cellRenderer': cellRenderer_reject, 'minWidth': 90, 'editable': True, 'sortable': False, 'filter': False},
+                    # Hidden columns
+                    {'field': 'Office', 'hide': True},
+                    {'field': 'Person_ID', 'hide': True},
+                    {'field': 'Clip URL', 'hide': True},
+                    {'field': 'URL_Tracking_Data', 'hide': True},
+                    {'field': 'Viewed', 'hide': True},
+                    {'field': 'Activity_ID', 'hide': True},
+                    {'field': 'Outlet_Options', 'hide': True}
+                ]
                 
                 # Call AgGrid with Enterprise modules enabled for Set Filters
                 selected_rows = AgGrid(
