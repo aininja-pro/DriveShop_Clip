@@ -355,11 +355,11 @@ def apply_custom_sidebar_styling():
         color: white !important;
     }
     
-    /* Selectbox dropdown styling */
+    /* Selectbox dropdown styling - Updated to fix white text issue */
     .stSidebar .stSelectbox > div > div {
-        background-color: #1a1a1a !important;
+        background-color: white !important;
         border: 1px solid #333333 !important;
-        color: white !important;
+        color: #000000 !important;
     }
     
     /* Fix input text colors - make text dark in input fields */
@@ -373,9 +373,39 @@ def apply_custom_sidebar_styling():
         background-color: white !important;
     }
     
+    /* Selectbox selected value display */
     .stSidebar .stSelectbox > div > div > div {
         color: #000000 !important;
         background-color: white !important;
+    }
+    
+    /* Additional fix for selectbox text visibility */
+    .stSidebar [data-baseweb="select"] > div {
+        background-color: white !important;
+    }
+    
+    .stSidebar [data-baseweb="select"] > div > div {
+        color: #000000 !important;
+    }
+    
+    /* More specific selectors for the displayed selected value */
+    .stSidebar [data-baseweb="select"] [data-baseweb="tag"] {
+        color: #000000 !important;
+        background-color: #f0f0f0 !important;
+    }
+    
+    /* Target the specific div that contains the selected text */
+    .stSidebar [data-baseweb="select"] > div > div > div {
+        color: #000000 !important;
+    }
+    
+    /* Another approach - target by class if present */
+    .stSidebar .css-1wa3eu0-placeholder {
+        color: #000000 !important;
+    }
+    
+    .stSidebar div[data-baseweb="select"] span {
+        color: #000000 !important;
     }
     
     /* Dropdown options styling */
