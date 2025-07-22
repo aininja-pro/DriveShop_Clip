@@ -1430,8 +1430,10 @@ with st.sidebar:
         print(f"Logo loading error: {e}")
         st.markdown("**DriveShop**")
 
-# Check authentication
-if not auth.is_authenticated():
+# Check authentication and refresh session if needed
+# Session timeout is configurable via SESSION_TIMEOUT_HOURS environment variable
+session_timeout = int(os.environ.get('SESSION_TIMEOUT_HOURS', '24'))
+if not auth.check_and_refresh_session(session_timeout_hours=session_timeout):
     # Apply dark background for login page
     st.markdown("""
         <style>
