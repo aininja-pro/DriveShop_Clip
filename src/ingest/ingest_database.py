@@ -243,6 +243,12 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
     all_results = []
     
     for url in urls:
+        # Redirect MotorTrend automobilemag URLs to car-reviews
+        if 'motortrend.com/automobilemag' in url:
+            original_url = url
+            url = url.replace('/automobilemag', '/car-reviews')
+            logger.info(f"🔄 Redirecting MotorTrend URL: {original_url} -> {url}")
+        
         logger.info(f"Processing URL: {url}")
         
         # MEDIA OUTLET VALIDATION - Check if URL is from authorized outlet

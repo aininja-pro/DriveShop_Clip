@@ -862,6 +862,12 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         Dictionary with article content or None if not found
     """
     try:
+        # Redirect MotorTrend automobilemag URLs to car-reviews
+        if 'motortrend.com/automobilemag' in url:
+            original_url = url
+            url = url.replace('/automobilemag', '/car-reviews')
+            logger.info(f"🔄 Redirecting MotorTrend URL: {original_url} -> {url}")
+        
         # Get make and model for finding relevant content
         make = loan.get('make', '')
         model = loan.get('model', '')
