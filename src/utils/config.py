@@ -94,4 +94,14 @@ USER_AGENTS = {
     'basic': 'DriveShopMediaMonitorBot/1.0',
     'enhanced': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     'mobile': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1'
+}
+
+# YouTube ScrapFly configuration
+# Can be overridden by environment variables YOUTUBE_SCRAPFLY_MAX_VIDEOS, etc.
+import os
+
+YOUTUBE_SCRAPFLY_CONFIG = {
+    'max_videos': int(os.getenv('YOUTUBE_SCRAPFLY_MAX_VIDEOS', 100)),  # Maximum number of videos to try to fetch from a channel
+    'scroll_actions': int(os.getenv('YOUTUBE_SCRAPFLY_SCROLL_ACTIONS', 5)),  # Number of scroll actions to perform (each loads ~10-15 more videos)
+    'scroll_wait_ms': int(os.getenv('YOUTUBE_SCRAPFLY_SCROLL_WAIT_MS', 2000))  # Milliseconds to wait after each scroll
 } 

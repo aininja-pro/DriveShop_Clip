@@ -92,7 +92,9 @@ class ScrapFlyWebCrawler:
             self.consecutive_failures = 0
             self.circuit_breaker_until = 0
 
-    def crawl(self, url: str, render_js: bool = False, use_stealth: bool = True, country: str = "US") -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    def crawl(self, url: str, render_js: bool = False, use_stealth: bool = True, 
+              country: str = "US", js_scenario: list = None, auto_scroll: bool = False,
+              rendering_wait: int = None) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Crawl a URL using ScrapFly with anti-bot protection and rate limiting
         
@@ -101,6 +103,9 @@ class ScrapFlyWebCrawler:
             render_js: Whether to render JavaScript (costs more credits)
             use_stealth: Whether to use anti-detection features
             country: Country for proxy location
+            js_scenario: JavaScript scenario for complex interactions
+            auto_scroll: Enable automatic scrolling to load all content
+            rendering_wait: Wait time in milliseconds after rendering (max 25000)
             
         Returns:
             Tuple of (content, title, error)
@@ -130,6 +135,19 @@ class ScrapFlyWebCrawler:
                 'render_js': render_js,
                 'asp': use_stealth,
             }
+            
+            # Add optional parameters
+            if js_scenario:
+                config_params['js_scenario'] = js_scenario
+                logger.info(f"   - JavaScript scenario: {len(js_scenario)} actions")
+            
+            if auto_scroll:
+                config_params['auto_scroll'] = auto_scroll
+                logger.info(f"   - Auto-scroll: ENABLED")
+            
+            if rendering_wait:
+                config_params['rendering_wait'] = min(rendering_wait, 25000)  # Max 25s
+                logger.info(f"   - Rendering wait: {config_params['rendering_wait']}ms")
             
             # Add YouTube-specific wait behavior
             if is_youtube and render_js:

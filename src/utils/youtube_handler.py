@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 # Import local modules
 from src.utils.logger import setup_logger
 from src.utils.rate_limiter import rate_limiter
+from src.utils.config import YOUTUBE_SCRAPFLY_CONFIG
 
 logger = setup_logger(__name__)
 
@@ -587,19 +588,25 @@ def _create_fallback_metadata_with_title(video_id, title, url):
         'url': url
     }
 
-def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90) -> Optional[List[Dict[str, Any]]]:
+def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90, max_videos: int = None) -> Optional[List[Dict[str, Any]]]:
     """
     Scrape YouTube channel page using ScrapFly to get raw HTML and parse manually.
+    Now with enhanced scrolling to load more videos (up to max_videos).
     Falls back to YouTube API if ScrapFly fails.
     
     Args:
         channel_url: YouTube channel URL (e.g., https://www.youtube.com/@TheCarCareNutReviews/videos)
         make: Vehicle make to search for
         model: Vehicle model to search for
+        max_videos: Maximum number of videos to try to load (default from config)
         
     Returns:
         List of video dictionaries with title, url, video_id
     """
+    # Use configuration value if max_videos not specified
+    if max_videos is None:
+        max_videos = YOUTUBE_SCRAPFLY_CONFIG.get('max_videos', 100)
+    
     try:
         from src.utils.scrapfly_client import ScrapFlyWebCrawler
         
@@ -616,7 +623,7 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
         
         if not test_content:
             logger.warning(f"⚠️ ScrapFly API test failed: {test_error} - falling back to YouTube API")
-            return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
+            return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward, max_videos)
         else:
             logger.info("✅ ScrapFly API test successful - proceeding with YouTube scraping")
         
@@ -629,22 +636,38 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
         
         logger.info(f"🎬 Scraping YouTube channel with ScrapFly: {channel_url}")
         
-        # Use ScrapFly to get the raw HTML
+        # Use ScrapFly to get the raw HTML with scrolling
         try:
-            # Get raw HTML from YouTube channel page
+            # Create JavaScript scenario to scroll and load more videos
+            # This scrolls multiple times to trigger lazy loading
+            scroll_actions = YOUTUBE_SCRAPFLY_CONFIG.get('scroll_actions', 5)
+            scroll_wait_ms = YOUTUBE_SCRAPFLY_CONFIG.get('scroll_wait_ms', 2000)
+            
+            js_scenario = []
+            for _ in range(scroll_actions):
+                js_scenario.extend([
+                    {"scroll": {"direction": "down"}},
+                    {"wait": scroll_wait_ms}
+                ])
+            
+            logger.info(f"🎬 Scraping YouTube channel with ScrapFly (enhanced scrolling for {max_videos} videos)...")
+            
+            # Get raw HTML from YouTube channel page with scrolling
             # YouTube requires ASP (Anti-Scraping Protection) and JS rendering
             html_content, title, error = crawler.crawl(
                 url=channel_url,
                 render_js=True,  # Essential for YouTube
                 use_stealth=True,  # ASP - Essential for YouTube
-                country='US'
+                country='US',
+                js_scenario=js_scenario,  # Scroll to load more videos
+                rendering_wait=3000  # Wait 3s after initial render
             )
             
             if not html_content or len(html_content) < 1000:
                 logger.warning(f"❌ ScrapFly returned insufficient content ({len(html_content) if html_content else 0} chars) - falling back to YouTube API")
                 if error:
                     logger.warning(f"ScrapFly error: {error}")
-                return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
+                return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward, max_videos)
                 
             logger.info(f"✅ ScrapFly successfully scraped YouTube channel! ({len(html_content)} chars)")
             
@@ -700,7 +723,11 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                         logger.warning(f"   ❌ Error processing video {i+1}: {e}")
                         continue
                 
-                logger.info(f"🎬 ScrapFly method: Found {len(videos_found)} valid videos")
+                logger.info(f"🎬 ScrapFly method: Found {len(videos_found)} valid videos (after scrolling)")
+                
+                # Log if we found more than 30 videos (proving scrolling worked)
+                if len(videos_found) > 30:
+                    logger.info(f"✨ Scrolling worked! Found {len(videos_found) - 30} additional videos beyond initial 30")
                 
                 # If ScrapFly found videos, use them
                 if videos_found:
@@ -717,9 +744,10 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                     
                     logger.info(f"Filtering {len(videos_found)} videos for make='{make}' and model variations: {model_variations}")
                     
-                    # 🚀 SHOW MORE DEBUG INFO: Display first 50 videos instead of just 25
-                    logger.info("🔍 DEBUG: All video titles extracted by ScrapFly:")
-                    for i, video in enumerate(videos_found[:50]):  # Show first 50 for debugging (to catch video #33)
+                    # 🚀 SHOW MORE DEBUG INFO: Display more videos if we got them
+                    videos_to_show = min(70, len(videos_found))  # Show up to 70 videos (to catch video #52)
+                    logger.info(f"🔍 DEBUG: Showing {videos_to_show} of {len(videos_found)} video titles extracted by ScrapFly:")
+                    for i, video in enumerate(videos_found[:videos_to_show]):
                         logger.info(f"  {i+1}. '{video['title']}'")
                     
                     for video in videos_found:
@@ -750,25 +778,25 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                         return relevant_videos[:10]  # Return top 10 most relevant
                     else:
                         logger.warning("ScrapFly found videos but none were relevant - falling back to YouTube API")
-                        return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
+                        return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward, max_videos)
                         
                 else:
                     logger.warning("ScrapFly extracted no videos - falling back to YouTube API")
-                    return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
+                    return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward, max_videos)
                     
             except Exception as e:
                 logger.error(f"BeautifulSoup parsing failed: {e} - falling back to YouTube API")
-                return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
+                return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward, max_videos)
                 
         except Exception as e:
             logger.error(f"Error processing ScrapFly YouTube response: {e} - falling back to YouTube API")
-            return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
+            return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward, max_videos)
         
     except Exception as e:
         logger.error(f"Error scraping YouTube channel with ScrapFly: {e} - falling back to YouTube API")
-        return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward)
+        return _fallback_to_youtube_api(channel_url, make, model, start_date, days_forward, max_videos)
 
-def _fallback_to_youtube_api(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90) -> Optional[List[Dict[str, Any]]]:
+def _fallback_to_youtube_api(channel_url: str, make: str, model: str, start_date: Optional[datetime] = None, days_forward: int = 90, max_videos: int = 100) -> Optional[List[Dict[str, Any]]]:
     """
     Fallback to YouTube API when ScrapFly fails.
     Provides unlimited video access to find videos at position 33+.
