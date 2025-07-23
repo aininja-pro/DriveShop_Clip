@@ -393,7 +393,7 @@ class EnhancedCrawlerManager:
                 from src.utils.content_extractor import extract_article_content
                 extracted_content = extract_article_content(rss_content, found_url or url)
                 
-                if extracted_content and not self.is_generic_content(extracted_content, make, model):
+                if extracted_content and not self.is_generic_content(extracted_content, found_url or url, make, model):
                     logger.info(f"✅ Tier 3: RSS feed returned QUALITY content for {make} {model}")
                     result = {
                         'success': True,
@@ -981,24 +981,64 @@ class EnhancedCrawlerManager:
                     logger.debug(f"Error with selector {selector}: {e}")
                     continue
                     
-            # Fallback: Look for numbered pagination (page/2, page/3, etc.)
+            # Fallback: Look for numbered pagination (page/2, page/3, ?page=2, etc.)
+            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
             base_url = current_url.rstrip('/')
-            if '/page/' in current_url:
-                # Extract current page number and increment
+            
+            # First check if URL already has page parameter (?page=X)
+            parsed_url = urlparse(current_url)
+            query_params = parse_qs(parsed_url.query)
+            
+            if 'page' in query_params:
+                # URL uses query parameter pagination like ?page=2
+                try:
+                    current_page = int(query_params['page'][0])
+                    query_params['page'] = [str(current_page + 1)]
+                    new_query = urlencode(query_params, doseq=True)
+                    next_page_url = urlunparse((
+                        parsed_url.scheme,
+                        parsed_url.netloc,
+                        parsed_url.path,
+                        parsed_url.params,
+                        new_query,
+                        parsed_url.fragment
+                    ))
+                    logger.info(f"🔗 PAGINATION: Generated next page URL (query param): {next_page_url}")
+                    return next_page_url
+                except (ValueError, IndexError):
+                    pass
+            elif '/page/' in current_url:
+                # URL uses path-based pagination like /page/2/
                 parts = current_url.split('/page/')
                 if len(parts) == 2:
                     try:
                         current_page = int(parts[1].split('/')[0])
                         next_page_url = f"{parts[0]}/page/{current_page + 1}/"
-                        logger.info(f"🔗 PAGINATION: Generated next page URL: {next_page_url}")
+                        logger.info(f"🔗 PAGINATION: Generated next page URL (path-based): {next_page_url}")
                         return next_page_url
                     except ValueError:
                         pass
             else:
-                # Try adding /page/2/ to base URL
-                next_page_url = f"{base_url}/page/2/"
-                logger.info(f"🔗 PAGINATION: Trying page 2 URL: {next_page_url}")
-                return next_page_url
+                # No pagination found - try both formats
+                # For Hagerty specifically, use query parameter format
+                if 'hagerty.com' in current_url:
+                    query_params['page'] = ['2']
+                    new_query = urlencode(query_params, doseq=True)
+                    next_page_url = urlunparse((
+                        parsed_url.scheme,
+                        parsed_url.netloc,
+                        parsed_url.path,
+                        parsed_url.params,
+                        new_query,
+                        parsed_url.fragment
+                    ))
+                    logger.info(f"🔗 PAGINATION: Trying Hagerty-style page 2 URL: {next_page_url}")
+                    return next_page_url
+                else:
+                    # Try WordPress-style /page/2/
+                    next_page_url = f"{base_url}/page/2/"
+                    logger.info(f"🔗 PAGINATION: Trying WordPress-style page 2 URL: {next_page_url}")
+                    return next_page_url
                 
             logger.info(f"🛑 PAGINATION: No next page found for {current_url}")
             return None

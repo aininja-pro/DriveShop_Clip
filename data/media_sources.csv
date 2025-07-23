@@ -14,4 +14,6 @@ www.carfax.com,Carfax,true,false,h1,div.date,div.article,true,,Vehicle history d
 www.automobilemag.com,Automobile Magazine,false,false,h1,time,div.content-article,true,,Article content loads without JavaScript
 www.tfltruck.com,TFL Truck,false,false,h1.entry-title,time.entry-date,div.entry-content,true,,Basic content is accessible without JavaScript
 www.cnet.com,CNET,true,false,h1,time,div.article-main-body,true,,Review sections load dynamically
-www.youtube.com,YouTube,true,false,h1,span.date,div.content,true,,Video content requires JavaScript,false 
+www.youtube.com,YouTube,true,false,h1,span.date,div.content,true,,Video content requires JavaScript,false
+hagerty.com,Hagerty,true,true,h1,time,article,true,https://www.hagerty.com/media/feed/,Articles load dynamically with JavaScript
+www.hagerty.com,Hagerty,true,true,h1,time,article,true,https://www.hagerty.com/media/feed/,Articles load dynamically with JavaScript 

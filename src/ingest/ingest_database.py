@@ -216,11 +216,21 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
     wo_number = str(loan.get('work_order', ''))
     make = loan.get('make', '')
     model = loan.get('model', '')
+    model_short = loan.get('model_short', '')  # Get short model from dashboard
     contact = loan.get('to', '')
     person_id = loan.get('person_id', '')
     
     # Activity ID should already be in the loan data from load_loans_data_from_url
     activity_id = loan.get('activity_id', '')
+    
+    # CRITICAL FIX: Set search_model for hierarchical search (broad to specific)
+    # Use short model if available (e.g., "Tacoma" instead of "Tacoma TRD Pro Double Cab")
+    if model_short:
+        loan['search_model'] = model_short
+        logger.info(f"Using SHORT model for hierarchical search: '{model_short}' (full: '{model}')")
+    else:
+        loan['search_model'] = model
+        logger.info(f"No short model available, using full model: '{model}'")
     
     logger.info(f"Processing loan {wo_number}: {make} {model} (database mode - no GPT)")
     

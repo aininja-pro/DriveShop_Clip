@@ -2234,6 +2234,7 @@ with st.sidebar:
                         remapped_records.append({
                             'work_order': record.get('WO #'),
                             'model': record.get('Model'),
+                            'model_short': record.get('Model Short Name'),  # CRITICAL: Add short model for hierarchical search
                             'to': record.get('To'),
                             'affiliation': record.get('Affiliation'),
                             'urls': urls,

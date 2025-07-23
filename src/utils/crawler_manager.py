@@ -517,10 +517,11 @@ class CrawlerManager:
                         link_url = link.get('href') if link and link.get('href') else link.text if link else None
                         
                         # Check if the item mentions our vehicle
-                        if (vehicle_make.lower() in title_text.lower() or 
-                            vehicle_model.lower() in title_text.lower() or
-                            vehicle_make.lower() in description_text.lower() or
-                            vehicle_model.lower() in description_text.lower()):
+                        # MUST contain the model name (more specific than just make)
+                        model_in_title = vehicle_model.lower() in title_text.lower()
+                        model_in_desc = vehicle_model.lower() in description_text.lower()
+                        
+                        if model_in_title or model_in_desc:
                             
                             logger.info(f"Found matching RSS item: {title_text}")
                             if link_url:

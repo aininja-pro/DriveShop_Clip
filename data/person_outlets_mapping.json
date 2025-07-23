@@ -21042,12 +21042,6 @@
         "outlet_name": "Youtube.com",
         "outlet_url": "https://www.youtube.com/c/AutoJeffReviews/videos",
         "outlet_id": "1833",
-        "impressions": 144000
-      },
-      {
-        "outlet_name": "Youtube.com",
-        "outlet_url": "https://www.youtube.com/c/AutoJeffReviews/videos",
-        "outlet_id": "1833",
         "impressions": 5920
       },
       {
@@ -29904,13 +29898,7 @@
         "outlet_name": "Youtube.com",
         "outlet_url": "https://www.youtube.com/@CarsMadeSimple/videos",
         "outlet_id": "1833",
-        "impressions": 450000
-      },
-      {
-        "outlet_name": "Youtube.com",
-        "outlet_url": "https://www.youtube.com/@CarsMadeSimple/videos",
-        "outlet_id": "1833",
-        "impressions": 11500
+        "impressions": 33500
       }
     ]
   },

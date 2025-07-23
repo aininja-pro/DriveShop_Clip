@@ -429,26 +429,26 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
             # Start with the base model (short name is usually cleaner)
             base_model = model_short_value if model_short_value else model_value
             
-            # If we have a full model that contains additional info, use it
-            if model_value and model_short_value and model_value != model_short_value:
-                # Check if the full model contains the short model
-                if model_short_value.lower() in model_value.lower():
-                    # Use the full model as it's more specific
-                    hierarchical_model = model_value
-                else:
-                    # Combine them intelligently
-                    hierarchical_model = f"{base_model} {model_value}".strip()
+            # FIXED: Use SHORT model for initial search (broad to specific approach)
+            # This allows finding articles that use just "Tacoma" in the title
+            # even when we're looking for "Tacoma TRD Pro Double Cab"
+            if model_short_value:
+                # We have a short model - use it for searching
+                search_model = model_short_value
+                logger.info(f"Using SHORT model for search: '{search_model}' (full: '{model_value}')")
             else:
-                # Use whichever one we have
-                hierarchical_model = model_value if model_value else model_short_value
+                # No short model - use whatever we have
+                search_model = model_value
+                logger.info(f"No short model available, using full: '{search_model}'")
             
-            # Clean up the hierarchical model
-            hierarchical_model = hierarchical_model.strip()
+            # Clean up the search model
+            search_model = search_model.strip()
             
-            # Store both the base model and the hierarchical search model
+            # Store all variations for different uses
             loan['model'] = base_model  # Keep this for compatibility
             loan['model_full'] = model_value if model_value else base_model  # Original full from CSV
-            loan['search_model'] = hierarchical_model  # This is what we'll pass to hierarchical search
+            loan['model_short'] = model_short_value  # Store short model explicitly
+            loan['search_model'] = search_model  # This is what we'll use for searching (SHORT first!)
             
             # Add source/affiliation
             if 'Affiliation' in df.columns:
