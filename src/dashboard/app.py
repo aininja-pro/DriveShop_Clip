@@ -2622,6 +2622,9 @@ with bulk_review_tab:
     # Add tracking for outlet data (id and impressions)
     if 'outlet_data_mapping' not in st.session_state:
         st.session_state.outlet_data_mapping = {}
+    # Add tracking for edited URLs
+    if 'edited_urls' not in st.session_state:
+        st.session_state.edited_urls = {}
     
     # Load saved checkbox states from a temp file EARLY
     import pickle
@@ -3094,16 +3097,19 @@ with bulk_review_tab:
                         full_outlet_data = get_full_outlet_data_for_person(person_id, person_outlets_mapping)
                         st.session_state.outlet_data_mapping[wo_num] = full_outlet_data
                 
-                # Create simpler view renderer with better visual feedback
+                # Create editable view renderer with edit icon
                 cellRenderer_view = JsCode("""
                 class UrlCellRenderer {
                   init(params) {
                     const isViewed = params.data['Viewed'];
+                    this.isEditMode = false;
+                    this.params = params;
                     
                     this.eGui = document.createElement('div');
                     this.eGui.style.display = 'flex';
                     this.eGui.style.alignItems = 'center';
                     this.eGui.style.gap = '5px';
+                    this.eGui.style.width = '100%';
                     
                     // Add checkmark for viewed records
                     if (isViewed) {
@@ -3115,6 +3121,15 @@ with bulk_review_tab:
                       this.eGui.appendChild(checkmark);
                     }
                     
+                    // Container for view/edit mode
+                    this.contentContainer = document.createElement('div');
+                    this.contentContainer.style.display = 'flex';
+                    this.contentContainer.style.alignItems = 'center';
+                    this.contentContainer.style.gap = '5px';
+                    this.contentContainer.style.flex = '1';
+                    this.contentContainer.style.minWidth = '0'; // Allow flex shrinking
+                    this.contentContainer.style.overflow = 'hidden';
+                    
                     // Create the link
                     this.link = document.createElement('a');
                     this.link.innerText = '📄 View';
@@ -3124,8 +3139,133 @@ with bulk_review_tab:
                     this.link.style.textDecoration = 'underline';
                     this.link.style.cursor = 'pointer';
                     this.link.style.opacity = isViewed ? '0.7' : '1';
+                    this.link.title = params.data['Clip URL']; // Show full URL on hover
                     
-                    this.eGui.appendChild(this.link);
+                    // Create edit icon
+                    this.editIcon = document.createElement('span');
+                    this.editIcon.innerHTML = '✏️';
+                    this.editIcon.style.cursor = 'pointer';
+                    this.editIcon.style.fontSize = '12px';
+                    this.editIcon.style.opacity = '0.6';
+                    this.editIcon.title = 'Edit URL';
+                    
+                    // Create input field (hidden initially)
+                    this.input = document.createElement('input');
+                    this.input.type = 'text';
+                    this.input.style.display = 'none';
+                    this.input.style.width = 'calc(100% - 60px)'; // Leave room for buttons
+                    this.input.style.minWidth = '200px';
+                    this.input.style.padding = '2px 4px';
+                    this.input.style.fontSize = '12px';
+                    this.input.style.border = '1px solid #ccc';
+                    this.input.style.borderRadius = '3px';
+                    
+                    // Create save/cancel buttons (hidden initially)
+                    this.saveBtn = document.createElement('button');
+                    this.saveBtn.innerHTML = '✓';
+                    this.saveBtn.style.display = 'none';
+                    this.saveBtn.style.cursor = 'pointer';
+                    this.saveBtn.style.padding = '2px 6px';
+                    this.saveBtn.style.fontSize = '11px';
+                    this.saveBtn.style.backgroundColor = '#28a745';
+                    this.saveBtn.style.color = 'white';
+                    this.saveBtn.style.border = 'none';
+                    this.saveBtn.style.borderRadius = '3px';
+                    this.saveBtn.title = 'Save';
+                    
+                    this.cancelBtn = document.createElement('button');
+                    this.cancelBtn.innerHTML = '✕';
+                    this.cancelBtn.style.display = 'none';
+                    this.cancelBtn.style.cursor = 'pointer';
+                    this.cancelBtn.style.padding = '2px 6px';
+                    this.cancelBtn.style.fontSize = '11px';
+                    this.cancelBtn.style.backgroundColor = '#dc3545';
+                    this.cancelBtn.style.color = 'white';
+                    this.cancelBtn.style.border = 'none';
+                    this.cancelBtn.style.borderRadius = '3px';
+                    this.cancelBtn.title = 'Cancel';
+                    
+                    // Add event listeners
+                    this.editIcon.addEventListener('click', () => this.enterEditMode());
+                    this.saveBtn.addEventListener('click', () => this.saveUrl());
+                    this.cancelBtn.addEventListener('click', () => this.exitEditMode());
+                    this.input.addEventListener('keydown', (e) => {
+                      if (e.key === 'Enter') this.saveUrl();
+                      if (e.key === 'Escape') this.exitEditMode();
+                      // Allow Ctrl+V / Cmd+V
+                      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                        e.stopPropagation();
+                      }
+                    });
+                    
+                    // Enable paste functionality
+                    this.input.addEventListener('paste', (e) => {
+                      e.stopPropagation();
+                      // Allow default paste behavior
+                    });
+                    
+                    // Prevent grid from intercepting input events
+                    this.input.addEventListener('click', (e) => e.stopPropagation());
+                    this.input.addEventListener('dblclick', (e) => e.stopPropagation());
+                    this.input.addEventListener('mousedown', (e) => e.stopPropagation());
+                    
+                    // Add elements to container
+                    this.contentContainer.appendChild(this.link);
+                    this.contentContainer.appendChild(this.editIcon);
+                    this.contentContainer.appendChild(this.input);
+                    this.contentContainer.appendChild(this.saveBtn);
+                    this.contentContainer.appendChild(this.cancelBtn);
+                    
+                    this.eGui.appendChild(this.contentContainer);
+                  }
+                  
+                  enterEditMode() {
+                    this.isEditMode = true;
+                    this.link.style.display = 'none';
+                    this.editIcon.style.display = 'none';
+                    this.input.style.display = 'block';
+                    this.saveBtn.style.display = 'inline-block';
+                    this.cancelBtn.style.display = 'inline-block';
+                    this.input.value = this.params.data['Clip URL'];
+                    
+                    // Ensure proper focus and selection
+                    setTimeout(() => {
+                      this.input.focus();
+                      this.input.select();
+                      // Enable context menu for right-click paste
+                      this.input.addEventListener('contextmenu', (e) => {
+                        e.stopPropagation();
+                      });
+                    }, 10);
+                  }
+                  
+                  exitEditMode() {
+                    this.isEditMode = false;
+                    this.link.style.display = 'inline';
+                    this.editIcon.style.display = 'inline';
+                    this.input.style.display = 'none';
+                    this.saveBtn.style.display = 'none';
+                    this.cancelBtn.style.display = 'none';
+                  }
+                  
+                  saveUrl() {
+                    const newUrl = this.input.value.trim();
+                    if (newUrl && newUrl !== this.params.data['Clip URL']) {
+                      // Update the data
+                      this.params.node.setDataValue('Clip URL', newUrl);
+                      
+                      // Update the link
+                      this.link.href = newUrl;
+                      
+                      // Trigger grid update - this will cause the grid data to be sent to Python
+                      this.params.api.refreshCells({
+                        force: true,
+                        columns: ['📄 View', 'Clip URL'],
+                        rowNodes: [this.params.node]
+                      });
+                    }
+                    
+                    this.exitEditMode();
                   }
 
                   getGui() {
@@ -3136,6 +3276,8 @@ with bulk_review_tab:
                     const isViewed = params.data['Viewed'];
                     this.link.style.color = isViewed ? '#6c757d' : '#1f77b4';
                     this.link.style.opacity = isViewed ? '0.7' : '1';
+                    this.link.href = params.data['Clip URL'];
+                    this.link.title = params.data['Clip URL']; // Update tooltip
                     return true;
                   }
                 }
@@ -3693,7 +3835,7 @@ with bulk_review_tab:
                     {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 100},
                     {'field': 'Contact', 'minWidth': 180},
                     {'field': 'Media Outlet', 'cellRenderer': cellRenderer_outlet_dropdown if person_outlets_mapping else None, 'minWidth': 220, 'editable': True, 'sortable': True, 'filter': True},
-                    {'field': '📄 View', 'cellRenderer': cellRenderer_view, 'minWidth': 80, 'maxWidth': 100, 'sortable': False, 'filter': False},
+                    {'field': '📄 View', 'cellRenderer': cellRenderer_view, 'minWidth': 150, 'maxWidth': 600, 'sortable': False, 'filter': False, 'resizable': True},
                     {'field': 'Make', 'minWidth': 120},
                     {'field': 'Model', 'minWidth': 150},
                     {'field': '📅 Published Date', 'headerName': 'Pub Date', 'editable': True, 'minWidth': 100, 'sortable': True, 'filter': True, 'cellEditor': 'agTextCellEditor', 'cellEditorParams': {'maxLength': 8}},
@@ -3944,6 +4086,64 @@ with bulk_review_tab:
                             st.session_state.date_save_message = f"❌ Error saving Published Date changes: {e}"
                             print(f"❌ Error saving published date changes: {e}")
                     
+                    # 1.7. Handle URL changes (save to database)
+                    url_changed = False
+                    url_changed_count = 0
+                    url_changed_wos = []
+                    
+                    for idx, row in selected_rows["data"].iterrows():
+                        wo_num = str(row.get('WO #', ''))
+                        new_url = row.get('Clip URL', '')
+                        
+                        if wo_num and new_url:
+                            # Get the last saved value to avoid duplicate saves
+                            last_saved_url = st.session_state.edited_urls.get(wo_num, '')
+                            
+                            # Also check against the original URL in the data
+                            original_url = ''
+                            for orig_idx, orig_row in df.iterrows():
+                                if str(orig_row.get('WO #', '')) == wo_num:
+                                    original_url = orig_row.get('Clip URL', '')
+                                    break
+                            
+                            # Save if different from both last saved and original
+                            if new_url != last_saved_url and new_url != original_url:
+                                url_changed = True
+                                url_changed_count += 1
+                                url_changed_wos.append(wo_num)
+                                st.session_state.edited_urls[wo_num] = new_url
+                                print(f"💾 Saving URL change for WO# {wo_num}: → '{new_url}'")
+                    
+                    # Save URL changes to database
+                    if url_changed:
+                        try:
+                            # Update clips in the database
+                            for wo_num in url_changed_wos:
+                                new_url = st.session_state.edited_urls[wo_num]
+                                try:
+                                    # Get database connection
+                                    db = get_database()
+                                    # Update the clip in database
+                                    success = db.update_clip_url(wo_num, new_url)
+                                    if success:
+                                        print(f"✅ Updated WO# {wo_num} URL to: {new_url}")
+                                    else:
+                                        print(f"⚠️ Failed to update WO# {wo_num} URL in database")
+                                except Exception as e:
+                                    print(f"❌ Error updating WO# {wo_num} URL: {e}")
+                            
+                            # Use session state to show success message
+                            from datetime import datetime
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            if url_changed_count == 1:
+                                st.session_state.url_save_message = f"💾 URL saved for WO# {url_changed_wos[0]} at {timestamp}"
+                            else:
+                                st.session_state.url_save_message = f"💾 {url_changed_count} URL edits saved at {timestamp}"
+                            print(f"✅ Updated database with {url_changed_count} URL changes")
+                        except Exception as e:
+                            st.session_state.url_save_message = f"❌ Error saving URL changes: {e}"
+                            print(f"❌ Error saving URL changes: {e}")
+                    
                     # 2. Then handle approval/rejection checkboxes (stable tracking)
                     approved_rows = selected_rows["data"][selected_rows["data"]["✅ Approve"] == True]
                     rejected_rows = selected_rows["data"][selected_rows["data"]["❌ Reject"] == True]
@@ -4004,6 +4204,24 @@ with bulk_review_tab:
                         st.error(st.session_state.byline_save_message)
                     # Clear message after showing
                     st.session_state.byline_save_message = None
+                
+                # Display published date save messages
+                if hasattr(st.session_state, 'date_save_message') and st.session_state.date_save_message:
+                    if st.session_state.date_save_message.startswith("💾"):
+                        st.success(st.session_state.date_save_message)
+                    else:
+                        st.error(st.session_state.date_save_message)
+                    # Clear message after showing
+                    st.session_state.date_save_message = None
+                
+                # Display URL save messages
+                if hasattr(st.session_state, 'url_save_message') and st.session_state.url_save_message:
+                    if st.session_state.url_save_message.startswith("💾"):
+                        st.success(st.session_state.url_save_message)
+                    else:
+                        st.error(st.session_state.url_save_message)
+                    # Clear message after showing
+                    st.session_state.url_save_message = None
                 
                 # Show current selection counts
                 approved_count = len(st.session_state.selected_for_approval)

@@ -1166,6 +1166,24 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"❌ Failed to update published date for WO# {wo_number}: {e}")
             return False
+    
+    def update_clip_url(self, wo_number: str, new_url: str) -> bool:
+        """Update the clip_url field for a specific clip"""
+        try:
+            result = self.supabase.table('clips').update({
+                'clip_url': new_url
+            }).eq('wo_number', wo_number).execute()
+            
+            if result.data:
+                logger.info(f"✅ Updated clip URL for WO# {wo_number} to: {new_url}")
+                return True
+            else:
+                logger.warning(f"⚠️ No clip found with WO# {wo_number}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update clip URL for WO# {wo_number}: {e}")
+            return False
 
 # Global database instance
 _db_instance = None
