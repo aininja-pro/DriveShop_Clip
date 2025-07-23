@@ -756,36 +756,83 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
             if channel_videos:
                 logger.info(f"✅ ScrapFly found {len(channel_videos)} relevant videos in channel")
                 
-                # Use the first relevant video found by ScrapFly
-                for video_info in channel_videos:
+                # Process ALL relevant videos and collect successful extractions
+                successful_videos = []
+                
+                for i, video_info in enumerate(channel_videos):
                     video_id = video_info.get('video_id')
-                    if video_id:
-                        # Try metadata fallback first since transcript fetching is consistently failing
-                        logger.info(f"Trying metadata fallback first for ScrapFly video: {video_info['title']}")
-                        metadata = get_video_metadata_fallback(video_id, known_title=video_info['title'])
-                        if metadata and metadata.get('content_text'):
-                            logger.info(f"✅ ScrapFly + metadata success: {video_info['title']}")
-                            return {
-                                'url': video_info['url'],
-                                'content': metadata['content_text'],
-                                'content_type': 'video_metadata',
-                                'title': metadata.get('title', video_info['title']),
-                                'channel_name': metadata.get('channel_name', ''),
-                                'view_count': metadata.get('view_count', '0'),
-                                'published_date': video_info.get('published_date')
-                            }
+                    if not video_id:
+                        continue
                         
-                        # Only try transcript as fallback if metadata failed
-                        transcript = get_transcript(video_id)
-                        if transcript:
-                            logger.info(f"✅ ScrapFly + transcript success: {video_info['title']}")
-                            return {
-                                'url': video_info['url'],
-                                'content': transcript,
-                                'content_type': 'video',
-                                'title': video_info['title'],
-                                'published_date': video_info.get('published_date')
-                            }
+                    logger.info(f"Processing video {i+1}/{len(channel_videos)}: {video_info['title']}")
+                    
+                    # Try metadata fallback first since transcript fetching is consistently failing
+                    metadata = get_video_metadata_fallback(video_id, known_title=video_info['title'])
+                    if metadata and metadata.get('content_text'):
+                        logger.info(f"✅ ScrapFly + metadata success: {video_info['title']}")
+                        video_result = {
+                            'url': video_info['url'],
+                            'content': metadata['content_text'],
+                            'content_type': 'video_metadata',
+                            'title': metadata.get('title', video_info['title']),
+                            'channel_name': metadata.get('channel_name', ''),
+                            'view_count': metadata.get('view_count', '0'),
+                            'published_date': video_info.get('published_date')
+                        }
+                        successful_videos.append(video_result)
+                        continue
+                    
+                    # Only try transcript as fallback if metadata failed
+                    transcript = get_transcript(video_id)
+                    if transcript:
+                        logger.info(f"✅ ScrapFly + transcript success: {video_info['title']}")
+                        video_result = {
+                            'url': video_info['url'],
+                            'content': transcript,
+                            'content_type': 'video',
+                            'title': video_info['title'],
+                            'published_date': video_info.get('published_date')
+                        }
+                        successful_videos.append(video_result)
+                
+                # Return the best match based on title relevance
+                if successful_videos:
+                    logger.info(f"Successfully processed {len(successful_videos)} out of {len(channel_videos)} videos")
+                    
+                    # Score each video based on model match in title
+                    from src.utils.model_variations import generate_model_variations
+                    model_variations = generate_model_variations(make, model)
+                    
+                    best_video = None
+                    best_score = -1
+                    
+                    for video in successful_videos:
+                        title_lower = video['title'].lower()
+                        score = 0
+                        
+                        # Check for exact model match first (highest priority)
+                        if model.lower() in title_lower:
+                            score = 100
+                        else:
+                            # Check model variations
+                            for variation in model_variations:
+                                if variation in title_lower:
+                                    # Longer variations get higher scores (more specific)
+                                    score = max(score, len(variation))
+                        
+                        logger.info(f"Video '{video['title']}' scored: {score}")
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_video = video
+                    
+                    if best_video:
+                        logger.info(f"🎯 Selected best matching video with score {best_score}: {best_video['title']}")
+                        return best_video
+                    else:
+                        # If no good match found, return the first one
+                        logger.info(f"No high-scoring match found, returning first video: {successful_videos[0]['title']}")
+                        return successful_videos[0]
             else:
                 logger.info(f"ScrapFly found no relevant videos for {make} {model} in channel")
                 

@@ -229,6 +229,9 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
     successful_urls = 0
     clip_results = []
     
+    # Collect results from all URLs to pick the best one
+    all_results = []
+    
     for url in urls:
         logger.info(f"Processing URL: {url}")
         
@@ -254,6 +257,13 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
             result = process_web_url(url, loan)
         
         if result and (result.get('clip_url') or result.get('url')):
+            all_results.append((url, result))
+    
+    # Process all collected results through GPT and pick the best one
+    best_result = None
+    best_score = -1
+    
+    for url, result in all_results:
             # Additional validation: Check if result URL is also a homepage
             result_url = result.get('clip_url') or result.get('url', '')
             if is_homepage_or_index_url(result_url):

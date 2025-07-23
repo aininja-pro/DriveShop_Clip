@@ -38,39 +38,59 @@ def flexible_model_match(video_title: str, model_variation: str) -> bool:
     if not model_words:
         return False
     
-    # Count how many model words appear in the title
-    matches = 0
-    core_matches = 0  # Track matches of important words
-    
     # Define less important words that shouldn't be strictly required
     optional_words = {'awd', '4wd', 'fwd', 'rwd', '2wd', 'drive', 'wheel', 'all'}
     
+    # Define make/brand words that shouldn't count as model matches
+    make_words = {
+        'toyota', 'honda', 'mazda', 'ford', 'chevrolet', 'chevy', 'gmc', 'ram', 
+        'jeep', 'dodge', 'chrysler', 'nissan', 'infiniti', 'lexus', 'acura',
+        'hyundai', 'kia', 'genesis', 'volkswagen', 'vw', 'audi', 'bmw', 'mercedes',
+        'benz', 'mercedes-benz', 'volvo', 'subaru', 'mitsubishi', 'tesla'
+    }
+    
+    # Filter out make words and optional words to get core model words
+    core_words = [w for w in model_words if w not in optional_words and w not in make_words]
+    
+    # If no core words remain (e.g., "toyota awd"), it's not a valid model
+    if not core_words:
+        return False
+    
+    # Count matches
+    total_matches = 0
+    core_matches = 0
+    
     for word in model_words:
         if word in video_title:
-            matches += 1
-            if word not in optional_words:
+            total_matches += 1
+            if word in core_words:
                 core_matches += 1
     
-    # Calculate match percentage
-    match_percentage = matches / len(model_words)
+    # Calculate match percentages
+    total_match_percentage = total_matches / len(model_words) if model_words else 0
+    core_match_percentage = core_matches / len(core_words) if core_words else 0
     
-    # More flexible matching rules:
-    # 1. If we have 80% or more matches, it's a match
-    if match_percentage >= 0.8:
+    # Matching rules (prioritize core model words):
+    # 1. If ALL core words match, it's likely a match
+    if core_match_percentage == 1.0 and core_matches >= 1:
         return True
     
-    # 2. If we have at least 2 core (non-optional) word matches, it's a match
+    # 2. If we have at least 2 core word matches, it's a match
     if core_matches >= 2:
         return True
     
-    # 3. If we have 60% or more matches AND at least 1 core match, it's a match
-    if match_percentage >= 0.6 and core_matches >= 1:
+    # 3. If we have 80% or more total matches AND at least 1 core match
+    if total_match_percentage >= 0.8 and core_matches >= 1:
         return True
     
-    # 4. Special case: if model variation is just 2 words and we match both core words
-    core_words = [w for w in model_words if w not in optional_words]
-    if len(core_words) <= 2 and all(word in video_title for word in core_words):
-        return True
+    # 4. Special case: single core word models (like "Corolla") need exact match
+    if len(core_words) == 1 and core_matches == 1:
+        # But make sure it's not a partial match (e.g., "Corolla" shouldn't match "Corolla Cross")
+        # Check if the word is followed by another model-like word
+        core_word = core_words[0]
+        word_pattern = r'\b' + re.escape(core_word) + r'\b'
+        if re.search(word_pattern, video_title):
+            return True
     
     return False
 
