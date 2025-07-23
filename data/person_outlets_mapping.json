@@ -3450,10 +3450,10 @@
     "reporter_name": "Jamie (Benjamin) Butters",
     "outlets": [
       {
-        "outlet_name": "Automotive News",
-        "outlet_url": "https://www.autonews.com/car-concepts/",
-        "outlet_id": "1195",
-        "impressions": 56684
+        "outlet_name": "Wall Street Journal ",
+        "outlet_url": "https://www.wsj.com/",
+        "outlet_id": "1320",
+        "impressions": 26042523
       }
     ]
   },
@@ -9591,6 +9591,18 @@
         "outlet_url": "https://www.yankodesign.com/category/automotive/",
         "outlet_id": "6399",
         "impressions": 2489000
+      },
+      {
+        "outlet_name": "dlmag.com",
+        "outlet_url": "https://dlmag.com/",
+        "outlet_id": "6261",
+        "impressions": 2000
+      },
+      {
+        "outlet_name": "GearCulture.com",
+        "outlet_url": "https://gearculture.com/",
+        "outlet_id": "3347",
+        "impressions": 603000
       }
     ]
   },
@@ -15997,7 +16009,7 @@
     "outlets": [
       {
         "outlet_name": "S3 Magazine",
-        "outlet_url": "https://s3mag.com/category/features/cars/",
+        "outlet_url": "https://s3mag.com/category/features/new-car-reviews/",
         "outlet_id": "3691",
         "impressions": 25000
       }

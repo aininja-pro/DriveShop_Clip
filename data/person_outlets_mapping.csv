@@ -431,7 +431,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 1742,Greg Whale,407,Ventura County Star,http://www.vcstar.com/,35036
 1743,Chambers Williams,1427,MySA.com,https://www.mysanantonio.com/,225684
 1743,Chambers Williams,260,Fort Worth Star-Telegram (daily),http://www.star-telegram.com,70253
-1748,Jamie (Benjamin) Butters,1195,Automotive News,https://www.autonews.com/car-concepts/,56684
+1748,Jamie (Benjamin) Butters,1320,Wall Street Journal ,https://www.wsj.com/,26042523
 1749,Pat Devereux,2771,BBC.com,https://www.topgear.com/car-reviews,3650640
 1751,Arv Voss,1867,TFLcar.com,https://tflcar.com/category/review/,98461
 1751,Arv Voss,4081,Our Auto Expert,http://ourautoexpert.com/,10000
@@ -1189,6 +1189,8 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 6346,Vincent Nguyen,3095,Instagram,https://www.instagram.com/vincentnguyen/,1700
 6346,Vincent Nguyen,4411,Facebook.com,https://www.facebook.com/vincentnguyen,1000
 6346,Vincent Nguyen,6399,Yanko Design,https://www.yankodesign.com/category/automotive/,2489000
+6346,Vincent Nguyen,6261,dlmag.com,https://dlmag.com/,2000
+6346,Vincent Nguyen,3347,GearCulture.com,https://gearculture.com/,603000
 6367,Christopher Little,2354,LimitedSlipBlog.com,https://limitedslipblog.com,9500
 6385,Marc Carter,2240,Torque Report,https://www.torquenews.com/auto-industry-reviews,6807
 6385,Marc Carter,2055,Inhabitat.com,https://inhabitat.com/news/,436828
@@ -1952,7 +1954,7 @@ Person_ID,Reporter_Name,Outlet_ID,Outlet_Name,Outlet_URL,Impressions
 9971,Jamie King,5922,instagram.com/jamiekingfit,https://www.instagram.com/jamiekingfit/,18400
 9996,Alicia Chew,4473,instagram.com/aliciatenise/,https://www.instagram.com/aliciatenise/,32300
 10001,Colby Holiday,6236,instagram.com/worldofawanderer,http://www.instagram.com/worldofawanderer,7868
-10006,Jonathan Wooley,3691,S3 Magazine,https://s3mag.com/category/features/cars/,25000
+10006,Jonathan Wooley,3691,S3 Magazine,https://s3mag.com/category/features/new-car-reviews/,25000
 10040,Bethanie Garcia,3095,Instagram,https://www.instagram.com/thegarciadiaries,135000
 10062,Vanessa Krombeen,4766,instagram/thecheekybeen,https://www.instagram.com/thecheekybeen/,187000
 10071,Matthew Pilgrim,4863,Pilgrim Motor Press,http://www.pilgrimmotorpress.com/,1000

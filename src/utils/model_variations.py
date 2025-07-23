@@ -17,10 +17,11 @@ def generate_model_variations(make: str, model: str) -> List[str]:
     - "ES 350" → ["es 350", "es350", "lexus es 350", "lexus es350"]
     - "CX-90" → ["cx-90", "cx 90", "cx90", "mazda cx-90", "mazda cx 90", "mazda cx90"]
     - "3 Series" → ["3 series", "3series", "bmw 3 series", "bmw 3series"]
+    - "Crown Signia Limited" → ["crown signia limited", "crown signia", "signia", ...]
     
     Args:
         make: Vehicle make (e.g., "Lexus", "Mazda", "BMW")
-        model: Vehicle model (e.g., "ES 350", "CX-90", "3 Series")
+        model: Vehicle model (e.g., "ES 350", "CX-90", "3 Series", "Crown Signia Limited")
         
     Returns:
         List of normalized model variations to search for
@@ -30,17 +31,74 @@ def generate_model_variations(make: str, model: str) -> List[str]:
     
     variations = set()  # Use set to avoid duplicates
     
+    # Common trim level indicators to detect and handle
+    TRIM_INDICATORS = {
+        'limited', 'sport', 'touring', 'premium', 'base', 'deluxe',
+        'platinum', 'titanium', 'signature', 'select', 'preferred',
+        'elite', 'ultimate', 'luxury', 'executive', 'technology',
+        # Lexus/Toyota specific
+        'le', 'xle', 'se', 'xse', 'trd', 'sr', 'sr5',
+        # Honda specific
+        'lx', 'ex', 'ex-l', 'touring', 'sport', 
+        # Mazda specific
+        'gs', 'gt', 'signature', 'turbo',
+        # General
+        's', 'sv', 'sl', 'pro-4x', 'laramie', 'lariat', 'king ranch'
+    }
+    
     # 1. Basic model as-is
     variations.add(model_lower)
     
-    # 2. Handle spaces vs no spaces
+    # 2. Handle trim levels - generate variations without trim indicators
+    # Split model into words to check for trim indicators
+    model_words = model_lower.split()
+    if len(model_words) > 1:
+        # Special handling for multi-word trim indicators
+        multi_word_trims = ['f sport', 'king ranch']
+        has_trim = False
+        base_model = model_lower
+        
+        # Check for multi-word trims first
+        for trim in multi_word_trims:
+            if trim in model_lower:
+                base_model = model_lower.replace(trim, '').strip()
+                has_trim = True
+                break
+        
+        # If no multi-word trim found, check single words from the end
+        if not has_trim:
+            # Check from the end of the model name for trim indicators
+            for i in range(len(model_words) - 1, -1, -1):
+                word = model_words[i]
+                clean_word = word.replace('-', '').lower()
+                
+                if clean_word in TRIM_INDICATORS:
+                    # Found a trim indicator, everything before this is the base model
+                    base_model_words = model_words[:i]
+                    if base_model_words:  # Only if we have a base model left
+                        base_model = ' '.join(base_model_words)
+                        has_trim = True
+                        break
+        
+        # If we found a trim indicator and have a base model, add variations without trim
+        if has_trim and base_model and base_model != model_lower:
+            variations.add(base_model)  # "crown signia"
+            variations.add(base_model.replace(' ', ''))  # "crownsignia"
+            variations.add(base_model.replace(' ', '-'))  # "crown-signia"
+            if '-' in base_model:
+                variations.add(base_model.replace('-', ' '))  # Handle hyphenated models
+                variations.add(base_model.replace('-', ''))
+            
+            logger.info(f"🔧 Detected trim level in '{model}' - added base model variation: '{base_model}'")
+    
+    # 3. Handle spaces vs no spaces
     model_no_spaces = model_lower.replace(' ', '')
     model_with_spaces = model_lower
     
     variations.add(model_no_spaces)          # "es350", "cx90"
     variations.add(model_with_spaces)        # "es 350", "cx-90"
     
-    # 3. Handle hyphens vs spaces vs no separator
+    # 4. Handle hyphens vs spaces vs no separator
     if '-' in model_lower:
         model_hyphen_to_space = model_lower.replace('-', ' ')  # "cx-90" → "cx 90"
         model_hyphen_to_none = model_lower.replace('-', '')    # "cx-90" → "cx90"
@@ -53,14 +111,14 @@ def generate_model_variations(make: str, model: str) -> List[str]:
         variations.add(model_space_to_hyphen)
         variations.add(model_space_to_none)
     
-    # 4. Add make prefix variations
+    # 5. Add make prefix variations
     for var in list(variations):
         variations.add(f"{make_lower} {var}")     # "lexus es350", "mazda cx90"
         variations.add(f"{make_lower}{var}")      # "lexuses350", "mazdacx90"
         if ' ' not in var:  # Only add hyphen for no-space variants
             variations.add(f"{make_lower}-{var}") # "lexus-es350", "mazda-cx90"
     
-    # 5. Handle numeric patterns (like "3 Series" vs "3Series")
+    # 6. Handle numeric patterns (like "3 Series" vs "3Series")
     # Find patterns like "word number" or "number word"
     number_patterns = [
         (r'(\w+)\s+(\d+)', r'\1\2'),           # "es 350" → "es350"
@@ -76,7 +134,7 @@ def generate_model_variations(make: str, model: str) -> List[str]:
                 new_var = re.sub(pattern, replacement, var)
                 variations.add(new_var)
     
-    # 6. Common automotive abbreviations and alternate forms (be more selective)
+    # 7. Common automotive abbreviations and alternate forms (be more selective)
     abbreviation_maps = {
         'turbo': ['t'],
         # Removed 'h' abbreviation for hybrid - it's too ambiguous and causes issues
@@ -91,7 +149,6 @@ def generate_model_variations(make: str, model: str) -> List[str]:
         for var in list(variations):
             # Split into words to avoid partial replacements
             words = var.split()
-            new_words = words.copy()
             
             # Check each word for exact matches
             for i, word in enumerate(words):

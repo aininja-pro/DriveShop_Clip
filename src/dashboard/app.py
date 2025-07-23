@@ -5600,6 +5600,130 @@ with rejected_tab:
                             st.error("❌ Could not move any clips - they may not exist in the database")
                 else:
                     st.warning("No records selected")
+            
+            # Add Excel Export functionality
+            st.markdown("---")
+            col_export1, col_export2 = st.columns([1, 3])
+            
+            with col_export1:
+                # Dynamic button text based on mode
+                if st.session_state.rejected_view_mode == 'historical' and start_date and end_date:
+                    button_text = f"📥 Export {start_date.strftime('%m/%d')} - {end_date.strftime('%m/%d')}"
+                    button_help = f"Export records from {start_date} to {end_date} to Excel with clickable URLs"
+                else:
+                    button_text = "📥 Export to Excel"
+                    button_help = "Export current rejected records to Excel with clickable URLs"
+                
+                if st.button(button_text, key="export_rejected_excel", help=button_help):
+                    # Create Excel file with rejected records
+                    try:
+                        # Get the data to export
+                        export_df = rejected_df.copy()
+                        
+                        # Create a workbook and worksheet
+                        wb = Workbook()
+                        ws = wb.active
+                        ws.title = "Rejected Records"
+                        
+                        # Define header style
+                        header_font = Font(bold=True, color="FFFFFF")
+                        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                        header_alignment = Alignment(horizontal="center", vertical="center")
+                        
+                        # Define the columns to export
+                        export_columns = ['WO #', 'Make', 'Model', 'To', 'Office', 'Rejection_Reason', 'Processed_Date']
+                        
+                        # Write headers
+                        for col_idx, col_name in enumerate(export_columns, 1):
+                            cell = ws.cell(row=1, column=col_idx, value=col_name)
+                            cell.font = header_font
+                            cell.fill = header_fill
+                            cell.alignment = header_alignment
+                        
+                        # Write data rows using DataFrame values directly
+                        for row_idx in range(len(export_df)):
+                            for col_idx, col_name in enumerate(export_columns, 1):
+                                value = export_df.iloc[row_idx][col_name] if col_name in export_df.columns else ''
+                                ws.cell(row=row_idx + 2, column=col_idx, value=str(value) if value else '')
+                        
+                        # After writing the main columns, add URL columns
+                        # Get unique URLs for each WO
+                        url_start_col = len(export_columns) + 1
+                        
+                        # Add URL headers
+                        ws.cell(row=1, column=url_start_col, value="URLs").font = header_font
+                        ws.cell(row=1, column=url_start_col, value="URLs").fill = header_fill
+                        ws.cell(row=1, column=url_start_col, value="URLs").alignment = header_alignment
+                        
+                        # Process URLs for each row
+                        for row_idx in range(len(export_df)):
+                            # Get original URLs from the row
+                            original_urls = export_df.iloc[row_idx].get('original_urls', '') if 'original_urls' in export_df.columns else ''
+                            if original_urls and not pd.isna(original_urls):
+                                urls = [url.strip() for url in str(original_urls).split(';') if url.strip()]
+                                
+                                # Write each URL as a hyperlink in consecutive columns
+                                for url_idx, url in enumerate(urls):
+                                    col_idx = url_start_col + url_idx
+                                    
+                                    # Ensure header exists for this URL column
+                                    if row_idx == 0:  # First data row
+                                        header_cell = ws.cell(row=1, column=col_idx, value=f"URL {url_idx + 1}")
+                                        header_cell.font = header_font
+                                        header_cell.fill = header_fill
+                                        header_cell.alignment = header_alignment
+                                    
+                                    # Create hyperlink
+                                    cell = ws.cell(row=row_idx + 2, column=col_idx)
+                                    cell.value = f"Link {url_idx + 1}"
+                                    cell.hyperlink = url
+                                    cell.font = Font(color="0000FF", underline="single")
+                        
+                        # Auto-adjust column widths
+                        for column in ws.columns:
+                            max_length = 0
+                            column_letter = column[0].column_letter
+                            for cell in column:
+                                try:
+                                    if len(str(cell.value)) > max_length:
+                                        max_length = len(cell.value)
+                                except:
+                                    pass
+                            adjusted_width = min(max_length + 2, 50)
+                            ws.column_dimensions[column_letter].width = adjusted_width
+                        
+                        # Save to BytesIO
+                        excel_buffer = io.BytesIO()
+                        wb.save(excel_buffer)
+                        excel_buffer.seek(0)
+                        
+                        # Generate filename with date range
+                        if st.session_state.rejected_view_mode == 'historical' and start_date and end_date:
+                            filename = f"rejected_records_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx"
+                        else:
+                            filename = f"rejected_records_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                        
+                        # Provide download button
+                        st.download_button(
+                            label="📥 Download Excel File",
+                            data=excel_buffer.getvalue(),
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                        
+                        st.success(f"✅ Excel file ready for download with {len(export_df)} records")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error creating Excel file: {str(e)}")
+                        import traceback
+                        st.error(traceback.format_exc())
+            
+            with col_export2:
+                if st.session_state.rejected_view_mode == 'historical' and start_date and end_date:
+                    st.info(f"📅 Export will include records from {start_date} to {end_date}")
+                else:
+                    st.info("📋 Export will include all visible rejected records")
+                    
     else:
         st.info("📊 No rejected records found")
         # ... existing code ...

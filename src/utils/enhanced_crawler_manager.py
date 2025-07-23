@@ -84,6 +84,12 @@ class EnhancedCrawlerManager:
         """Detect if content is a generic index page vs specific article - FIXED VERSION"""
         if not content:
             return True
+        
+        # Check if this is a homepage/index URL
+        parsed_url = urlparse(url)
+        if not parsed_url.path or parsed_url.path == '/' or parsed_url.path == '':
+            logger.info(f"🏠 Homepage URL detected ({url}) - treating as GENERIC content for escalation")
+            return True
             
         content_lower = content.lower()
         make_lower = make.lower() if make else ""
@@ -1089,28 +1095,23 @@ class EnhancedCrawlerManager:
             base_model = model_parts[0] if model_parts else model_lower  # "camry" from "camry hybrid"
             variant = model_parts[1] if len(model_parts) > 1 else ""      # "hybrid" from "camry hybrid"
         
-        # Create COMPREHENSIVE model variations (handle dashes, spaces, years, etc.)
-        model_variations = [
-            model_lower,                      # "camry hybrid"
-            base_model,                       # "camry" (BROADER SEARCH - key for finding more articles)
-            model_lower.replace(' ', ''),     # "camryhybrid"
-            model_lower.replace(' ', '-'),    # "camry-hybrid"
-            model_lower.replace('-', ''),     # "cx5" (for CX-5)
-            model_lower.replace('-', ' '),    # "cx 5"
-        ]
+        # Use the enhanced model variations generator that handles trim levels
+        from src.utils.model_variations import generate_model_variations
+        model_variations = generate_model_variations(make, model)
         
-        # Add year variants for recent years (2023-2025)
+        # Add year variants to the generated variations
         current_year = 2025
+        year_variations = []
         for year in [current_year, current_year-1, current_year-2]:  # 2025, 2024, 2023
-            model_variations.extend([
-                f"{year} {base_model}",       # "2025 camry"
-                f"{base_model} {year}",       # "camry 2025"  
-                f"{year} {model_lower}",      # "2025 camry hybrid"
-                f"{model_lower} {year}",      # "camry hybrid 2025"
-            ])
+            for variation in model_variations[:5]:  # Add years to the first few variations
+                year_variations.extend([
+                    f"{year} {variation}",       # "2025 crown signia"
+                    f"{variation} {year}",       # "crown signia 2025"
+                ])
         
-        # Remove duplicates and filter out empty strings
-        model_variations = list(set([v for v in model_variations if v.strip()]))
+        # Combine all variations and remove duplicates
+        model_variations.extend(year_variations)
+        model_variations = list(set([v.lower() for v in model_variations if v.strip()]))
         
         logger.info(f"🔍 FLEXIBLE SEARCH: Looking for articles about '{make}' '{model}'")
         logger.info(f"🔍 Base model: '{base_model}', Variant: '{variant}'")
