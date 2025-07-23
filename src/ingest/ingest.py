@@ -52,10 +52,11 @@ logger = setup_logger(__name__)
 
 def flexible_model_match(video_title: str, model_variation: str) -> bool:
     """
-    Check if all words in the model variation appear in the video title,
-    allowing them to be non-consecutive.
+    Check if the model variation matches the video title with flexible matching.
+    Uses a threshold-based approach instead of requiring ALL words.
     
     Examples:
+    - "kona limited awd" matches "2025 Hyundai Kona Limited" (2/3 words = 67%)
     - "accord hybrid touring" matches "The 2025 Honda Accord Touring Is A Blissful Hybrid Sedan"
     - "cx-50 turbo" matches "The Mazda CX-50 2.5 Turbo Review"
     
@@ -64,18 +65,50 @@ def flexible_model_match(video_title: str, model_variation: str) -> bool:
         model_variation: The model string to search for (already lowercased)
         
     Returns:
-        True if all words in model_variation appear in video_title
+        True if enough words from model_variation appear in video_title
     """
     # Split model variation into words, handling hyphens as word boundaries
     model_words = re.split(r'[-\s]+', model_variation.strip())
     model_words = [word for word in model_words if word]  # Remove empty strings
     
-    # Check if all model words appear in the title
-    for word in model_words:
-        if word not in video_title:
-            return False
+    if not model_words:
+        return False
     
-    return True
+    # Count how many model words appear in the title
+    matches = 0
+    core_matches = 0  # Track matches of important words
+    
+    # Define less important words that shouldn't be strictly required
+    optional_words = {'awd', '4wd', 'fwd', 'rwd', '2wd', 'drive', 'wheel', 'all'}
+    
+    for word in model_words:
+        if word in video_title:
+            matches += 1
+            if word not in optional_words:
+                core_matches += 1
+    
+    # Calculate match percentage
+    match_percentage = matches / len(model_words)
+    
+    # More flexible matching rules:
+    # 1. If we have 80% or more matches, it's a match
+    if match_percentage >= 0.8:
+        return True
+    
+    # 2. If we have at least 2 core (non-optional) word matches, it's a match
+    if core_matches >= 2:
+        return True
+    
+    # 3. If we have 60% or more matches AND at least 1 core match, it's a match
+    if match_percentage >= 0.6 and core_matches >= 1:
+        return True
+    
+    # 4. Special case: if model variation is just 2 words and we match both core words
+    core_words = [w for w in model_words if w not in optional_words]
+    if len(core_words) <= 2 and all(word in video_title for word in core_words):
+        return True
+    
+    return False
 
 # Initialize the enhanced crawler manager (it will be reused for all URLs)
 crawler_manager = EnhancedCrawlerManager()
