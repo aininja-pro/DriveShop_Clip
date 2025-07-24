@@ -1152,12 +1152,30 @@ class DatabaseManager:
     def update_clip_published_date(self, wo_number: str, new_date: str) -> bool:
         """Update the published_date field for a specific clip"""
         try:
+            # Convert date string to proper format for PostgreSQL DATE field
+            formatted_date = None
+            if new_date and new_date.strip() and new_date not in ['—', '-', 'None', 'null', '']:
+                from datetime import datetime
+                try:
+                    # Try parsing MM/DD/YYYY format
+                    date_obj = datetime.strptime(new_date.strip(), '%m/%d/%Y')
+                    formatted_date = date_obj.strftime('%Y-%m-%d')  # PostgreSQL DATE format
+                except ValueError:
+                    try:
+                        # Try parsing MM/DD/YY format (legacy)
+                        date_obj = datetime.strptime(new_date.strip(), '%m/%d/%y')
+                        formatted_date = date_obj.strftime('%Y-%m-%d')
+                    except ValueError:
+                        logger.warning(f"⚠️ Invalid date format for WO# {wo_number}: {new_date}")
+                        return False
+            
+            # Update with properly formatted date or NULL
             result = self.supabase.table('clips').update({
-                'published_date': new_date
+                'published_date': formatted_date
             }).eq('wo_number', wo_number).execute()
             
             if result.data:
-                logger.info(f"✅ Updated published date for WO# {wo_number} to: {new_date}")
+                logger.info(f"✅ Updated published date for WO# {wo_number} to: {formatted_date}")
                 return True
             else:
                 logger.warning(f"⚠️ No clip found with WO# {wo_number}")

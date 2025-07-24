@@ -2918,7 +2918,7 @@ with bulk_review_tab:
                                         year, month, day = match.groups()
                                         from datetime import datetime
                                         date_obj = datetime(int(year), int(month), int(day))
-                                        return date_obj.strftime('%m/%d/%y')
+                                        return date_obj.strftime('%m/%d/%Y')
                                     except:
                                         continue
                         
@@ -2931,7 +2931,7 @@ with bulk_review_tab:
                                 parsed_date = dateutil.parser.parse(str(processed_date))
                                 # Only use if within last 30 days (likely recent article)
                                 if (datetime.now() - parsed_date).days <= 30:
-                                    return parsed_date.strftime('%m/%d/%y')
+                                    return parsed_date.strftime('%m/%d/%Y')
                             except:
                                 pass
                         
@@ -3088,6 +3088,11 @@ with bulk_review_tab:
                             st.session_state.last_saved_bylines[wo_num] = byline_author
                         elif contact and contact.strip():
                             st.session_state.last_saved_bylines[wo_num] = contact
+                    
+                    # Initialize published dates to prevent false changes on load
+                    published_date = row.get('📅 Published Date', '')
+                    if wo_num and published_date and wo_num not in st.session_state.last_saved_dates:
+                        st.session_state.last_saved_dates[wo_num] = published_date
                     
                     # Populate outlet data mapping for this WO
                     if wo_num and person_id and wo_num not in st.session_state.outlet_data_mapping:
