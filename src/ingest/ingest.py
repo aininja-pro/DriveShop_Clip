@@ -867,6 +867,16 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             original_url = url
             url = url.replace('/automobilemag', '/car-reviews')
             logger.info(f"🔄 Redirecting MotorTrend URL: {original_url} -> {url}")
+            
+        # Redirect Tightwad Garage to blog section where articles are located
+        if 'tightwadgarage.com' in url and '/blog' not in url:
+            original_url = url
+            # Ensure URL ends with /blog
+            if url.endswith('/'):
+                url = url + 'blog'
+            else:
+                url = url + '/blog'
+            logger.info(f"🔄 Redirecting Tightwad Garage URL: {original_url} -> {url}")
         
         # Get make and model for finding relevant content
         make = loan.get('make', '')

@@ -19,3 +19,5 @@ hagerty.com,Hagerty,true,true,h1,time,article,true,https://www.hagerty.com/media
 www.hagerty.com,Hagerty,true,true,h1,time,article,true,https://www.hagerty.com/media/feed/,Articles load dynamically with JavaScript
 theatlantavoice.com,The Atlanta Voice,false,false,h1,time,div.entry-content,true,https://theatlantavoice.com/feed/,Black and African American news outlet
 www.theatlantavoice.com,The Atlanta Voice,false,false,h1,time,div.entry-content,true,https://theatlantavoice.com/feed/,Black and African American news outlet 
+tightwadgarage.com,Tightwad Garage,true,true,h1,time,div.content,true,,Blog-style site with /blog/post/ URL structure - requires JS rendering
+www.tightwadgarage.com,Tightwad Garage,true,true,h1,time,div.content,true,,Blog-style site with /blog/post/ URL structure - requires JS rendering

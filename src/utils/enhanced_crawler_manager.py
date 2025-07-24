@@ -35,6 +35,40 @@ class EnhancedCrawlerManager:
         self.cache_manager = CacheManager()
         self.original_crawler = CrawlerManager()  # For tiers 4-5
         
+    def _is_likely_index_page(self, original_content: str, extracted_content: str, url: str) -> bool:
+        """
+        Detect if this is likely an index/category page based on extraction rate.
+        Index pages typically have very low extraction rates because they contain
+        many navigation elements and article snippets rather than a single article.
+        """
+        if not original_content:
+            return False
+            
+        content_length = len(original_content)
+        extracted_length = len(extracted_content) if extracted_content else 0
+        
+        # Calculate extraction rate
+        if content_length > 0:
+            extraction_rate = (extracted_length / content_length) * 100
+        else:
+            extraction_rate = 0
+            
+        # If we have a large page (>50KB) but extracted very little (<1KB), 
+        # it's likely an index page with snippets
+        if content_length > 50000 and extracted_length < 1000:
+            logger.info(f"📊 Low extraction rate ({extraction_rate:.1f}%) - {extracted_length} chars from {content_length} chars")
+            logger.info(f"🔍 This appears to be an index/category page, should use Index Discovery")
+            return True
+            
+        # Also check URL patterns that suggest index pages
+        url_lower = url.lower()
+        index_patterns = ['/blog', '/news', '/articles', '/reviews', '/category/', '/tag/']
+        if any(pattern in url_lower for pattern in index_patterns) and extraction_rate < 2.0:
+            logger.info(f"📊 Index URL pattern with low extraction rate ({extraction_rate:.1f}%)")
+            return True
+            
+        return False
+        
     def should_use_google_search(self, url: str, make: str, model: str) -> bool:
         """Determine if we should try Google Search first"""
         domain = urlparse(url).netloc.lower()
@@ -435,7 +469,22 @@ class EnhancedCrawlerManager:
                 min_content_length = 200
                 extraction_successful = extracted_content and len(extracted_content.strip()) >= min_content_length
                 
-                if extraction_successful and not self.is_generic_content(extracted_content, url, make, model):
+                # Check if this is likely an index page based on extraction rate
+                is_index = self._is_likely_index_page(scrapfly_content, extracted_content, url)
+                logger.info(f"📊 Index page detection: Original={len(scrapfly_content)} chars, Extracted={len(extracted_content) if extracted_content else 0} chars, Is Index={is_index}")
+                
+                if is_index:
+                    logger.info(f"Tier 4: ScrapFly returned an index page, escalating to Index Discovery")
+                    # CRITICAL: Run Index Discovery with the RAW HTML content, not extracted text
+                    from urllib.parse import urlparse as parse_url
+                    domain = parse_url(url).netloc
+                    index_result = self._try_index_page_discovery(url, make, model, person_name, domain, pre_fetched_html=scrapfly_content)
+                    if index_result:
+                        logger.info(f"✅ Index Discovery found specific article via ScrapFly index page")
+                        return index_result
+                    else:
+                        logger.warning(f"❌ Index Discovery failed to find article from ScrapFly index page")
+                elif extraction_successful and not self.is_generic_content(extracted_content, url, make, model):
                     logger.info(f"Tier 3 Success: ScrapFly + successful extraction found SPECIFIC content for {url}")
                     result = {
                         'success': True,
@@ -456,7 +505,7 @@ class EnhancedCrawlerManager:
                     )
                     return self._add_byline_to_result(result, person_name)
                 else:
-                    logger.info(f"Tier 4: ScrapFly content extraction failed or generic, escalating to ScrapingBee")
+                    logger.info(f"Tier 4: ScrapFly content extraction failed or generic, escalating")
             else:
                 logger.warning(f"Tier 4: ScrapFly failed for {url}: {scrapfly_error}")
         except Exception as e:
@@ -788,25 +837,95 @@ class EnhancedCrawlerManager:
         # Note: ScrapingBee and Google Search are HTTP-based APIs, no cleanup needed
         logger.info("Enhanced crawler manager cleanup completed")
 
-    def _try_index_page_discovery(self, index_url: str, make: str, model: str, person_name: str, domain: str) -> Optional[Dict[str, Any]]:
+    def _try_index_page_discovery(self, index_url: str, make: str, model: str, person_name: str, domain: str, pre_fetched_html: str = None) -> Optional[Dict[str, Any]]:
         """
         INDEX PAGE DISCOVERY: Scrape index page, extract article links, find relevant ones, crawl them.
         This is like YouTube processing but for web articles.
         """
         logger.info(f"🔍 Starting Index Page Discovery for {index_url}")
         
-        # Step 1: Scrape the ENTIRE index page (like YouTube RSS feed)
-        logger.info(f"Step 1: Scraping index page: {index_url}")
-        index_content = self._scrape_index_page(index_url)
-        if not index_content:
-            logger.warning(f"❌ Failed to scrape index page: {index_url}")
-            return None
+        # Step 1: Use pre-fetched HTML if available, otherwise scrape the ENTIRE index page
+        if pre_fetched_html:
+            logger.info(f"Step 1: Using pre-fetched HTML content ({len(pre_fetched_html)} chars)")
+            index_content = pre_fetched_html
+        else:
+            logger.info(f"Step 1: Scraping index page: {index_url}")
+            index_content = self._scrape_index_page(index_url)
+        
+        # OPTIMIZATION: Check article URL cache first
+        from src.utils.article_url_cache import get_article_cache
+        article_cache = get_article_cache()
+        
+        # Extract domain from URL
+        from urllib.parse import urlparse
+        domain = urlparse(index_url).netloc.lower().replace('www.', '')
+        
+        cached_url = article_cache.get_article_url(domain, make, model)
+        if cached_url:
+            logger.info(f"🎯 OPTIMIZATION: Using cached article URL: {cached_url}")
             
-        # Step 2: Extract ALL article links from index page (like YouTube video links)
-        logger.info(f"Step 2: Extracting article links from index page")
-        article_links = self._extract_article_links_from_index(index_content, index_url)
+            # Try to fetch the cached article directly
+            article_result = self._crawl_specific_url(cached_url, make, model)
+            if article_result['success']:
+                logger.info(f"✅ Successfully fetched cached article, skipping Index Discovery")
+                return self._add_byline_to_result({
+                    'success': True,
+                    'content': article_result['content'],
+                    'title': article_result.get('title', f'{make} {model} Review'),
+                    'url': cached_url,
+                    'tier_used': f"Index Discovery (Cached) -> {article_result.get('tier_used', 'Unknown')}",
+                    'attribution_strength': article_result.get('attribution_strength', 'unknown'),
+                    'actual_byline': article_result.get('actual_byline'),
+                    'discovery_details': {
+                        'method': 'cached_url',
+                        'index_url': index_url
+                    }
+                }, person_name)
+            else:
+                logger.warning(f"❌ Cached URL failed, falling back to Index Discovery")
+        
+        # If homepage doesn't have good content, try common blog paths
+        article_links = []
+        urls_to_try = [index_url]
+        
+        # Add /blog path if not already in URL
+        if '/blog' not in index_url.lower():
+            from urllib.parse import urljoin
+            blog_url = urljoin(index_url, '/blog')
+            urls_to_try.append(blog_url)
+            
+        for try_url in urls_to_try:
+            logger.info(f"🔍 Trying URL: {try_url}")
+            index_content = self._scrape_index_page(try_url)
+                
+            if index_content:
+                # Step 2: Extract ALL article links from index page (like YouTube video links)
+                logger.info(f"Step 2: Extracting article links from: {try_url}")
+                
+                # DEBUG: Show what content we're working with
+                logger.info(f"📊 Index content length: {len(index_content)} characters")
+                if "tightwadgarage.com" in try_url:
+                    # Log a snippet of the content to see what we got
+                    content_preview = index_content[:1000].replace('\n', ' ')
+                    logger.info(f"📊 Tightwad content preview: {content_preview}")
+                    
+                    # Check if the content looks like HTML or extracted text
+                    if '<html' in index_content.lower() or '<body' in index_content.lower():
+                        logger.info(f"✅ Content appears to be HTML (good for link extraction)")
+                    else:
+                        logger.warning(f"⚠️ Content doesn't look like HTML - might be extracted text only")
+                
+                article_links = self._extract_article_links_from_index(index_content, try_url)
+                
+                if article_links:
+                    logger.info(f"✅ Found {len(article_links)} article links at {try_url}")
+                    index_url = try_url  # Update for further processing
+                    break
+                else:
+                    logger.warning(f"❌ No article links found at: {try_url}")
+                    
         if not article_links:
-            logger.warning(f"❌ No article links found on index page: {index_url}")
+            logger.warning(f"❌ No article links found on any tried paths")
             return None
             
         logger.info(f"📄 Found {len(article_links)} article links on index page")
@@ -829,6 +948,13 @@ class EnhancedCrawlerManager:
             article_result = self._crawl_specific_url(article_url, make, model)
             if article_result['success']:
                 logger.info(f"✅ INDEX DISCOVERY SUCCESS: Successfully crawled specific article: {article_url}")
+                
+                # CACHE the discovered URL for future use
+                try:
+                    article_cache.store_article_url(domain, make, model, article_url, article_title)
+                    logger.info(f"💾 Cached article URL for future use")
+                except Exception as e:
+                    logger.warning(f"Failed to cache article URL: {e}")
                 
                 # EXTRACT AUTHOR INFORMATION for attribution transparency
                 attribution_strength = 'unknown'
@@ -889,9 +1015,21 @@ class EnhancedCrawlerManager:
         
         all_content = ""
         page_count = 0
-        max_pages = 5  # Reasonable limit to avoid infinite loops
+        # Reduce pagination for problematic sites to avoid timeouts
+        if "tightwadgarage.com" in index_url:
+            max_pages = 3  # Limit to 3 pages for Tightwad to avoid rate limiting
+        else:
+            max_pages = 5  # Default pagination limit
         current_url = index_url
         visited_urls = set()
+        
+        # ENHANCED DEBUG for Tightwad Garage
+        if "tightwadgarage.com" in index_url:
+            logger.info(f"🚨 DEBUG: Scraping Tightwad Garage index - will search up to {max_pages} pages")
+        
+        # Check if this domain requires forced JS rendering
+        force_js_domains = ['tightwadgarage.com', 'hagerty.com', 'motortrend.com']
+        should_force_js = any(domain in index_url.lower() for domain in force_js_domains)
         
         while current_url and page_count < max_pages and current_url not in visited_urls:
             page_count += 1
@@ -899,12 +1037,25 @@ class EnhancedCrawlerManager:
             
             logger.info(f"📄 PAGINATION: Scraping page {page_count}: {current_url}")
             
-            # Try Enhanced HTTP first (fast and free)
-            page_content = self.enhanced_http.fetch_url(current_url)
-            if not page_content or len(page_content) < 1000:
-                # Try ScrapingBee if Enhanced HTTP fails - DISABLED FOR TESTING
-                logger.info(f"Enhanced HTTP failed for page {page_count}, ScrapingBee DISABLED - skipping")
-                # page_content = self.scraping_bee.scrape_url(current_url)
+            # CRITICAL FIX: Use ScrapFly with JS for domains that require it
+            if should_force_js:
+                logger.info(f"🎯 Using ScrapFly with JS rendering for {current_url}")
+                try:
+                    from src.utils.scrapfly_client import scrapfly_crawl_with_fallback
+                    page_content, title, error = scrapfly_crawl_with_fallback(current_url)
+                    if error:
+                        logger.warning(f"ScrapFly error: {error}")
+                        page_content = None
+                except Exception as e:
+                    logger.error(f"ScrapFly exception: {e}")
+                    page_content = None
+            else:
+                # Try Enhanced HTTP first (fast and free)
+                page_content = self.enhanced_http.fetch_url(current_url)
+                if not page_content or len(page_content) < 1000:
+                    # Try ScrapingBee if Enhanced HTTP fails - DISABLED FOR TESTING
+                    logger.info(f"Enhanced HTTP failed for page {page_count}, ScrapingBee DISABLED - skipping")
+                    # page_content = self.scraping_bee.scrape_url(current_url)
                 
             if page_content and len(page_content) > 1000:
                 logger.info(f"✅ PAGINATION: Got page {page_count} content ({len(page_content)} chars)")
@@ -1064,6 +1215,7 @@ class EnhancedCrawlerManager:
                 'a[href*="/drive"]',
                 'a[href*="/first"]',
                 'a[href*="/road"]',
+                'a[href*="/blog/post/"]',  # For blog-style sites like Tightwad Garage
                 'article a[href]',
                 '.post a[href]',
                 '.entry a[href]',
@@ -1073,6 +1225,10 @@ class EnhancedCrawlerManager:
                 'h3 a[href]',
                 '.headline a[href]',
                 '.title a[href]',
+                # Tightwad Garage specific selectors
+                '.blog-post a[href]',
+                '.post-title a[href]',
+                '.entry-title a[href]',
                 'a[href]'  # CATCH-ALL: Get ALL links, filter by domain and relevance later
             ]
             
@@ -1109,6 +1265,22 @@ class EnhancedCrawlerManager:
             logger.info(f"🔍 DEBUG: First 10 article links found:")
             for i, link in enumerate(links[:10]):
                 logger.info(f"  {i+1}. {link}")
+            
+            # ENHANCED DEBUG: Check specifically for CX-70 articles
+            cx70_links = [link for link in links if 'cx-70' in link.lower() or 'cx70' in link.lower()]
+            if cx70_links:
+                logger.info(f"🚨 DEBUG: Found {len(cx70_links)} CX-70 specific links:")
+                for link in cx70_links:
+                    logger.info(f"   - {link}")
+            else:
+                logger.info(f"🚨 DEBUG: NO CX-70 links found among {len(links)} extracted links")
+                
+            # ENHANCED DEBUG: Check if Tightwad Garage CX-70 URL is in the list
+            tightwad_cx70_url = "https://tightwadgarage.com/blog/post/2335133/2025-mazda-cx-70-review"
+            if tightwad_cx70_url in links:
+                logger.info(f"✅ DEBUG: Tightwad CX-70 URL IS in extracted links at index {links.index(tightwad_cx70_url)}")
+            else:
+                logger.info(f"❌ DEBUG: Tightwad CX-70 URL NOT in extracted links")
                 
             return links[:100]  # Increased from 50 to 100 to search deeper pagination
             
@@ -1116,12 +1288,18 @@ class EnhancedCrawlerManager:
             logger.error(f"❌ Error extracting article links: {e}")
             return []
 
-    def _find_relevant_articles(self, article_links: List[str], make: str, model: str, person_name: str) -> List[tuple]:
+    def _find_relevant_articles(self, article_links: List[str], make: str, model: str, person_name: str = "") -> List[tuple]:
         """Find articles with FLEXIBLE Make + Model matching - BROADER SEARCH for better results"""
         relevant_articles = []
         
         make_lower = make.lower()
         model_lower = model.lower()
+        
+        # ENHANCED DEBUG: Log the exact inputs we're searching for
+        logger.info(f"🔍 DEBUG: _find_relevant_articles called with:")
+        logger.info(f"   Make: '{make}' (lower: '{make_lower}')")
+        logger.info(f"   Model: '{model}' (lower: '{model_lower}')")
+        logger.info(f"   Links to search: {len(article_links)}")
         
         # Smart model parsing for compound models like "GR Corolla Premium"
         model_parts = model_lower.split()
@@ -1158,11 +1336,29 @@ class EnhancedCrawlerManager:
         logger.info(f"🔍 Model variations ({len(model_variations)}): {model_variations[:15]}...")  # Show first 15
         logger.info(f"🔍 Searching through {len(article_links)} total article links...")
         
+        # ENHANCED DEBUG: Check for specific Tightwad Garage URL
+        tightwad_url = "https://tightwadgarage.com/blog/post/2335133/2025-mazda-cx-70-review"
+        if tightwad_url in article_links:
+            logger.info(f"🚨 DEBUG: Tightwad Garage URL IS IN article_links at index {article_links.index(tightwad_url)}")
+        else:
+            logger.info(f"🚨 DEBUG: Tightwad Garage URL NOT FOUND in article_links")
+            # Check if any similar URL exists
+            for idx, link in enumerate(article_links):
+                if "tightwadgarage.com" in link and ("cx-70" in link or "cx70" in link):
+                    logger.info(f"🚨 DEBUG: Found similar Tightwad URL at index {idx}: {link}")
+        
         for i, article_url in enumerate(article_links):
             try:
                 url_lower = article_url.lower()
                 title = self._extract_title_from_url(article_url)
                 title_lower = title.lower()
+                
+                # ENHANCED DEBUG for Tightwad Garage URL specifically
+                if "tightwadgarage.com" in article_url and ("cx-70" in article_url or "cx70" in article_url):
+                    logger.info(f"🚨 PROCESSING TIGHTWAD URL at index {i}: {article_url}")
+                    logger.info(f"   url_lower: {url_lower}")
+                    logger.info(f"   extracted title: '{title}'")
+                    logger.info(f"   title_lower: '{title_lower}'")
                 
                 # TIER 1: Check for exact make + model match (perfect)
                 has_make_url = make_lower in url_lower
@@ -1184,7 +1380,29 @@ class EnhancedCrawlerManager:
                 has_variant_title = variant and variant in title_lower
                 has_variant = has_variant_url or has_variant_title
                 
-                if i < 30:  # Debug first 30 URLs to see what we're finding
+                # ENHANCED DEBUG for Tightwad URL
+                if "tightwadgarage.com" in article_url and ("cx-70" in article_url or "cx70" in article_url):
+                    logger.info(f"🚨 TIGHTWAD URL MATCHING RESULTS:")
+                    logger.info(f"   has_make_url: {has_make_url} ('{make_lower}' in '{url_lower}')")
+                    logger.info(f"   has_make_title: {has_make_title}")
+                    logger.info(f"   has_full_model_url: {has_full_model_url}")
+                    logger.info(f"   has_full_model_title: {has_full_model_title}")
+                    logger.info(f"   matching_variation: {matching_variation}")
+                    logger.info(f"   Model variations being checked: {model_variations[:10]}")
+                    # Check each variation manually for this URL
+                    for var in model_variations[:10]:
+                        if var in url_lower:
+                            logger.info(f"   ✅ Variation '{var}' FOUND in URL")
+                        else:
+                            logger.info(f"   ❌ Variation '{var}' NOT in URL")
+                
+                # Log ALL URLs when debugging Tightwad Garage
+                if "tightwadgarage.com" in article_url and i < 100:  # Debug first 100 URLs for Tightwad
+                    logger.info(f"🔍 TIGHTWAD {i+1}/{len(article_links)}: {article_url}")
+                    logger.info(f"  Title: '{title}'")
+                    logger.info(f"  Make '{make}' found: URL={has_make_url}, Title={has_make_title}")
+                    logger.info(f"  Full model found: URL={has_full_model_url}, Title={has_full_model_title} (variation: {matching_variation})")
+                elif i < 30:  # Debug first 30 URLs for others
                     logger.info(f"🔍 {i+1}/{len(article_links)}: {article_url}")
                     logger.info(f"  Title: '{title}'")
                     logger.info(f"  Make '{make}' found: URL={has_make_url}, Title={has_make_title}")

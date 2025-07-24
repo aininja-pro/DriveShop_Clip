@@ -1,0 +1,13 @@
+{
+  "tightwadgarage.com": {
+    "mazda_cx-70": {
+      "url": "https://tightwadgarage.com/blog/post/2335133/2025-mazda-cx-70-review",
+      "title": "2025 Mazda CX-70 Review",
+      "discovered": "2024-01-23",
+      "notes": "Article confirmed via Index Discovery but site is slow"
+    }
+  },
+  "hagerty.com": {
+    "comment": "Add known slow-loading articles here as discovered"
+  }
+}

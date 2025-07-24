@@ -26,6 +26,13 @@ class ScrapFlyWebCrawler:
         self.consecutive_failures = 0
         self.max_consecutive_failures = 5  # Circuit breaker threshold
         
+        # Domain-specific rate limiting for problematic sites
+        self.domain_last_request = {}  # Track last request time per domain
+        self.domain_min_delay = {
+            'tightwadgarage.com': 5.0,  # 5 seconds between requests for Tightwad
+            'hagerty.com': 3.0,         # 3 seconds for Hagerty
+        }
+        
         if not self.api_key:
             logger.warning("SCRAPFLY_API_KEY not found in environment variables")
             self.client = None
@@ -41,17 +48,35 @@ class ScrapFlyWebCrawler:
             return True
         return False
     
-    def _enforce_rate_limit(self):
-        """Enforce minimum delay between requests"""
+    def _enforce_rate_limit(self, url: str):
+        """Enforce minimum delay between requests with domain-specific limits"""
+        from urllib.parse import urlparse
         current_time = time.time()
-        time_since_last = current_time - self.last_request_time
         
+        # Extract domain from URL
+        domain = urlparse(url).netloc.lower().replace('www.', '')
+        
+        # Check domain-specific rate limit
+        domain_delay = self.domain_min_delay.get(domain, self.min_delay_between_requests)
+        
+        # Check last request time for this specific domain
+        if domain in self.domain_last_request:
+            time_since_domain_request = current_time - self.domain_last_request[domain]
+            if time_since_domain_request < domain_delay:
+                sleep_time = domain_delay - time_since_domain_request
+                logger.info(f"⏱️ Domain rate limiting for {domain}: sleeping {sleep_time:.1f}s")
+                time.sleep(sleep_time)
+        
+        # Also enforce global rate limit
+        time_since_last = current_time - self.last_request_time
         if time_since_last < self.min_delay_between_requests:
             sleep_time = self.min_delay_between_requests - time_since_last
-            logger.info(f"⏱️ Rate limiting: sleeping {sleep_time:.1f}s")
+            logger.info(f"⏱️ Global rate limiting: sleeping {sleep_time:.1f}s")
             time.sleep(sleep_time)
         
+        # Update timestamps
         self.last_request_time = time.time()
+        self.domain_last_request[domain] = self.last_request_time
     
     def _handle_rate_limit_response(self, error_message: str) -> Optional[int]:
         """
@@ -119,7 +144,7 @@ class ScrapFlyWebCrawler:
             return None, None, "ScrapFly circuit breaker is open - too many failures"
         
         # Enforce rate limiting
-        self._enforce_rate_limit()
+        self._enforce_rate_limit(url)
         
         try:
             logger.info(f"🕷️ ScrapFly crawling: {url}")
@@ -156,9 +181,11 @@ class ScrapFlyWebCrawler:
                 # No need for custom wait parameters
                 
             # Configure ScrapFly request
+            logger.info(f"🔧 ScrapFly config params: {config_params}")
             config_options = ScrapeConfig(**config_params)
             
             # Execute the scrape
+            logger.info(f"🚀 Executing ScrapFly scrape with config: {config_options}")
             result = self.client.scrape(config_options)
             
             if result.success:
@@ -216,6 +243,17 @@ class ScrapFlyWebCrawler:
         if self._is_circuit_breaker_open():
             return None, None, "ScrapFly circuit breaker is open - too many failures"
         
+        # Check if this domain requires forced JS rendering
+        force_js_domains = ['tightwadgarage.com', 'hagerty.com', 'motortrend.com']
+        should_force_js = any(domain in url.lower() for domain in force_js_domains)
+        
+        if should_force_js:
+            logger.info(f"🎯 Domain requires forced JS rendering, skipping basic scrape")
+            # Add wait time for blog sites that need dynamic content to load
+            rendering_wait = 5000 if 'blog' in url.lower() else None
+            content, title, error = self.crawl(url, render_js=True, use_stealth=True, rendering_wait=rendering_wait)
+            return content, title, error
+        
         # Attempt 1: Basic scrape (no JS, basic stealth)
         logger.info("🔄 Attempt 1: Basic scrape")
         content, title, error = self.crawl(url, render_js=False, use_stealth=True)
@@ -230,7 +268,10 @@ class ScrapFlyWebCrawler:
         # Attempt 2: With JavaScript rendering (ONLY if basic failed)
         logger.info("🔄 Attempt 2: With JavaScript rendering")
         time.sleep(3)  # Longer pause between attempts to respect rate limits
-        content, title, error = self.crawl(url, render_js=True, use_stealth=True)
+        
+        # Add wait time for blog sites that need dynamic content to load
+        rendering_wait = 5000 if 'blog' in url.lower() else None
+        content, title, error = self.crawl(url, render_js=True, use_stealth=True, rendering_wait=rendering_wait)
         
         if content and len(content) > 1000:
             logger.info("✅ JavaScript rendering successful")
