@@ -2706,7 +2706,7 @@ with bulk_review_tab:
                 'relevance_score': 'Relevance Score',
                 'status': 'Status',
                 'tier_used': 'Processing Method',
-                'published_date': 'Published Date',
+                'published_date': 'Published Date',  # Map database field to expected name
                 'media_outlet': 'Media Outlet',  # Map media_outlet to Media Outlet for dropdown
                 'byline_author': 'Actual_Byline',  # Map database field to expected name
                 'attribution_strength': 'Attribution_Strength'  # Map database field to expected name
@@ -3011,7 +3011,12 @@ with bulk_review_tab:
                 def get_actual_byline(row):
                     """Get actual byline author with smart fallbacks"""
                     try:
-                        # First check if we have an actual byline from the database
+                        # NEW LOGIC: Check if we have a saved value from user editing first
+                        wo_num = str(row.get('WO #', ''))
+                        if wo_num in st.session_state.last_saved_bylines:
+                            return st.session_state.last_saved_bylines[wo_num]
+                        
+                        # Check if we have an actual byline from the database
                         actual_byline = str(row.get('Actual_Byline', '')).strip()
                         if actual_byline and actual_byline.lower() not in ['nan', 'none', '', '—', 'null']:
                             # IMPORTANT: Check if this looks like the concatenated problematic string
@@ -3021,37 +3026,22 @@ with bulk_review_tab:
                             else:
                                 return actual_byline
                         
-                        # Otherwise use the smart analysis
-                        attribution_strength, byline_author = smart_attribution_analysis(row)
+                        # NEW LOGIC: Default to Contact field value (user's requirement)
+                        contact_person = str(row.get('To', '')).strip()
+                        if contact_person and contact_person.lower() not in ['nan', 'none', '']:
+                            return contact_person
                         
-                        # If we have a byline, return it
-                        if byline_author:
-                            return byline_author
-                        
-                        # For strong attribution without byline (shouldn't happen), use contact
-                        if attribution_strength == 'strong':
+                        # If no contact name available, return placeholder
+                        return '—'
+                    
+                    except:
+                        # If anything fails, try to use contact as fallback
+                        try:
                             contact_person = str(row.get('To', '')).strip()
                             if contact_person and contact_person.lower() not in ['nan', 'none', '']:
                                 return contact_person
-                        
-                        # For delegated/unknown, don't show contact as fallback
-                        # Try to extract from summary if available
-                        summary = str(row.get('Summary', ''))
-                        if 'by ' in summary.lower():
-                            import re
-                            author_match = re.search(r'by\s+([A-Za-z\s\.]+)', summary, re.IGNORECASE)
-                            if author_match:
-                                potential_author = author_match.group(1).strip()
-                                if len(potential_author) > 2 and len(potential_author) < 50:  # Reasonable author name length
-                                    return potential_author
-                    
-                        # Return appropriate placeholder based on attribution
-                        if attribution_strength == 'delegated':
-                            return 'Staff/Contributor'
-                        else:
-                            return '—'
-                    
-                    except:
+                        except:
+                            pass
                         return '—'
 
                 # Attribution logic kept in code but column hidden from UI
@@ -3084,14 +3074,20 @@ with bulk_review_tab:
                     wo_num = str(row.get('WO #', ''))
                     media_outlet = row.get('Media Outlet', '')
                     byline_author = row.get('📝 Byline Author', '')
+                    contact = row.get('Contact', '')
                     person_id = row.get('Person_ID', '')
                     
                     # Only set if not already tracked (preserves user changes)
                     if wo_num and media_outlet and wo_num not in st.session_state.last_saved_outlets:
                         st.session_state.last_saved_outlets[wo_num] = media_outlet
                     
-                    if wo_num and byline_author and wo_num not in st.session_state.last_saved_bylines:
-                        st.session_state.last_saved_bylines[wo_num] = byline_author
+                    # For Byline Author: Use Contact as default if no byline_author exists
+                    if wo_num and wo_num not in st.session_state.last_saved_bylines:
+                        # If we have a byline author, use it; otherwise default to Contact
+                        if byline_author and byline_author.strip() and byline_author.strip() not in ['—', 'nan', 'None']:
+                            st.session_state.last_saved_bylines[wo_num] = byline_author
+                        elif contact and contact.strip():
+                            st.session_state.last_saved_bylines[wo_num] = contact
                     
                     # Populate outlet data mapping for this WO
                     if wo_num and person_id and wo_num not in st.session_state.outlet_data_mapping:
@@ -5945,7 +5941,6 @@ with rejected_tab:
                     
     else:
         st.info("📊 No rejected records found")
-        # ... existing code ...
 
 # ========== DETAILED ANALYSIS TAB (Existing 40/60 Interface) ==========
 with analysis_tab:
@@ -6873,6 +6868,7 @@ with history_tab:
                 
                 with col_excel_hist:
                     # Excel generation temporarily disabled for historical files
+                    # to avoid compatibility issues
                     # to avoid compatibility issues
                     st.info("💡 **Excel Generation**\n\nFor historical sessions, use the JSON download and import into the current session for Excel generation.")
                     st.caption("This ensures compatibility with the latest Excel format.")
