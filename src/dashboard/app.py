@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUp
 from src.utils.logger import logger
 from src.utils.sentiment_analysis import run_sentiment_analysis
 from src.utils.fms_api import FMSAPIClient
-from src.utils.auth import SupabaseAuth
+from src.utils.auth_improved import ImprovedSupabaseAuth as SupabaseAuth
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
