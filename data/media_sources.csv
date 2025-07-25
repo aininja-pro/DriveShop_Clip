@@ -21,3 +21,9 @@ theatlantavoice.com,The Atlanta Voice,false,false,h1,time,div.entry-content,true
 www.theatlantavoice.com,The Atlanta Voice,false,false,h1,time,div.entry-content,true,https://theatlantavoice.com/feed/,Black and African American news outlet 
 tightwadgarage.com,Tightwad Garage,true,true,h1,time,div.content,true,,Blog-style site with /blog/post/ URL structure - requires JS rendering
 www.tightwadgarage.com,Tightwad Garage,true,true,h1,time,div.content,true,,Blog-style site with /blog/post/ URL structure - requires JS rendering
+drivechicago.com,DriveChicago,true,true,h1.entry-title,time.entry-date,div.entry-content,true,,Modern site with dynamic content loading - requires JS
+www.drivechicago.com,DriveChicago,true,true,h1.entry-title,time.entry-date,div.entry-content,true,,Modern site with dynamic content loading - requires JS
+dailyherald.com,Daily Herald,true,false,h1,time,div.article-content,true,,News site with some dynamic content
+www.dailyherald.com,Daily Herald,true,false,h1,time,div.article-content,true,,News site with some dynamic content
+nwherald.com,Northwest Herald,true,false,h1,time,div.article-content,true,,Regional news site
+www.nwherald.com,Northwest Herald,true,false,h1,time,div.article-content,true,,Regional news site

@@ -23,12 +23,23 @@ class SimpleSessionPersistence:
         """Store session data in URL query parameters."""
         try:
             # Create session payload
-            payload = {
-                'access_token': session_data.get('access_token', ''),
-                'refresh_token': session_data.get('refresh_token', ''),
-                'expires_at': session_data.get('expires_at', 0),
-                'timestamp': datetime.now().isoformat()
-            }
+            # Handle both dict and Session object formats
+            if hasattr(session_data, 'access_token'):
+                # It's a Session object
+                payload = {
+                    'access_token': getattr(session_data, 'access_token', ''),
+                    'refresh_token': getattr(session_data, 'refresh_token', ''),
+                    'expires_at': getattr(session_data, 'expires_at', 0),
+                    'timestamp': datetime.now().isoformat()
+                }
+            else:
+                # It's a dict
+                payload = {
+                    'access_token': session_data.get('access_token', ''),
+                    'refresh_token': session_data.get('refresh_token', ''),
+                    'expires_at': session_data.get('expires_at', 0),
+                    'timestamp': datetime.now().isoformat()
+                }
             
             # Create signature for security
             payload_str = json.dumps(payload, sort_keys=True)

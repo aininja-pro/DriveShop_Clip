@@ -355,8 +355,34 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
     model_base = model_lower.split()[0] if model_lower else ""
     model_found = bool(model_lower) and (model_lower in content_lower or (model_base and model_base in content_lower))
     
+    # Special handling for models with numbers like "4Runner", "CX-5", "X3", etc.
+    # Also check for common variations (with/without spaces, hyphens)
+    if not model_found and model:
+        # Create variations of the model name for matching
+        model_variations = [
+            model_lower,  # Original lowercase
+            model_lower.replace('-', ''),  # Remove hyphens: "cx-5" -> "cx5"
+            model_lower.replace(' ', ''),  # Remove spaces: "4 runner" -> "4runner"
+            model_lower.replace('-', ' '),  # Replace hyphens with spaces: "cx-5" -> "cx 5"
+        ]
+        
+        # For models starting with numbers, add space-separated version
+        if model and model[0].isdigit():
+            # "4Runner" -> also check "4 runner"
+            import re
+            space_separated = re.sub(r'(\d+)([A-Za-z])', r'\1 \2', model_lower)
+            if space_separated != model_lower:
+                model_variations.append(space_separated)
+        
+        # Check all variations
+        for variant in model_variations:
+            if variant and variant in content_lower:
+                model_found = True
+                logger.info(f"Found model variant '{variant}' in content")
+                break
+    
     if not make_found and not model_found:
-        logger.info(f"💰 PRE-FILTER: Neither '{make}' nor '{model}' (or '{model_base}') found in content - skipping GPT analysis")
+        logger.info(f"💰 PRE-FILTER: Neither '{make}' nor '{model}' (or variants) found in content - skipping GPT analysis")
         return None
     
     # Filter 3: Binary/Corrupted Content Detection (avoid analyzing garbage data)
@@ -433,7 +459,15 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
                 
                 # Validate we got the expected structure
                 if isinstance(analysis_result, dict) and 'relevance_score' in analysis_result:
+                    relevance = analysis_result.get('relevance_score', 0)
                     logger.info(f"Successfully analyzed content with enhanced GPT: overall_score={analysis_result.get('overall_score', 'N/A')}, sentiment={analysis_result.get('overall_sentiment', 'N/A')}, relevance={analysis_result.get('relevance_score', 'N/A')}")
+                    
+                    # Log warning if GPT returned 0 relevance for content that passed pre-filters
+                    if relevance == 0:
+                        logger.warning(f"⚠️ GPT returned relevance_score=0 for {make} {model} despite passing pre-filters!")
+                        logger.warning(f"Content excerpt sent to GPT: {content[:500]}...")
+                        logger.warning(f"GPT reasoning: {analysis_result.get('summary', 'No summary provided')}")
+                    
                     return analysis_result
                 else:
                     logger.error("Parsed result doesn't have expected structure")
@@ -491,11 +525,44 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
         logger.warning("Content too short for relevance analysis")
         return {'relevance_score': 0}
     
+    # Extract a more representative sample of the content
+    # Try to find sections that mention the vehicle
+    content_lower = content.lower()
+    make_lower = make.lower() if make else ""
+    model_lower = model.lower() if model else ""
+    
+    # Look for the first occurrence of make or model
+    make_index = content_lower.find(make_lower) if make_lower else -1
+    model_index = content_lower.find(model_lower) if model_lower else -1
+    
+    # Start excerpt from the first mention, or from beginning if not found
+    start_index = 0
+    if make_index >= 0 or model_index >= 0:
+        # Start 200 chars before the first mention for context
+        start_index = max(0, min(make_index if make_index >= 0 else len(content), 
+                                 model_index if model_index >= 0 else len(content)) - 200)
+    
+    # Extract 6000 characters starting from the most relevant part
+    content_excerpt = content[start_index:start_index + 6000]
+    
+    # If we're not starting from the beginning, add ellipsis
+    if start_index > 0:
+        content_excerpt = "..." + content_excerpt
+    if start_index + 6000 < len(content):
+        content_excerpt = content_excerpt + "..."
+    
+    # Log what we're sending
+    logger.info(f"Sending {len(content_excerpt)} chars to GPT (from position {start_index})")
+    if make_lower in content_excerpt.lower() or model_lower in content_excerpt.lower():
+        logger.info(f"✓ Excerpt contains {make} or {model}")
+    else:
+        logger.warning(f"⚠️ Excerpt may not contain {make} {model} - might be too early in content")
+    
     # Simple relevance-only prompt
     prompt = f"""
     Analyze this automotive content for relevance to the {make} {model}.
     
-    Content: {content[:3000]}...
+    Content: {content_excerpt}
     
     Rate relevance on a scale of 0-10 where:
     - 0: No mention of the vehicle
@@ -503,6 +570,8 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
     - 4-6: Some discussion of the vehicle
     - 7-8: Substantial coverage of the vehicle
     - 9-10: Comprehensive review or detailed analysis
+    
+    IMPORTANT: If this content is specifically about the {make} {model}, the score should be at least 7.
     
     Respond with ONLY a JSON object: {{"relevance_score": <number>}}
     """
@@ -794,6 +863,12 @@ STRATEGIC ANALYSIS FRAMEWORK:
 
 1. RELEVANCE & MARKETING IMPACT:
    - Relevance Score (0-10): How relevant is this content to the {make} {model}?
+     IMPORTANT: If the video specifically discusses or reviews the {make} {model}, the relevance score should be at least 7.
+     * 0: No mention of the vehicle at all
+     * 1-3: Brief or passing mention only
+     * 4-6: Some discussion of the vehicle but not the main focus
+     * 7-8: Substantial coverage or detailed discussion of the {make} {model}
+     * 9-10: Comprehensive review or the {make} {model} is the primary focus
    - Marketing Impact Score (1-10): Rate the strategic importance for brand/marketing teams
      * 10: Game-changing insights requiring CMO attention
      * 8-9: Significant brand perception shifts or viral moments
@@ -897,6 +972,12 @@ STRATEGIC ANALYSIS FRAMEWORK:
 
 1. RELEVANCE & MARKETING IMPACT:
    - Relevance Score (0-10): How relevant is this content to the {make} {model}?
+     IMPORTANT: If the article specifically discusses or reviews the {make} {model}, the relevance score should be at least 7.
+     * 0: No mention of the vehicle at all
+     * 1-3: Brief or passing mention only
+     * 4-6: Some discussion of the vehicle but not the main focus
+     * 7-8: Substantial coverage or detailed discussion of the {make} {model}
+     * 9-10: Comprehensive review or the {make} {model} is the primary focus
    - Marketing Impact Score (1-10): Rate the strategic importance for brand/marketing teams
      * 10: Game-changing insights requiring CMO attention
      * 8-9: Significant brand perception shifts or media influence

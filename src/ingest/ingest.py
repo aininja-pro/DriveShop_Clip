@@ -948,11 +948,12 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             logger.info(f"📅 Content published: {published_date.strftime('%Y-%m-%d')} (no start date to compare)")
         else:
             logger.warning(f"📅 ⚠️ Content found: publication date could not be determined")
-            # When we have a loan start date but can't extract article date = REJECT
+            # When we have a loan start date but can't extract article date = Mark for manual review
             if start_date:
-                logger.warning(f"❌ REJECTED: Cannot verify article is after loan start date {start_date.strftime('%Y-%m-%d') if isinstance(start_date, datetime) else start_date}")
-                logger.warning(f"❌ RULE: Must prove article is AFTER loan placement")
-                return None
+                logger.warning(f"⚠️ WARNING: Cannot verify article date vs loan start date {start_date.strftime('%Y-%m-%d') if isinstance(start_date, datetime) else start_date}")
+                logger.warning(f"📝 MANUAL REVIEW NEEDED: Publication date missing - reviewer must verify article is after loan placement")
+                # Continue processing but flag for manual date entry
+                published_date = None  # Will need manual entry in dashboard
             else:
                 logger.info(f"📅 Allowing content (no start date provided for validation)")
             
@@ -976,6 +977,8 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             'tier_used': tier_used,
             'cached': cached,
             'published_date': published_date,  # Add the extracted publication date
+            'date_missing': published_date is None,  # Flag for missing date
+            'needs_manual_date': published_date is None and start_date is not None,  # Needs manual date entry
             # Add attribution information for UI display
             'attribution_strength': result.get('attribution_strength', 'unknown'),
             'byline_author': result.get('actual_byline')  # Map actual_byline to byline_author for database

@@ -249,32 +249,32 @@ class ScrapFlyWebCrawler:
         
         if should_force_js:
             logger.info(f"🎯 Domain requires forced JS rendering, skipping basic scrape")
-            # Add wait time for blog sites that need dynamic content to load
-            rendering_wait = 5000 if 'blog' in url.lower() else None
+            # Add wait time for all sites to ensure dynamic content loads
+            rendering_wait = 8000 if 'blog' in url.lower() else 5000  # 5-8 seconds for content to load
             content, title, error = self.crawl(url, render_js=True, use_stealth=True, rendering_wait=rendering_wait)
             return content, title, error
         
-        # Attempt 1: Basic scrape (no JS, basic stealth)
-        logger.info("🔄 Attempt 1: Basic scrape")
-        content, title, error = self.crawl(url, render_js=False, use_stealth=True)
+        # Attempt 1: WITH JavaScript rendering by default
+        logger.info("🔄 Attempt 1: With JavaScript rendering (default)")
+        # Add wait time for dynamic content to load
+        rendering_wait = 8000 if 'blog' in url.lower() else 5000  # 5-8 seconds for content to load
+        content, title, error = self.crawl(url, render_js=True, use_stealth=True, rendering_wait=rendering_wait)
         if content and len(content) > 1000:
-            logger.info("✅ Basic scrape successful")
+            logger.info("✅ JavaScript rendering successful")
             return content, title, error
         
         # Check circuit breaker again before second attempt
         if self._is_circuit_breaker_open():
             return None, None, "ScrapFly circuit breaker opened during crawl"
         
-        # Attempt 2: With JavaScript rendering (ONLY if basic failed)
-        logger.info("🔄 Attempt 2: With JavaScript rendering")
+        # Attempt 2: Without JavaScript (fallback if JS rendering failed)
+        logger.info("🔄 Attempt 2: Without JavaScript (fallback)")
         time.sleep(3)  # Longer pause between attempts to respect rate limits
         
-        # Add wait time for blog sites that need dynamic content to load
-        rendering_wait = 5000 if 'blog' in url.lower() else None
-        content, title, error = self.crawl(url, render_js=True, use_stealth=True, rendering_wait=rendering_wait)
+        content, title, error = self.crawl(url, render_js=False, use_stealth=True)
         
         if content and len(content) > 1000:
-            logger.info("✅ JavaScript rendering successful")
+            logger.info("✅ Non-JS scrape successful (fallback)")
         else:
             logger.warning("❌ All ScrapFly attempts failed")
         
@@ -313,7 +313,7 @@ class ScrapFlyWebCrawler:
 
 
 # Convenience function for easy use
-def scrapfly_crawl(url: str, render_js: bool = False) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def scrapfly_crawl(url: str, render_js: bool = True) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Convenience function to crawl a single URL with ScrapFly
     

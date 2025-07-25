@@ -3,7 +3,6 @@ from supabase import create_client, Client
 import os
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
-from .session_persistence import SessionPersistence
 
 class SupabaseAuth:
     def __init__(self):
@@ -11,7 +10,6 @@ class SupabaseAuth:
             os.environ.get("SUPABASE_URL", ""),
             os.environ.get("SUPABASE_ANON_KEY", "")
         )
-        self.session_persistence = SessionPersistence()
         # Try to restore session on initialization
         self._restore_session()
     
@@ -28,10 +26,6 @@ class SupabaseAuth:
                 st.session_state['session'] = response.session
                 # Store login timestamp for session management
                 st.session_state['login_time'] = datetime.now()
-                
-                # Persist session in cookie
-                self.session_persistence.set_session_cookie(response.session)
-                
                 return True, None
             else:
                 return False, "Invalid credentials"
@@ -49,9 +43,6 @@ class SupabaseAuth:
             st.session_state['authenticated'] = False
             st.session_state['user'] = None
             st.session_state['session'] = None
-            
-            # Clear persisted session
-            self.session_persistence.clear_session_cookie()
         except Exception as e:
             print(f"Logout error: {e}")
     
@@ -88,10 +79,6 @@ class SupabaseAuth:
                     st.session_state['user'] = response.user
                     st.session_state['authenticated'] = True
                     st.session_state['login_time'] = datetime.now()
-                    
-                    # Persist the refreshed session
-                    self.session_persistence.set_session_cookie(response.session)
-                    
                     return True
                     
             return False
@@ -141,36 +128,7 @@ class SupabaseAuth:
         This handles browser refreshes by checking if there's an active session.
         """
         try:
-            # First try to restore from persisted cookie
-            cookie_data = self.session_persistence.get_session_cookie()
-            if cookie_data:
-                access_token = cookie_data.get('access_token')
-                refresh_token = cookie_data.get('refresh_token')
-                
-                if access_token and refresh_token:
-                    # Try to set the session from tokens
-                    try:
-                        # Set the session using the stored tokens
-                        self.supabase.auth.set_session(access_token, refresh_token)
-                        
-                        # Verify the session is valid
-                        user = self.supabase.auth.get_user()
-                        if user and user.user:
-                            # Get the current session
-                            session_response = self.supabase.auth.get_session()
-                            if session_response and session_response.session:
-                                # Restore to Streamlit state
-                                st.session_state['authenticated'] = True
-                                st.session_state['user'] = user.user
-                                st.session_state['session'] = session_response.session
-                                st.session_state['login_time'] = datetime.now()
-                                return True
-                    except Exception as token_error:
-                        print(f"Token restoration error: {token_error}")
-                        # Clear invalid cookie
-                        self.session_persistence.clear_session_cookie()
-            
-            # Fallback: Try to get the current session from Supabase
+            # Try to get the current session from Supabase
             session_response = self.supabase.auth.get_session()
             
             if session_response and session_response.session:
@@ -182,9 +140,6 @@ class SupabaseAuth:
                     st.session_state['user'] = user.user
                     st.session_state['session'] = session_response.session
                     st.session_state['login_time'] = datetime.now()
-                    
-                    # Persist the session for future refreshes
-                    self.session_persistence.set_session_cookie(session_response.session)
                     return True
             
             return False

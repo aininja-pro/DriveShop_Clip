@@ -26,14 +26,27 @@ class SessionPersistence:
             session_id = self._generate_session_id()
             
             # Store essential session data
-            cookie_data = {
-                'session_id': session_id,
-                'access_token': session_data.get('access_token', ''),
-                'refresh_token': session_data.get('refresh_token', ''),
-                'expires_at': session_data.get('expires_at', 0),
-                'user_id': session_data.get('user', {}).get('id', ''),
-                'timestamp': datetime.now().isoformat()
-            }
+            # Handle both dict and Session object formats
+            if hasattr(session_data, 'access_token'):
+                # It's a Session object
+                cookie_data = {
+                    'session_id': session_id,
+                    'access_token': getattr(session_data, 'access_token', ''),
+                    'refresh_token': getattr(session_data, 'refresh_token', ''),
+                    'expires_at': getattr(session_data, 'expires_at', 0),
+                    'user_id': getattr(session_data.user, 'id', '') if hasattr(session_data, 'user') else '',
+                    'timestamp': datetime.now().isoformat()
+                }
+            else:
+                # It's a dict
+                cookie_data = {
+                    'session_id': session_id,
+                    'access_token': session_data.get('access_token', ''),
+                    'refresh_token': session_data.get('refresh_token', ''),
+                    'expires_at': session_data.get('expires_at', 0),
+                    'user_id': session_data.get('user', {}).get('id', ''),
+                    'timestamp': datetime.now().isoformat()
+                }
             
             # Encode the cookie data
             cookie_value = base64.b64encode(
