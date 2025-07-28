@@ -683,6 +683,15 @@ class DatabaseManager:
             True if the WO should be processed, False if it should be skipped
         """
         try:
+            # First check if we have a finalized clip (approved, pending_review, or rejected by user)
+            clips_result = self.supabase.table('clips').select('id, status').eq('wo_number', wo_number).execute()
+            if clips_result.data:
+                clip_status = clips_result.data[0].get('status', '')
+                if clip_status in ['approved', 'pending_review', 'rejected']:
+                    logger.info(f"✅ WO# {wo_number} already has {clip_status} clip - skipping")
+                    return False
+                # If it's a failed attempt (no_content_found/processing_failed), continue to check retry logic
+            
             # Check WO tracking table for retry logic
             result = self.supabase.table('wo_tracking').select('*').eq('wo_number', wo_number).execute()
             
@@ -693,9 +702,9 @@ class DatabaseManager:
             
             wo_record = result.data[0]
             
-            # If we already found a clip, don't retry
+            # If we already found a clip (successful), don't retry
             if wo_record['status'] == 'found':
-                logger.info(f"✅ WO# {wo_number} already has clip - skipping")
+                logger.info(f"✅ WO# {wo_number} already found clip - skipping")
                 return False
             
             # Check retry timing
@@ -738,8 +747,8 @@ class DatabaseManager:
         try:
             # Define retry intervals (in days)
             RETRY_INTERVALS = {
-                'no_content': 7,        # 7 days - content might be published weekly
-                'no_content_found': 7,  # 7 days - same as no_content
+                'no_content': 4,        # 4 days - content might be published within a few days
+                'no_content_found': 4,  # 4 days - same as no_content
                 'generic_content': 3,   # 3 days - they might publish specific content soon  
                 'crawl_failed': 1,      # 1 day - technical issues usually resolve quickly
                 'blocked_403': 2,       # 2 days - anti-bot measures might reset
@@ -778,6 +787,36 @@ class DatabaseManager:
                 
         except Exception as e:
             logger.error(f"❌ Failed to record attempt for WO# {wo_number}: {e}")
+            return False
+    
+    def record_skip_event(self, wo_number: str, run_id: str, skip_reason: str) -> bool:
+        """
+        Record when a clip is skipped during processing
+        
+        Args:
+            wo_number: The work order number that was skipped
+            run_id: The current processing run ID
+            skip_reason: Reason for skipping (e.g., 'retry_cooldown', 'already_approved')
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Update the existing clip record with skip information
+            result = self.supabase.table('clips').update({
+                'last_skip_run_id': run_id,
+                'skip_reason': skip_reason
+            }).eq('wo_number', wo_number).execute()
+            
+            if result.data:
+                logger.info(f"📝 Recorded skip event for WO# {wo_number}: {skip_reason}")
+                return True
+            else:
+                logger.warning(f"⚠️ No clip found to update skip status for WO# {wo_number}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to record skip event for WO# {wo_number}: {e}")
             return False
     
     def mark_wo_success(self, wo_number: str, clip_url: str) -> bool:
@@ -1111,6 +1150,9 @@ class DatabaseManager:
             
             filter_str = f" with filters: {', '.join(filter_desc)}" if filter_desc else ""
             logger.info(f"✅ Retrieved {len(result.data)} failed clips{filter_str}")
+            
+            # Note: Enrichment happens in get_current_run_failed_clips for current run
+            # Historical mode typically doesn't need retry status but could be added if needed
             return result.data
             
         except Exception as e:
@@ -1123,7 +1165,9 @@ class DatabaseManager:
             latest_run_id = self.get_latest_processing_run_id()
             
             if latest_run_id:
-                return self.get_all_failed_clips(run_id=latest_run_id)
+                clips = self.get_all_failed_clips(run_id=latest_run_id)
+                # Enrich with retry status
+                return self._enrich_clips_with_retry_status(clips)
             else:
                 logger.warning("⚠️ No processing runs found, returning empty list")
                 return []
@@ -1131,6 +1175,38 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"❌ Failed to get current run failed clips: {e}")
             return []
+    
+    def _enrich_clips_with_retry_status(self, clips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Add retry status information to failed clips"""
+        for clip in clips:
+            wo_number = clip.get('wo_number')
+            if wo_number and clip['status'] in ['no_content_found', 'processing_failed']:
+                # Check WO tracking for retry status
+                result = self.supabase.table('wo_tracking').select('retry_after_date').eq('wo_number', wo_number).execute()
+                
+                if result.data and result.data[0].get('retry_after_date'):
+                    retry_after = datetime.fromisoformat(result.data[0]['retry_after_date'])
+                    current_time = datetime.now()
+                    
+                    # Handle timezone awareness
+                    if retry_after.tzinfo is not None:
+                        from datetime import timezone
+                        current_time = datetime.now(timezone.utc)
+                    elif current_time.tzinfo is not None:
+                        retry_after = retry_after.replace(tzinfo=None)
+                    
+                    if current_time < retry_after:
+                        # Still in cooldown
+                        clip['retry_status'] = 'in_cooldown'
+                        clip['retry_after'] = retry_after.isoformat()
+                    else:
+                        # Ready for retry
+                        clip['retry_status'] = 'ready'
+                else:
+                    # No retry date set
+                    clip['retry_status'] = 'ready'
+        
+        return clips
     
     def get_processing_run_info(self, run_id: str) -> Optional[Dict[str, Any]]:
         """Get information about a specific processing run"""

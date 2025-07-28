@@ -5409,8 +5409,15 @@ with rejected_tab:
             latest_run_id = db.get_latest_processing_run_id()
             current_run_failed_clips = db.get_current_run_failed_clips()
             
+            # Also get clips that were skipped in the current run
+            current_run_skipped_clips = []
+            if latest_run_id:
+                skipped_result = db.supabase.table('clips').select('*').eq('last_skip_run_id', latest_run_id).execute()
+                if skipped_result.data:
+                    current_run_skipped_clips = skipped_result.data
+            
             # Get run info for display
-            if current_run_failed_clips and latest_run_id:
+            if (current_run_failed_clips or current_run_skipped_clips) and latest_run_id:
                 run_info = db.get_processing_run_info(latest_run_id)
                 
                 if run_info:
@@ -5421,6 +5428,20 @@ with rejected_tab:
             # Convert to combined issues format
             combined_issues = []
             for clip in current_run_failed_clips:
+                # Add retry status to rejection reason if in cooldown
+                rejection_reason = 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed'
+                if clip.get('retry_status') == 'in_cooldown':
+                    retry_date = clip.get('retry_after', '')
+                    if retry_date:
+                        # Format the retry date for display
+                        try:
+                            from datetime import datetime
+                            retry_dt = datetime.fromisoformat(retry_date.replace('Z', '+00:00'))
+                            retry_str = retry_dt.strftime('%Y-%m-%d %H:%M')
+                            rejection_reason += f" (Retry after {retry_str})"
+                        except:
+                            rejection_reason += " (In retry cooldown)"
+                
                 combined_issues.append({
                     'WO #': clip['wo_number'],
                     'Office': clip.get('office', ''),
@@ -5428,13 +5449,44 @@ with rejected_tab:
                     'Model': clip.get('model', ''),
                     'To': clip.get('contact', ''),
                     'Affiliation': clip.get('office', ''),
-                    'Rejection_Reason': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
+                    'Rejection_Reason': rejection_reason,
                     'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
                     'Processed_Date': clip.get('processed_date', ''),
                     'Type': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
                     'original_urls': clip.get('original_urls', ''),
                     'urls_attempted': clip.get('urls_attempted', 0),
-                    'failure_reason': clip.get('failure_reason', '')
+                    'failure_reason': clip.get('failure_reason', ''),
+                    'retry_status': clip.get('retry_status', ''),
+                    'attempt_count': clip.get('attempt_count', 1)
+                })
+            
+            # Add skipped clips from current run
+            for clip in current_run_skipped_clips:
+                skip_reason = clip.get('skip_reason', 'unknown')
+                rejection_reason = {
+                    'already_approved': 'Already Approved',
+                    'already_pending_review': 'Already in Bulk Review',
+                    'already_rejected': 'Already User Rejected',
+                    'retry_cooldown': 'In Retry Cooldown',
+                    'unknown': 'Unknown Skip Reason'
+                }.get(skip_reason, skip_reason)
+                
+                combined_issues.append({
+                    'WO #': clip['wo_number'],
+                    'Office': clip.get('office', ''),
+                    'Make': clip.get('make', ''),
+                    'Model': clip.get('model', ''),
+                    'To': clip.get('contact', ''),
+                    'Affiliation': clip.get('office', ''),
+                    'Rejection_Reason': f'Skipped: {rejection_reason}',
+                    'URL_Details': f"Skipped in current run",
+                    'Processed_Date': clip.get('processed_date', ''),
+                    'Type': 'Skipped',
+                    'original_urls': clip.get('original_urls', ''),
+                    'urls_attempted': clip.get('urls_attempted', 0),
+                    'failure_reason': skip_reason,
+                    'retry_status': 'skipped',
+                    'attempt_count': clip.get('attempt_count', 0)
                 })
             
         else:
@@ -5537,7 +5589,8 @@ with rejected_tab:
                 <small>
                     📝 <strong>{len(rejected_df)}</strong> rejected  •  
                     🚫 <strong>{rejected_df['Rejection_Reason'].value_counts().index[0] if 'Rejection_Reason' in rejected_df.columns and len(rejected_df) > 0 else 'N/A'}</strong> top issue  •  
-                    ⚡ <strong>{len(rejected_df[rejected_df['Rejection_Reason'].str.contains('No Content Found|Processing Failed', case=False, na=False)] if 'Rejection_Reason' in rejected_df.columns else [])}/{len(rejected_df)}</strong> technical failures
+                    ⚡ <strong>{len(rejected_df[rejected_df['Rejection_Reason'].str.contains('No Content Found|Processing Failed', case=False, na=False)] if 'Rejection_Reason' in rejected_df.columns else [])}/{len(rejected_df)}</strong> technical failures  •  
+                    ⏭️ <strong>{len(rejected_df[rejected_df['Type'] == 'Skipped'] if 'Type' in rejected_df.columns else [])}</strong> skipped
                 </small>
             </div>
             """, unsafe_allow_html=True)

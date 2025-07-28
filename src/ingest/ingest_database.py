@@ -404,8 +404,24 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
         wo_number = loan.get('work_order', '')
         
         # SMART RETRY LOGIC: Check if we should process this WO#
-        if not db.should_retry_wo(wo_number):
-            logger.info(f"⏭️ Skipping {wo_number} - smart retry logic (recently attempted)")
+        should_process = db.should_retry_wo(wo_number)
+        if not should_process:
+            # Determine skip reason based on database state
+            clips_result = db.supabase.table('clips').select('status').eq('wo_number', wo_number).execute()
+            if clips_result.data:
+                clip_status = clips_result.data[0].get('status', '')
+                if clip_status in ['approved', 'pending_review', 'rejected']:
+                    skip_reason = f'already_{clip_status}'
+                elif clip_status in ['no_content_found', 'processing_failed']:
+                    skip_reason = 'retry_cooldown'
+                else:
+                    skip_reason = 'unknown'
+            else:
+                skip_reason = 'unknown'
+            
+            # Record the skip event
+            db.record_skip_event(wo_number, run_id, skip_reason)
+            logger.info(f"⏭️ Skipping {wo_number} - {skip_reason}")
             return False
         
         # Process the loan (crawling + content extraction, no GPT)
