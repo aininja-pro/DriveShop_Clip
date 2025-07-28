@@ -5406,12 +5406,12 @@ with rejected_tab:
         # Choose data source based on mode
         if st.session_state.rejected_view_mode == 'current_run':
             # Current run mode - get only the most recent processing run
+            latest_run_id = db.get_latest_processing_run_id()
             current_run_failed_clips = db.get_current_run_failed_clips()
             
             # Get run info for display
-            if current_run_failed_clips:
-                latest_run_id = db.get_latest_processing_run_id()
-                run_info = db.get_processing_run_info(latest_run_id) if latest_run_id else None
+            if current_run_failed_clips and latest_run_id:
+                run_info = db.get_processing_run_info(latest_run_id)
                 
                 if run_info:
                     run_name = run_info.get('run_name', 'Unknown')
@@ -5476,13 +5476,27 @@ with rejected_tab:
                     'failure_reason': clip.get('failure_reason', '')
                 })
         
-        # Also add manually rejected clips (always shown regardless of mode)
-        @st.cache_data
-        def cached_get_rejected_clips():
-            db = get_database()
-            return db.get_rejected_clips()
+        # Add manually rejected clips based on view mode
+        if st.session_state.rejected_view_mode == 'current_run':
+            # For current run, only include rejected clips from the current run
+            if latest_run_id:
+                @st.cache_data
+                def cached_get_rejected_clips_by_run(run_id):
+                    db = get_database()
+                    return db.get_rejected_clips(run_id=run_id)
+                
+                rejected_clips = cached_get_rejected_clips_by_run(latest_run_id)
+            else:
+                rejected_clips = []
+        else:
+            # For historical view, get all rejected clips (with optional date filtering)
+            @st.cache_data
+            def cached_get_rejected_clips():
+                db = get_database()
+                return db.get_rejected_clips()
+            
+            rejected_clips = cached_get_rejected_clips()
         
-        rejected_clips = cached_get_rejected_clips()
         for clip in rejected_clips:
             combined_issues.append({
                 'WO #': clip['wo_number'],

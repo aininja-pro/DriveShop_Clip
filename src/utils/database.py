@@ -230,18 +230,31 @@ class DatabaseManager:
                 "sentiment_completed": clip_data.get('sentiment_completed', False)
             }
             
-            result = self.supabase.table('clips').insert(db_data).execute()
+            # Check if clip already exists for this WO#
+            existing = self.supabase.table('clips').select('id').eq('wo_number', clip_data['wo_number']).execute()
             
-            if result.data:
-                clip_id = result.data[0]['id']
-                logger.info(f"✅ Stored clip for WO# {clip_data['wo_number']} (ID: {clip_id})")
-                
-                # Update WO tracking
-                self.mark_wo_success(clip_data['wo_number'], clip_data.get('clip_url'))
-                
-                return True
+            if existing.data:
+                # Update existing clip
+                result = self.supabase.table('clips').update(db_data).eq('wo_number', clip_data['wo_number']).execute()
+                if result.data:
+                    clip_id = result.data[0]['id']
+                    logger.info(f"✅ Updated existing clip for WO# {clip_data['wo_number']} (ID: {clip_id})")
+                    # Update WO tracking
+                    self.mark_wo_success(clip_data['wo_number'], clip_data.get('clip_url'))
+                    return True
+                else:
+                    raise Exception("No data returned from update")
             else:
-                raise Exception("No data returned from insert")
+                # Insert new clip
+                result = self.supabase.table('clips').insert(db_data).execute()
+                if result.data:
+                    clip_id = result.data[0]['id']
+                    logger.info(f"✅ Stored new clip for WO# {clip_data['wo_number']} (ID: {clip_id})")
+                    # Update WO tracking
+                    self.mark_wo_success(clip_data['wo_number'], clip_data.get('clip_url'))
+                    return True
+                else:
+                    raise Exception("No data returned from insert")
                 
         except Exception as e:
             logger.error(f"❌ Failed to store clip: {e}")
@@ -289,18 +302,35 @@ class DatabaseManager:
                 "failure_reason": loan_data.get('failure_reason', reason)
             }
             
-            result = self.supabase.table('clips').insert(db_data).execute()
+            # Check if clip already exists for this WO#
+            existing = self.supabase.table('clips').select('id, attempt_count').eq('wo_number', loan_data['wo_number']).execute()
             
-            if result.data:
-                clip_id = result.data[0]['id']
-                logger.info(f"✅ Stored failed attempt for WO# {loan_data['wo_number']} (ID: {clip_id}, reason: {reason})")
+            if existing.data:
+                # Update existing failed attempt and increment attempt count
+                current_attempts = existing.data[0].get('attempt_count', 0) or 0
+                db_data['attempt_count'] = current_attempts + 1
                 
-                # Update WO tracking
-                self.mark_wo_attempt(loan_data['wo_number'], reason)
-                
-                return True
+                result = self.supabase.table('clips').update(db_data).eq('wo_number', loan_data['wo_number']).execute()
+                if result.data:
+                    clip_id = result.data[0]['id']
+                    logger.info(f"✅ Updated failed attempt for WO# {loan_data['wo_number']} (ID: {clip_id}, reason: {reason}, attempts: {db_data['attempt_count']})")
+                    # Update WO tracking
+                    self.mark_wo_attempt(loan_data['wo_number'], reason)
+                    return True
+                else:
+                    raise Exception("No data returned from update")
             else:
-                raise Exception("No data returned from insert")
+                # Insert new failed attempt
+                db_data['attempt_count'] = 1
+                result = self.supabase.table('clips').insert(db_data).execute()
+                if result.data:
+                    clip_id = result.data[0]['id']
+                    logger.info(f"✅ Stored failed attempt for WO# {loan_data['wo_number']} (ID: {clip_id}, reason: {reason})")
+                    # Update WO tracking
+                    self.mark_wo_attempt(loan_data['wo_number'], reason)
+                    return True
+                else:
+                    raise Exception("No data returned from insert")
                 
         except Exception as e:
             logger.error(f"❌ Failed to store failed attempt: {e}")
@@ -653,7 +683,7 @@ class DatabaseManager:
             True if the WO should be processed, False if it should be skipped
         """
         try:
-            # Check WO tracking table
+            # Check WO tracking table for retry logic
             result = self.supabase.table('wo_tracking').select('*').eq('wo_number', wo_number).execute()
             
             if not result.data:
@@ -671,7 +701,17 @@ class DatabaseManager:
             # Check retry timing
             if wo_record['retry_after_date']:
                 retry_after = datetime.fromisoformat(wo_record['retry_after_date'])
-                if datetime.now() < retry_after:
+                # Ensure we're comparing timezone-aware datetimes
+                current_time = datetime.now()
+                if retry_after.tzinfo is not None:
+                    # retry_after is timezone-aware, make current_time aware too
+                    from datetime import timezone
+                    current_time = datetime.now(timezone.utc)
+                elif current_time.tzinfo is not None:
+                    # current_time is timezone-aware, make retry_after naive
+                    retry_after = retry_after.replace(tzinfo=None)
+                
+                if current_time < retry_after:
                     logger.info(f"⏰ WO# {wo_number} in retry cooldown until {retry_after} - skipping")
                     return False
             
