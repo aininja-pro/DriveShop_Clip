@@ -5154,6 +5154,96 @@ with approved_queue_tab:
                                 logger.error(f"Move to bulk review error: {e}")
                         else:
                             st.warning("Please select clips to move")
+                
+                with col4:
+                    # Count clips with pending sentiment (sentiment_completed = False)
+                    pending_sentiment_count = len([clip for clip in clips_data if not clip.get('sentiment_completed', False)])
+                    
+                    # Count selected clips with pending sentiment
+                    selected_pending_count = 0
+                    if selected_count > 0 and hasattr(selected_clips, 'selected_rows'):
+                        selected_data = selected_clips.selected_rows
+                        if selected_data is not None:
+                            if hasattr(selected_data, 'to_dict'):
+                                selected_rows = selected_data.to_dict('records')
+                            elif isinstance(selected_data, list):
+                                selected_rows = selected_data
+                            else:
+                                selected_rows = []
+                            
+                            # Count selected clips with pending sentiment
+                            for row in selected_rows:
+                                if row.get('Sentiment') == "⏳ Pending":
+                                    selected_pending_count += 1
+                    
+                    # Show button with count
+                    button_text = f"🧠 Run Sentiment ({selected_pending_count})" if selected_pending_count > 0 else f"🧠 Run Sentiment ({pending_sentiment_count} pending)"
+                    button_disabled = pending_sentiment_count == 0 or (selected_count > 0 and selected_pending_count == 0)
+                    
+                    if st.button(button_text,
+                                 disabled=button_disabled,
+                                 help="Run sentiment analysis on clips with pending sentiment",
+                                 use_container_width=True):
+                        # Get clips to analyze
+                        clips_to_analyze = []
+                        
+                        if selected_count > 0 and selected_pending_count > 0:
+                            # Analyze only selected clips with pending sentiment
+                            for row in selected_rows:
+                                if row.get('Sentiment') == "⏳ Pending":
+                                    clip_id = row.get('id')
+                                    if clip_id:
+                                        clip_data = next((clip for clip in clips_data if clip['id'] == clip_id), None)
+                                        if clip_data and not clip_data.get('sentiment_completed', False):
+                                            clips_to_analyze.append(clip_data)
+                        else:
+                            # Analyze all clips with pending sentiment
+                            clips_to_analyze = [clip for clip in clips_data if not clip.get('sentiment_completed', False)]
+                        
+                        if clips_to_analyze:
+                            # Show progress bar for sentiment analysis
+                            st.info(f"🧠 Running sentiment analysis on {len(clips_to_analyze)} clips...")
+                            progress_bar = st.progress(0)
+                            progress_text = st.empty()
+                            
+                            def update_progress(progress, message):
+                                progress_bar.progress(progress)
+                                progress_text.text(message)
+                            
+                            # Check if OpenAI API key is available
+                            if not os.environ.get('OPENAI_API_KEY'):
+                                st.error("❌ OpenAI API key not found. Clips cannot be analyzed without API key.")
+                            else:
+                                # Run sentiment analysis
+                                try:
+                                    results = run_sentiment_analysis(clips_to_analyze, update_progress)
+                                    
+                                    # Process results
+                                    success_count = 0
+                                    if results and 'results' in results:
+                                        for clip, result in zip(clips_to_analyze, results['results']):
+                                            if result.get('sentiment_completed'):
+                                                success = db.update_clip_sentiment(clip['id'], result)
+                                                if success:
+                                                    success_count += 1
+                                    
+                                    progress_bar.progress(1.0)
+                                    progress_text.text(f"✅ Sentiment analysis complete! {success_count}/{len(clips_to_analyze)} successful")
+                                    
+                                    if success_count > 0:
+                                        st.success(f"✅ Successfully analyzed {success_count} clips!")
+                                        # Clear cache to refresh the table
+                                        st.cache_data.clear()
+                                        time.sleep(2)
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ No clips were successfully analyzed")
+                                        
+                                except Exception as e:
+                                    st.error(f"❌ Sentiment analysis error: {str(e)}")
+                                    logger.error(f"Sentiment analysis failed: {e}")
+                        else:
+                            st.warning("No clips with pending sentiment found")
             
             # Show download button if export is ready
             if st.session_state.get('fms_export_ready', False):
