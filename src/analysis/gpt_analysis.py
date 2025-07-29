@@ -34,7 +34,6 @@ def clean_json_response(response_text: str) -> str:
     Returns:
         Cleaned JSON string
     """
-    import re
     
     # Remove markdown code block formatting (```json and ```)
     json_pattern = r'```(?:json)?\s*([\s\S]*?)\s*```'
@@ -81,7 +80,6 @@ def parse_json_with_fallbacks(response_text: str) -> dict:
         Parsed JSON dictionary or fallback structure
     """
     import json
-    import re
     
     # Strategy 1: Clean and parse normally
     try:
@@ -369,7 +367,6 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
         # For models starting with numbers, add space-separated version
         if model and model[0].isdigit():
             # "4Runner" -> also check "4 runner"
-            import re
             space_separated = re.sub(r'(\d+)([A-Za-z])', r'\1 \2', model_lower)
             if space_separated != model_lower:
                 model_variations.append(space_separated)
@@ -608,7 +605,6 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
                 return {'relevance_score': relevance_score}
             else:
                 # Try to extract number from response
-                import re
                 relevance_match = re.search(r'(\d+)', response_content)
                 if relevance_match:
                     relevance_score = int(relevance_match.group(1))
