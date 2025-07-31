@@ -276,14 +276,26 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
         #     logger.warning(f"⚠️ SKIPPING homepage/index URL: {url}")
         #     continue
             
-        # Process the URL (YouTube or Web) - using correct function signatures
-        if 'youtube.com' in url or 'youtu.be' in url:
-            result = process_youtube_url(url, loan)
-        else:
-            result = process_web_url(url, loan)
-        
-        if result and (result.get('clip_url') or result.get('url')):
-            all_results.append((url, result))
+        # Process the URL based on platform
+        try:
+            if 'youtube.com' in url or 'youtu.be' in url:
+                result = process_youtube_url(url, loan)
+            elif 'tiktok.com' in url or 'vm.tiktok.com' in url:
+                # Import the TikTok processing function
+                from src.ingest.ingest import process_tiktok_url
+                result = process_tiktok_url(url, loan)
+            elif 'instagram.com' in url:
+                # Import the Instagram processing function
+                from src.ingest.ingest import process_instagram_url
+                result = process_instagram_url(url, loan)
+            else:
+                result = process_web_url(url, loan)
+            
+            if result and (result.get('clip_url') or result.get('url')):
+                all_results.append((url, result))
+        except Exception as e:
+            logger.error(f"❌ Error processing URL {url}: {e}")
+            # Continue processing other URLs even if this one fails
     
     # Process all collected results through GPT and pick the best one
     best_result = None

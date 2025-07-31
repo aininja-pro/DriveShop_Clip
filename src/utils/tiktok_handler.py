@@ -526,28 +526,14 @@ def search_channel_for_vehicle(channel_url: str, make: str, model: str, start_da
             
         logger.info(f"Found {len(channel_videos)} videos to scan")
         
-        # Pre-filter videos
+        # Pre-filter videos by make/model FIRST, date filtering later
         make_lower = make.lower()
         model_lower = model.lower()
         model_words = model_lower.split()  # Handle multi-word models
         
-        # Calculate date range
-        end_date = None
-        if start_date:
-            end_date = start_date + timedelta(days=days_forward)
-            logger.info(f"Date filter: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-        
         relevant_videos = []
         
         for video in channel_videos:
-            # Date filter first (cheapest check)
-            if start_date and video.get('published_date'):
-                if video['published_date'] < start_date:
-                    logger.debug(f"Skipping old video: {video['title'][:50]}... ({video['published_date'].strftime('%Y-%m-%d')})")
-                    continue
-                if end_date and video['published_date'] > end_date:
-                    logger.debug(f"Skipping future video: {video['title'][:50]}... ({video['published_date'].strftime('%Y-%m-%d')})")
-                    continue
             
             # Check title and description for make/model
             search_text = f"{video.get('title', '')} {video.get('description', '')}".lower()
@@ -570,6 +556,15 @@ def search_channel_for_vehicle(channel_url: str, make: str, model: str, start_da
                 logger.info(f"✅ Found potential match: {video['title'][:80]}...")
                 if video.get('published_date'):
                     logger.info(f"   Published: {video['published_date'].strftime('%Y-%m-%d')}")
+                    # Check date AFTER finding match
+                    if start_date and video['published_date'] < start_date:
+                        logger.info(f"   ⏭️ Skipping - published before loan start date")
+                        continue
+                    if start_date and days_forward:
+                        end_date = start_date + timedelta(days=days_forward)
+                        if video['published_date'] > end_date:
+                            logger.info(f"   ⏭️ Skipping - published after {days_forward} days window")
+                            continue
                 relevant_videos.append(video)
         
         if not relevant_videos:

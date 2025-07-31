@@ -47,6 +47,8 @@ from src.utils.escalation import crawling_strategy
 from src.utils.enhanced_crawler_manager import EnhancedCrawlerManager
 from src.analysis.gpt_analysis import analyze_clip
 from src.utils.date_extractor import extract_date_from_html, extract_youtube_upload_date, parse_date_string
+from src.utils.tiktok_handler import process_tiktok_video, search_channel_for_vehicle as search_tiktok_channel
+from src.utils.instagram_handler import process_instagram_post, search_profile_for_vehicle as search_instagram_profile
 
 logger = setup_logger(__name__)
 
@@ -988,6 +990,142 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         logger.error(f"Error processing web URL {url}: {e}")
         return None
 
+def process_tiktok_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Process a TikTok URL to extract video content.
+    
+    Args:
+        url: TikTok video or channel URL
+        loan: Loan data dictionary
+        
+    Returns:
+        Dictionary with clip data or None if not found
+    """
+    make = loan.get('make', '')
+    model = loan.get('model', '')
+    start_date = loan.get('start_date')
+    
+    logger.info(f"Processing TikTok URL: {url}")
+    
+    # Check if it's a video URL or channel URL
+    if '/video/' in url or 'vm.tiktok.com' in url:
+        # Direct video URL
+        video_data = process_tiktok_video(url)
+        
+        if video_data:
+            # Check relevance using the scoring system
+            from src.utils.tiktok_content_scorer import score_tiktok_relevance
+            relevance_score = score_tiktok_relevance(video_data, make, model)
+            
+            if relevance_score['total_score'] >= 35:
+                return {
+                    'url': url,
+                    'clip_url': url,
+                    'content': video_data.get('transcript') or video_data.get('description', ''),
+                    'extracted_content': video_data.get('transcript') or video_data.get('description', ''),
+                    'content_type': 'tiktok_video',
+                    'creator': video_data.get('creator', ''),
+                    'creator_handle': video_data.get('creator_handle', ''),
+                    'publish_date': video_data.get('published_date'),
+                    'duration': video_data.get('duration', 0),
+                    'views': video_data.get('views', 0),
+                    'relevance_score': relevance_score['total_score'],
+                    'sentiment_content': video_data.get('transcript') or video_data.get('description', ''),
+                    'vehicle_make': make,
+                    'vehicle_model': model
+                }
+    else:
+        # Channel URL - search for vehicle mentions
+        video_data = search_tiktok_channel(url, make, model, start_date, days_forward=90)
+        
+        if video_data:
+            return {
+                'url': video_data.get('url'),
+                'clip_url': video_data.get('url'),
+                'content': video_data.get('transcript') or video_data.get('description', ''),
+                'extracted_content': video_data.get('transcript') or video_data.get('description', ''),
+                'content_type': 'tiktok_video',
+                'creator': video_data.get('creator', ''),
+                'creator_handle': video_data.get('creator_handle', ''),
+                'publish_date': video_data.get('published_date'),
+                'duration': video_data.get('duration', 0),
+                'views': video_data.get('views', 0),
+                'relevance_score': video_data.get('relevance_score', {}).get('total_score', 0),
+                'sentiment_content': video_data.get('transcript') or video_data.get('description', ''),
+                'vehicle_make': make,
+                'vehicle_model': model
+            }
+    
+    return None
+
+def process_instagram_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Process an Instagram URL to extract post/reel content.
+    
+    Args:
+        url: Instagram post/reel or profile URL
+        loan: Loan data dictionary
+        
+    Returns:
+        Dictionary with clip data or None if not found
+    """
+    make = loan.get('make', '')
+    model = loan.get('model', '')
+    start_date = loan.get('start_date')
+    
+    logger.info(f"Processing Instagram URL: {url}")
+    
+    # Check if it's a post/reel URL or profile URL
+    if '/reel/' in url or '/p/' in url:
+        # Direct post/reel URL
+        post_data = process_instagram_post(url)
+        
+        if post_data:
+            # Check relevance using the scoring system
+            from src.utils.tiktok_content_scorer import score_tiktok_relevance
+            relevance_score = score_tiktok_relevance(post_data, make, model)
+            
+            if relevance_score['total_score'] >= 35:
+                return {
+                    'url': url,
+                    'clip_url': url,
+                    'content': post_data.get('transcript') or post_data.get('caption', ''),
+                    'extracted_content': post_data.get('transcript') or post_data.get('caption', ''),
+                    'content_type': 'instagram_reel' if post_data.get('is_video') else 'instagram_post',
+                    'creator': post_data.get('creator', ''),
+                    'creator_handle': post_data.get('creator_handle', ''),
+                    'publish_date': post_data.get('published_date'),
+                    'duration': post_data.get('duration', 0),
+                    'views': post_data.get('views', 0),
+                    'relevance_score': relevance_score['total_score'],
+                    'sentiment_content': post_data.get('transcript') or post_data.get('caption', ''),
+                    'vehicle_make': make,
+                    'vehicle_model': model
+                }
+    else:
+        # Profile URL - search for vehicle mentions
+        post_data = search_instagram_profile(url, make, model, start_date, days_forward=90)
+        
+        if post_data:
+            return {
+                'url': post_data.get('url'),
+                'clip_url': post_data.get('url'),
+                'content': post_data.get('transcript') or post_data.get('caption', ''),
+                'extracted_content': post_data.get('transcript') or post_data.get('caption', ''),
+                'content_type': 'instagram_reel' if post_data.get('is_video') else 'instagram_post',
+                'creator': post_data.get('creator', ''),
+                'creator_handle': post_data.get('creator_handle', ''),
+                'publish_date': post_data.get('published_date'),
+                'duration': post_data.get('duration', 0),
+                'views': post_data.get('views', 0),
+                'relevance_score': post_data.get('relevance_score', {}).get('total_score', 0),
+                'sentiment_content': post_data.get('transcript') or post_data.get('caption', ''),
+                'vehicle_make': make,
+                'vehicle_model': model
+            }
+    
+    return None
+
 def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Process a loan to find relevant clips.
@@ -1032,11 +1170,19 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             'processing_method': 'unknown'
         }
         
-        # Determine URL type (YouTube or web)
+        # Determine URL type and process accordingly
         if 'youtube.com' in url or 'youtu.be' in url:
             url_attempt['content_type'] = 'youtube'
             url_attempt['processing_method'] = 'YouTube API'
             clip_data = process_youtube_url(url, loan)
+        elif 'tiktok.com' in url or 'vm.tiktok.com' in url:
+            url_attempt['content_type'] = 'tiktok'
+            url_attempt['processing_method'] = 'TikTok API'
+            clip_data = process_tiktok_url(url, loan)
+        elif 'instagram.com' in url:
+            url_attempt['content_type'] = 'instagram'
+            url_attempt['processing_method'] = 'Instagram API'
+            clip_data = process_instagram_url(url, loan)
         else:
             url_attempt['content_type'] = 'web'
             url_attempt['processing_method'] = 'Web Crawler'
