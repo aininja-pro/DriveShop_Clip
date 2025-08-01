@@ -275,29 +275,65 @@ def apply_custom_sidebar_styling():
         color: #000000 !important;
     }
     
-    /* Tab styling */
+    /* Tab styling - Active tab colored, inactive tabs off-white */
     .stTabs {
         background-color: #ffffff !important;
     }
     
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #f0f2f6 !important;
+        background-color: transparent !important;
+        gap: 4px;
+        padding: 0 8px;
     }
     
+    /* Base tab styling - All tabs start with off-white */
     .stTabs [data-baseweb="tab"] {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        height: 45px !important;
+        padding-left: 24px !important;
+        padding-right: 24px !important;
+        border-radius: 8px 8px 0 0 !important;
+        border: none !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        margin-bottom: 0 !important;
+        background-color: #f5f5f5 !important;
+        color: #666666 !important;
     }
     
+    /* Hover effect for inactive tabs */
+    .stTabs [data-baseweb="tab"]:not([aria-selected="true"]):hover {
+        background-color: #e8e8e8 !important;
+        color: #333333 !important;
+    }
+    
+    /* Active tab styling - Blue with white text */
     .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border-bottom-color: #ff4b4b !important;
+        background-color: #1976d2 !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
     }
     
-    /* Fix tab text visibility */
+    /* Active tab text color */
+    .stTabs [aria-selected="true"] p {
+        color: #ffffff !important;
+    }
+    
+    /* Inactive tab text color */
+    .stTabs [aria-selected="false"] p {
+        color: #666666 !important;
+    }
+    
+    /* Remove the default bottom border indicator */
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: transparent !important;
+    }
+    
+    /* Tab text styling */
     .stTabs [data-baseweb="tab"] p {
-        color: #000000 !important;
+        font-size: 14px !important;
+        margin: 0 !important;
+        line-height: 1.5 !important;
     }
     
     /* Ensure all text is black in main content */
@@ -502,7 +538,7 @@ def apply_custom_sidebar_styling():
     /* Button styling in sidebar - LIGHT BLUE BUTTONS with DARK TEXT for visibility */
     .stSidebar .stButton > button {
         background-color: #e3f2fd !important;
-        color: #1565c0 !important;
+        color: #000000 !important;
         border: 2px solid #90caf9 !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
@@ -527,11 +563,11 @@ def apply_custom_sidebar_styling():
     
     /* Force dark blue text on all sidebar buttons - override any inherited styles */
     .stSidebar .stButton > button * {
-        color: #1565c0 !important;
+        color: #000000 !important;
     }
     
     .stSidebar .stButton > button span {
-        color: #1565c0 !important;
+        color: #000000 !important;
     }
     
     .stSidebar .stButton > button:hover * {
@@ -1558,25 +1594,61 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* Tab styling for light mode */
+    /* Tab styling - Active tab colored, inactive tabs off-white */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #f0f2f6 !important;
+        background-color: transparent !important;
+        gap: 4px;
+        padding: 0 8px;
     }
     
+    /* Base tab styling - All tabs start with off-white */
     .stTabs [data-baseweb="tab"] {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        height: 45px !important;
+        padding-left: 24px !important;
+        padding-right: 24px !important;
+        border-radius: 8px 8px 0 0 !important;
+        border: none !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        margin-bottom: 0 !important;
+        background-color: #f5f5f5 !important;
+        color: #666666 !important;
     }
     
+    /* Hover effect for inactive tabs */
+    .stTabs [data-baseweb="tab"]:not([aria-selected="true"]):hover {
+        background-color: #e8e8e8 !important;
+        color: #333333 !important;
+    }
+    
+    /* Active tab styling - Blue with white text */
     .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #000000 !important;
+        background-color: #1976d2 !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
     }
     
-    /* Fix tab text visibility */
-    .stTabs [data-baseweb="tab"] p,
-    .stTabs [data-baseweb="tab"] span {
-        color: #000000 !important;
+    /* Active tab text color */
+    .stTabs [aria-selected="true"] p {
+        color: #ffffff !important;
+    }
+    
+    /* Inactive tab text color */
+    .stTabs [aria-selected="false"] p {
+        color: #666666 !important;
+    }
+    
+    /* Remove the default bottom border indicator */
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: transparent !important;
+    }
+    
+    /* Tab text styling */
+    .stTabs [data-baseweb="tab"] p {
+        font-size: 14px !important;
+        margin: 0 !important;
+        line-height: 1.5 !important;
     }
     
     /* ULTRA COMPACT layout - maximum table space */
@@ -2362,241 +2434,15 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, creatoriq_tab, export_tab, history_tab = st.tabs([
-    "📋 Bulk Review", 
-    "✅ Approved Queue",
-    "⚠️ Rejected/Issues", 
-    "🚀 Strategic Intelligence", 
-    "🎬 CreatorIQ Export",
-    "📊 Export",
-    "📚 File History"
+bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, export_tab = st.tabs([
+    "Bulk Review", 
+    "Approved Queue",
+    "Rejected/Issues", 
+    "Strategic Intelligence", 
+    "Export"
 ])
 
-# ========== CREATORIQ TAB ==========
-with creatoriq_tab:
-    # Import CreatorIQ modules
-    try:
-        from src.creatoriq import playwright_scraper, parser, exporter
-        
-        # Compact header styling
-        st.markdown("### 🎬 CreatorIQ Scraper")
-        st.markdown("Extract social media post URLs from CreatorIQ campaign reports")
-        
-        # Input section with tight layout
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            url = st.text_input(
-                "CreatorIQ Report URL:",
-                placeholder="https://report.driveshop.com/report/audi_media_spotl-dcMIG3Mp5APt/posts",
-                help="Paste the CreatorIQ campaign report URL here"
-            )
-        
-        with col2:
-            scrolls = st.slider("Scroll cycles:", 5, 50, 20, help="Number of scroll cycles to load all posts")
-        
-        # Action buttons
-        col1, col2, col3 = st.columns([1, 1, 2])
-        
-        with col1:
-            scrape_button = st.button("🚀 Scrape", use_container_width=True)
-        
-        with col2:
-            if st.button("📋 Clear", use_container_width=True):
-                if 'creatoriq_urls' in st.session_state:
-                    del st.session_state.creatoriq_urls
-                if 'creatoriq_export_path' in st.session_state:
-                    del st.session_state.creatoriq_export_path
-                st.rerun()
-        
-        # Scraping logic
-        if scrape_button:
-            if url:
-                with st.spinner("🔄 Scraping CreatorIQ... this may take 1-3 minutes."):
-                    try:
-                        # Get HTML content and API responses with network interception
-                        html, api_responses = playwright_scraper.get_creatoriq_data(url, scrolls=scrolls)
-                        
-                        # Extract URLs using both HTML and captured API responses
-                        urls = parser.extract_social_urls(html, api_responses)
-                        
-                        # Store in session state
-                        st.session_state.creatoriq_urls = urls
-                        
-                        # Create export directory
-                        os.makedirs("data/creatoriq_exports", exist_ok=True)
-                        export_path = f"data/creatoriq_exports/creatoriq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-                        
-                        # Export to CSV
-                        exporter.export_to_csv(urls, export_path)
-                        st.session_state.creatoriq_export_path = export_path
-                        
-                        st.success(f"✅ Extraction complete: {len(urls)} URLs found")
-                        
-                    except Exception as e:
-                        st.error(f"❌ Error during scraping: {str(e)}")
-            else:
-                st.warning("⚠️ Please enter a valid CreatorIQ report URL")
-        
-        # Results display
-        if 'creatoriq_urls' in st.session_state and st.session_state.creatoriq_urls:
-            urls = st.session_state.creatoriq_urls
-            
-            # Metrics row
-            col1, col2, col3, col4 = st.columns(4)
-            
-            # Count URLs by platform
-            platform_counts = {}
-            for url in urls:
-                if 'instagram.com' in url:
-                    platform_counts['Instagram'] = platform_counts.get('Instagram', 0) + 1
-                elif 'tiktok.com' in url:
-                    platform_counts['TikTok'] = platform_counts.get('TikTok', 0) + 1
-                elif 'youtube.com' in url:
-                    platform_counts['YouTube'] = platform_counts.get('YouTube', 0) + 1
-                elif 'twitter.com' in url:
-                    platform_counts['Twitter'] = platform_counts.get('Twitter', 0) + 1
-                elif 'facebook.com' in url:
-                    platform_counts['Facebook'] = platform_counts.get('Facebook', 0) + 1
-            
-            with col1:
-                st.metric("Total URLs", len(urls))
-            with col2:
-                st.metric("Instagram", platform_counts.get('Instagram', 0))
-            with col3:
-                st.metric("TikTok", platform_counts.get('TikTok', 0))
-            with col4:
-                st.metric("YouTube", platform_counts.get('YouTube', 0))
-            
-            # Create DataFrame for AgGrid display
-            data = []
-            for i, url in enumerate(urls, 1):
-                platform = exporter.get_platform(url)
-                data.append({
-                    "#": i,
-                    "Platform": platform,
-                    "Post URL": url,
-                    "Creator": "",  # Will be extracted later
-                    "Status": "✅ Found"
-                })
-            
-            df = pd.DataFrame(data)
-            
-            # Create proper cellRenderer for clickable URLs (same as Bulk Review)
-            cellRenderer_url = JsCode("""
-            class UrlCellRenderer {
-              init(params) {
-                this.eGui = document.createElement('a');
-                this.eGui.innerText = '🔗 View';
-                this.eGui.href = params.value;
-                this.eGui.target = '_blank';
-                this.eGui.style.color = '#1f77b4';
-                this.eGui.style.textDecoration = 'underline';
-                this.eGui.style.cursor = 'pointer';
-              }
-
-              getGui() {
-                return this.eGui;
-              }
-
-              refresh(params) {
-                return false;
-              }
-            }
-            """)
-            
-            # Configure AgGrid with EXACT same settings as Bulk Review
-            gb = GridOptionsBuilder.from_dataframe(df)
-            
-            # *** ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
-            gb.configure_side_bar()  # Enable filtering sidebar
-            gb.configure_default_column(
-                filter="agSetColumnFilter",  # CHECKBOX FILTERS with search
-                sortable=True,  # Enable sorting
-                resizable=True,  # Enable column resizing
-                editable=False, 
-                groupable=True, 
-                value=True, 
-                enableRowGroup=True, 
-                enablePivot=True, 
-                enableValue=True,
-                filterParams={
-                    "buttons": ["reset", "apply"],
-                    "closeOnApply": True,
-                    "newRowsAction": "keep"
-                }
-            )
-            
-            # Configure columns with proper widths and features
-            gb.configure_column("#", minWidth=60, pinned="left")
-            gb.configure_column("Platform", minWidth=120, pinned="left")
-            gb.configure_column("Post URL", 
-                cellRenderer=cellRenderer_url,
-                minWidth=120,
-                sortable=False,
-                filter=False
-            )
-            gb.configure_column("Creator", minWidth=180)
-            gb.configure_column("Status", minWidth=120)
-            
-            # Configure selection
-            gb.configure_selection(selection_mode="multiple", use_checkbox=False)
-            
-            gridOptions = gb.build()
-            
-            # Display table with EXACT same AgGrid call as Bulk Review
-            st.markdown("#### 📊 Extracted URLs")
-            selected_rows = AgGrid(
-                df,
-                gridOptions=gridOptions,
-                allow_unsafe_jscode=True,
-                update_mode=GridUpdateMode.SELECTION_CHANGED,
-                height=650,  # Same height as Bulk Review
-                fit_columns_on_grid_load=True,
-                columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',  # Auto-size all columns
-                theme="alpine",
-                enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
-            )
-            
-            # Download section
-            if 'creatoriq_export_path' in st.session_state:
-                export_path = st.session_state.creatoriq_export_path
-                
-                if os.path.exists(export_path):
-                    with open(export_path, 'rb') as f:
-                        csv_data = f.read()
-                    
-                    st.download_button(
-                        label="📥 Download CSV",
-                        data=csv_data,
-                        file_name=f"creatoriq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-        
-        # Help section
-        with st.expander("ℹ️ How to use CreatorIQ Scraper"):
-            st.markdown("""
-            **Steps:**
-            1. **Get URL**: Copy the CreatorIQ campaign report URL (must end with `/posts`)
-            2. **Adjust Scrolls**: Set scroll cycles (20 is usually enough for 500+ posts)
-            3. **Scrape**: Click 'Scrape' and wait 1-3 minutes for completion
-            4. **Review**: Check the extracted URLs in the table below
-            5. **Download**: Export the results as CSV for further analysis
-            
-            **Supported Platforms:**
-            - Instagram (profiles and posts)
-            - TikTok (videos)
-            - YouTube (videos)
-            - Twitter (posts)
-            - Facebook (posts)
-            
-            **Note**: The scraper extracts post URLs only. Creator names and engagement metrics will be added in future versions.
-            """)
-    
-    except ImportError as e:
-        st.error(f"❌ CreatorIQ module not available: {str(e)}")
-        st.info("Please ensure the CreatorIQ module is properly installed.")
+# ========== CREATORIQ TAB ========== (REMOVED)
 
 # ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_review_tab:
@@ -6966,102 +6812,3 @@ with export_tab:
         import traceback
         st.error(f"Full error: {traceback.format_exc()}")
 
-# ========== FILE HISTORY TAB ==========
-with history_tab:
-    st.markdown("## 📚 File History")
-    st.markdown("*Access all your previous approval session files and generate reports*")
-    
-    # Get all JSON files from data directory
-    data_dir = os.path.join(project_root, "data")
-    json_files = []
-    if os.path.exists(data_dir):
-        for file in os.listdir(data_dir):
-            if file.startswith("approved_clips_") and file.endswith(".json"):
-                file_path = os.path.join(data_dir, file)
-                file_stats = os.stat(file_path)
-                # Extract date from filename: approved_clips_20250625_163543.json
-                try:
-                    date_str = file.replace("approved_clips_", "").replace(".json", "")
-                    date_part = date_str.split("_")[0]  # 20250625
-                    time_part = date_str.split("_")[1]  # 163543
-                    formatted_date = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
-                    formatted_time = f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
-                    display_name = f"{formatted_date} at {formatted_time}"
-                except:
-                    display_name = file.replace("approved_clips_", "").replace(".json", "")
-                
-                json_files.append({
-                    'filename': file,
-                    'filepath': file_path,
-                    'display_name': display_name,
-                    'size': file_stats.st_size,
-                    'modified': file_stats.st_mtime
-                })
-    
-    # Sort by modification time (newest first)
-    json_files.sort(key=lambda x: x['modified'], reverse=True)
-    
-    if json_files:
-        st.markdown(f"**Found {len(json_files)} previous approval sessions:**")
-        
-        # Create a more compact display
-        for i, file_info in enumerate(json_files):
-            # Use filename as unique identifier to avoid key conflicts
-            file_key = file_info['filename'].replace('.json', '').replace('approved_clips_', '')
-            
-            with st.expander(f"📅 {file_info['display_name']} ({file_info['size']/1024:.1f} KB)", expanded=(i==0)):
-                col_json_hist, col_excel_hist, col_info = st.columns([1, 1, 1])
-                
-                with col_json_hist:
-                    # Load and provide JSON download
-                    try:
-                        with open(file_info['filepath'], 'r') as f:
-                            json_data = json.load(f)
-                        st.download_button(
-                            label="📋 Download JSON",
-                            data=json.dumps(json_data, indent=2),
-                            file_name=file_info['filename'],
-                            mime="application/json",
-                            key=f"json_download_{file_key}",
-                            help="Download this JSON file"
-                        )
-                    except Exception as e:
-                        st.error(f"Error loading JSON: {e}")
-                
-                with col_excel_hist:
-                    # Excel generation temporarily disabled for historical files
-                    # to avoid compatibility issues
-                    # to avoid compatibility issues
-                    st.info("💡 **Excel Generation**\n\nFor historical sessions, use the JSON download and import into the current session for Excel generation.")
-                    st.caption("This ensures compatibility with the latest Excel format.")
-                
-                with col_info:
-                    # Show file info
-                    try:
-                        with open(file_info['filepath'], 'r') as f:
-                            json_data = json.load(f)
-                        if json_data:
-                            st.metric("Clips", len(json_data))
-                            avg_relevance = sum(clip.get('relevance_score', 0) for clip in json_data) / len(json_data)
-                            st.metric("Avg Score", f"{avg_relevance:.1f}")
-                        else:
-                            st.metric("Clips", 0)
-                    except:
-                        st.metric("Clips", "Error")
-    else:
-        st.info("No previous approval sessions found. Approve some clips to create downloadable files!")
-        
-        # Show helpful instructions
-        st.markdown("""
-        **How File History works:**
-        1. 📋 **Approve clips** in the Bulk Review tab
-        2. 📁 **Files are automatically saved** with timestamps
-        3. 📚 **Access them here** anytime - even after browser restart
-        4. 📊 **Generate fresh Excel reports** from any historical session
-        5. 📋 **Download original JSON** for data integration
-        
-        **File naming:** `approved_clips_YYYYMMDD_HHMMSS.json`
-        **Example:** `approved_clips_20250625_163543.json` = June 25th, 2025 at 4:35 PM
-        """)
-
- 
