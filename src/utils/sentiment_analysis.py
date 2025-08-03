@@ -20,6 +20,9 @@ except ImportError:
     logger = setup_logger(__name__)
     logger.info("Using original enhanced analyzer")
 
+from src.utils.youtube_handler import extract_video_id, get_transcript
+from src.utils.database import DatabaseManager
+
 class SentimentAnalyzer:
     """Handles sentiment analysis for clips using OpenAI"""
     
@@ -31,6 +34,7 @@ class SentimentAnalyzer:
         """
         self.api_key = os.environ.get("OPENAI_API_KEY")
         self.use_enhanced = use_enhanced
+        self.db = DatabaseManager()
         # Note: We'll use the existing analyze_clip function which handles API key internally
         
     async def analyze_clip_sentiment(self, clip_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -45,6 +49,36 @@ class SentimentAnalyzer:
         """
         try:
             content = clip_data.get('extracted_content', '')
+            
+            # Check if this is a YouTube video with insufficient content
+            if 'youtube.com' in clip_data.get('clip_url', '') or 'youtu.be' in clip_data.get('clip_url', ''):
+                # Check if content is too short OR looks like metadata
+                is_metadata = (
+                    'Video Title:' in content and 'Channel:' in content and 'Video Description:' in content
+                ) or (
+                    'video_title' in content.lower() or 'channel_name' in content.lower()
+                )
+                
+                # If content is too short (likely just metadata), re-extract
+                if not content or len(content) < 1000 or is_metadata:
+                    logger.info(f"YouTube clip {clip_data.get('wo_number')} has insufficient content ({len(content or '')} chars), re-extracting...")
+                    
+                    video_id = extract_video_id(clip_data.get('clip_url', ''))
+                    if video_id:
+                        # Re-extract with Whisper fallback
+                        new_content = get_transcript(video_id, video_url=clip_data.get('clip_url', ''), use_whisper_fallback=True)
+                        
+                        if new_content and len(new_content) > len(content or ''):
+                            logger.info(f"✅ Re-extracted YouTube content: {len(new_content)} chars (was {len(content or '')} chars)")
+                            content = new_content
+                            
+                            # Update the database with new content
+                            self.db.supabase.table('clips').update({
+                                'extracted_content': content
+                            }).eq('id', clip_data['id']).execute()
+                        else:
+                            logger.warning(f"Failed to get better content for YouTube video {video_id}")
+            
             if not content:
                 logger.warning(f"No content found for clip {clip_data.get('wo_number')}")
                 return {

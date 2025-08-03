@@ -395,12 +395,15 @@ def get_latest_videos(channel_id, max_videos=25):
         logger.error(f"Error fetching latest videos for channel {channel_id}: {e}")
         return []
 
-def get_transcript(video_id):
+def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
     """
     Get the transcript for a YouTube video.
+    First tries YouTube's built-in captions, then falls back to Whisper API if enabled.
     
     Args:
         video_id (str): YouTube video ID
+        video_url (str, optional): Full YouTube URL for Whisper fallback
+        use_whisper_fallback (bool): Whether to use Whisper API as fallback
         
     Returns:
         str: Transcript text or None if not available
@@ -412,29 +415,49 @@ def get_transcript(video_id):
         # Apply rate limiting
         rate_limiter.wait_if_needed('youtube.com')
         
-        # Get transcript
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        
-        # Try to get English transcript first
+        # Try to get English transcript directly
         try:
-            transcript = transcript_list.find_transcript(['en'])
-        except NoTranscriptFound:
-            # If no English transcript, get the first available
-            transcript = transcript_list.find_transcript(['en-US', 'en-GB'])
-        
-        # Get the transcript data
-        transcript_data = transcript.fetch()
+            # First try manual transcripts in English
+            transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
+        except:
+            try:
+                # Try any available transcript
+                transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
+            except:
+                raise Exception(f"No transcript found for video {video_id}")
         
         # Combine all text parts
         full_text = ' '.join([part['text'] for part in transcript_data])
         
+        logger.info(f"✅ Got YouTube transcript for {video_id}: {len(full_text)} characters")
         return full_text
     
-    except (TranscriptsDisabled, NoTranscriptFound) as e:
-        logger.warning(f"No transcript available for video {video_id}: {e}")
-        return None
     except Exception as e:
-        logger.error(f"Error fetching transcript for video {video_id}: {e}")
+        logger.warning(f"No YouTube transcript available for video {video_id}: {e}")
+        
+        # Try Whisper fallback if enabled and URL provided
+        if use_whisper_fallback and video_url:
+            logger.info(f"🎤 Attempting Whisper transcription for {video_id}...")
+            try:
+                # Import the appropriate version based on OpenAI library
+                try:
+                    import openai
+                    if hasattr(openai, '__version__') and openai.__version__.startswith('1.'):
+                        from src.utils.whisper_transcriber import transcribe_youtube_video
+                    else:
+                        from src.utils.whisper_transcriber_v0 import transcribe_youtube_video
+                except:
+                    from src.utils.whisper_transcriber_v0 import transcribe_youtube_video
+                
+                whisper_transcript = transcribe_youtube_video(video_url, video_id)
+                if whisper_transcript:
+                    logger.info(f"✅ Whisper transcription successful for {video_id}: {len(whisper_transcript)} characters")
+                    return whisper_transcript
+                else:
+                    logger.warning(f"❌ Whisper transcription failed for {video_id}")
+            except Exception as whisper_error:
+                logger.error(f"Error using Whisper fallback: {whisper_error}")
+        
         return None
 
 def get_video_metadata_fallback(video_id, known_title=None):
