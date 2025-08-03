@@ -9,15 +9,28 @@ import asyncio
 
 from src.utils.logger import setup_logger
 from src.analysis.gpt_analysis import analyze_clip
-
-logger = setup_logger(__name__)
+try:
+    # Try to import the v1 API version first (for OpenAI 1.x)
+    from src.analysis.gpt_analysis_enhanced_v1 import analyze_clip_enhanced
+    logger = setup_logger(__name__)
+    logger.info("Using OpenAI v1.x compatible enhanced analyzer")
+except ImportError:
+    # Fall back to original if v1 doesn't exist
+    from src.analysis.gpt_analysis_enhanced import analyze_clip_enhanced
+    logger = setup_logger(__name__)
+    logger.info("Using original enhanced analyzer")
 
 class SentimentAnalyzer:
     """Handles sentiment analysis for clips using OpenAI"""
     
-    def __init__(self):
-        """Initialize the sentiment analyzer"""
+    def __init__(self, use_enhanced=True):
+        """Initialize the sentiment analyzer
+        
+        Args:
+            use_enhanced: Whether to use enhanced Message Pull-Through analysis
+        """
         self.api_key = os.environ.get("OPENAI_API_KEY")
+        self.use_enhanced = use_enhanced
         # Note: We'll use the existing analyze_clip function which handles API key internally
         
     async def analyze_clip_sentiment(self, clip_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -39,21 +52,42 @@ class SentimentAnalyzer:
                     'sentiment_completed': False
                 }
             
-            # Use the existing advanced analyze_clip function
+            # Extract vehicle details
             make = clip_data.get('make', '')
             model = clip_data.get('model', '')
             url = clip_data.get('clip_url', '')
+            
+            # Extract year and trim if available
+            year = None
+            trim = None
+            
+            # Try to parse year from model (e.g., "2024 Camry XLE")
+            model_parts = model.split()
+            if model_parts and model_parts[0].isdigit() and len(model_parts[0]) == 4:
+                year = model_parts[0]
+                model = ' '.join(model_parts[1:])
+                
+                # Check if last part might be trim
+                if len(model_parts) > 2:
+                    potential_trim = model_parts[-1]
+                    if any(indicator in potential_trim.upper() for indicator in ['XLE', 'XSE', 'SR', 'LIMITED', 'SPORT', 'BASE', 'LX', 'EX', 'SI']):
+                        trim = potential_trim
+                        model = ' '.join(model_parts[1:-1])
+            
+            # Choose analyzer based on configuration
+            if self.use_enhanced:
+                analyzer_func = analyze_clip_enhanced
+                analyzer_args = (content, make, model, year, trim, 3, url)
+            else:
+                analyzer_func = analyze_clip
+                analyzer_args = (content, make, model, 3, url)
             
             # Run analysis in thread pool since analyze_clip is synchronous
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 None, 
-                analyze_clip,
-                content,
-                make,
-                model,
-                3,  # max_retries
-                url
+                analyzer_func,
+                *analyzer_args
             )
             
             # Handle None result (no API key or parsing failed)

@@ -524,6 +524,9 @@ class DatabaseManager:
     def update_clip_sentiment(self, clip_id: str, sentiment_data: Dict[str, Any]) -> bool:
         """Update a clip with sentiment analysis results"""
         try:
+            # Check if this is enhanced sentiment data (v2)
+            is_enhanced = 'sentiment_classification' in sentiment_data
+            
             # Handle PostgreSQL array fields - convert Python lists to PostgreSQL array format
             pros_list = sentiment_data.get('pros', [])
             cons_list = sentiment_data.get('cons', [])
@@ -579,8 +582,15 @@ class DatabaseManager:
                 "risks_to_address": risks_to_address if isinstance(risks_to_address, list) else []
             }
             
+            # Add enhanced sentiment data if this is v2
+            if is_enhanced:
+                updates['sentiment_data_enhanced'] = json.dumps(sentiment_data)
+                updates['sentiment_version'] = 'v2'
+            else:
+                updates['sentiment_version'] = 'v1'
+            
             # Log the update for debugging
-            logger.info(f"Updating clip {clip_id} with strategic sentiment data: marketing_impact={updates.get('marketing_impact_score')}")
+            logger.info(f"Updating clip {clip_id} with {'enhanced' if is_enhanced else 'original'} sentiment data: marketing_impact={updates.get('marketing_impact_score')}")
             
             result = self.supabase.table('clips').update(updates).eq('id', clip_id).execute()
             
