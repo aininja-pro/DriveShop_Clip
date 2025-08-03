@@ -569,7 +569,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                     return None
             
             # If date is acceptable, proceed with content extraction
-            transcript = get_transcript(video_id)
+            transcript = get_transcript(video_id, video_url=url)
             
             if transcript:
                 title = metadata.get('title', f"YouTube Video {video_id}") if metadata else f"YouTube Video {video_id}"
@@ -711,7 +711,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                 logger.info(f"✅ Found relevant video by title match ('{model_var}'): {video['title']}")
                             
                             video_id = video['video_id']
-                            transcript = get_transcript(video_id)
+                            transcript = get_transcript(video_id, video_url=video['url'])
                             
                             if transcript:
                                 return {
@@ -785,7 +785,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                         continue
                     
                     # Only try transcript as fallback if metadata failed
-                    transcript = get_transcript(video_id)
+                    transcript = get_transcript(video_id, video_url=video_info['url'])
                     if transcript:
                         logger.info(f"✅ ScrapFly + transcript success: {video_info['title']}")
                         video_result = {
