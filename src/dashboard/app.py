@@ -95,6 +95,12 @@ except ImportError:
         st.error("Database module not available")
         return None
 
+# Cache the database connection to prevent multiple connections
+@st.cache_resource
+def get_cached_database():
+    """Get a cached database connection that persists across reruns"""
+    return get_database()
+
 @st.cache_data
 def load_person_outlets_mapping():
     """Load Person_ID to Media Outlets mapping from JSON file"""
@@ -2519,7 +2525,7 @@ with bulk_review_tab:
     # Cache database calls to improve performance
     @st.cache_data(ttl=300)  # Cache for 5 minutes to allow fresh data
     def cached_get_pending_clips():
-        db = get_database()
+        db = get_cached_database()
         return db.get_pending_clips()
     
     # Try to load results from database
@@ -2593,8 +2599,8 @@ with bulk_review_tab:
                     st.success("✅ Record successfully rejected and moved to Rejected/Issues tab!")
                     st.session_state.rejection_success = False  # Clear the flag
 
-                # Quick stats overview 
-                col1, col2, col3, col4 = st.columns(4)
+                # Quick stats overview - only show relevant metrics for pending review
+                col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Total Clips", len(df))
                 with col2:
@@ -2603,19 +2609,6 @@ with bulk_review_tab:
                 with col3:
                     high_quality = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns and not df.empty else 0
                     st.metric("High Quality", high_quality)
-                with col4:
-                    # Check approved count from database
-                    @st.cache_data
-                    def cached_get_approved_clips_count():
-                        db = get_database()
-                        return len(db.get_approved_clips())
-                    
-                    try:
-                        approved_count = cached_get_approved_clips_count()
-                    except Exception as e:
-                        logger.error(f"Error getting approved clips count: {e}")
-                        approved_count = 0
-                    st.metric("Approved", approved_count)
                 
                 
                 # Display filtered results with AgGrid
@@ -3808,7 +3801,7 @@ with bulk_review_tab:
                                 new_outlet = st.session_state.last_saved_outlets[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_database()
+                                    db = get_cached_database()
                                     
                                     # Get outlet data for this WO
                                     outlet_id = None
@@ -3870,7 +3863,7 @@ with bulk_review_tab:
                                 new_byline = st.session_state.last_saved_bylines[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_database()
+                                    db = get_cached_database()
                                     # Update the clip in database using the new method
                                     success = db.update_clip_byline_author(wo_num, new_byline)
                                     if success:
@@ -3921,7 +3914,7 @@ with bulk_review_tab:
                                 new_date = st.session_state.last_saved_dates[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_database()
+                                    db = get_cached_database()
                                     # Update the clip in database using the new method
                                     success = db.update_clip_published_date(wo_num, new_date)
                                     if success:
@@ -3979,7 +3972,7 @@ with bulk_review_tab:
                                 new_url = st.session_state.edited_urls[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_database()
+                                    db = get_cached_database()
                                     # Update the clip in database
                                     success = db.update_clip_url(wo_num, new_url)
                                     if success:
@@ -4130,7 +4123,7 @@ with bulk_review_tab:
                     # Manual Save Progress button
                     if st.button("💾 Save Progress", help="Save all UI selections to database"):
                         try:
-                            db = get_database()
+                            db = get_cached_database()
                             saved_count = 0
                             
                             # Save viewed states
@@ -4229,7 +4222,7 @@ with bulk_review_tab:
                                 # Update clips in database to approved status (workflow_stage stays 'found' for Approved Queue)
                                 try:
                                     # Get database connection
-                                    db = get_database()
+                                    db = get_cached_database()
                                     
                                     # First, approve the clips with Media Outlet data
                                     approved_clips = []
@@ -4372,7 +4365,7 @@ with bulk_review_tab:
                             if selected_rejected_wos:
                                 try:
                                     # Get database instance
-                                    db = get_database()
+                                    db = get_cached_database()
                                     if not db:
                                         st.error("Database connection not available")
                                         st.session_state.show_rejection_dialog = False
@@ -4555,12 +4548,8 @@ with approved_queue_tab:
     
     # Load clips based on selected filter
     try:
-        # Use cached database connection
-        @st.cache_resource
-        def get_cached_db():
-            return get_database()
-        
-        db = get_cached_db()
+        # Use the global cached database connection
+        db = get_cached_database()
         
         # One-time migration: Update any existing clips with 'exported' status to have proper workflow_stage
         # This ensures legacy exported clips show up in Recent Complete
@@ -5348,11 +5337,25 @@ with rejected_tab:
     
     # Load rejected clips and failed processing attempts from database
     try:
+        # Get cached database connection
+        db = get_cached_database()
+        
+        # Cache the current run data to avoid duplicate calls
+        @st.cache_data(ttl=300)  # Cache for 5 minutes
+        def get_current_run_data(_db):
+            """Get current run data with caching to prevent duplicate DB calls
+            
+            Args:
+                _db: Database connection (prefixed with _ to exclude from cache key)
+            """
+            latest_id = _db.get_latest_processing_run_id()
+            failed_clips = _db.get_current_run_failed_clips()
+            return latest_id, failed_clips
+        
         # Choose data source based on mode
         if st.session_state.rejected_view_mode == 'current_run':
             # Current run mode - get only the most recent processing run
-            latest_run_id = db.get_latest_processing_run_id()
-            current_run_failed_clips = db.get_current_run_failed_clips()
+            latest_run_id, current_run_failed_clips = get_current_run_data(db)
             
             # Also get clips that were skipped in the current run
             current_run_skipped_clips = []
@@ -5479,7 +5482,7 @@ with rejected_tab:
             if latest_run_id:
                 @st.cache_data
                 def cached_get_rejected_clips_by_run(run_id):
-                    db = get_database()
+                    db = get_cached_database()
                     return db.get_rejected_clips(run_id=run_id)
                 
                 rejected_clips = cached_get_rejected_clips_by_run(latest_run_id)
@@ -5489,7 +5492,7 @@ with rejected_tab:
             # For historical view, get all rejected clips (with optional date filtering)
             @st.cache_data
             def cached_get_rejected_clips():
-                db = get_database()
+                db = get_cached_database()
                 return db.get_rejected_clips()
             
             rejected_clips = cached_get_rejected_clips()
@@ -5803,7 +5806,7 @@ with rejected_tab:
                         selected_rows = selected_rows.to_dict('records')
                     
                     # Get database instance
-                    db = get_database()
+                    db = get_cached_database()
                     if not db:
                         st.error("Database connection not available")
                     else:
@@ -5963,8 +5966,8 @@ with rejected_tab:
 with analysis_tab:
     # Single column layout for Strategic Intelligence
     try:
-        # Get database instance
-        db = get_database()
+        # Use the already cached database instance instead of getting a new one
+        # db is already available from the main cached database instance
         
         # Load data from database for analysis (all approved clips with sentiment)
         sentiment_result = db.supabase.table('clips').select('*').eq('sentiment_completed', True).execute()
@@ -5990,7 +5993,8 @@ with oem_tab:
 
 # ========== HISTORICAL RE-PROCESSING TAB ==========
 with reprocess_tab:
-    display_historical_reprocessing_tab()
+    # Pass the cached database connection to avoid duplicate connections
+    display_historical_reprocessing_tab(db=get_cached_database())
 
 # ========== EXPORT TAB ==========
 with export_tab:
@@ -5998,12 +6002,8 @@ with export_tab:
     st.markdown('<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #6c757d; font-style: italic;">Export clips to Excel with custom filters and date ranges</p>', unsafe_allow_html=True)
     
     try:
-        # Use cached database connection
-        @st.cache_resource
-        def get_cached_db():
-            return get_database()
-        
-        db = get_cached_db()
+        # Use the global cached database connection
+        db = get_cached_database()
         
         # Create filter columns
         col1, col2, col3 = st.columns([1, 1, 1])
