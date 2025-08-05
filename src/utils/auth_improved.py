@@ -84,11 +84,16 @@ class ImprovedSupabaseAuth:
     def is_authenticated(self) -> bool:
         """Check if user is authenticated."""
         # First check session state
-        if st.session_state.get('authenticated', False):
+        auth_state = st.session_state.get('authenticated', False)
+        print(f"Session state authenticated: {auth_state}")
+        if auth_state:
             return True
             
         # Try to restore session if not in session state
-        return self._restore_session()
+        print("Attempting to restore session...")
+        restored = self._restore_session()
+        print(f"Session restoration result: {restored}")
+        return restored
     
     def get_current_user(self) -> Optional[Dict[Any, Any]]:
         """Get the current authenticated user."""
@@ -107,9 +112,17 @@ class ImprovedSupabaseAuth:
                         'refresh_token': persisted.get('refresh_token')
                     }
             
-            if session and session.get('refresh_token'):
+            # Handle session object properly
+            refresh_token = None
+            if session:
+                if hasattr(session, 'refresh_token'):
+                    refresh_token = session.refresh_token
+                elif isinstance(session, dict) and 'refresh_token' in session:
+                    refresh_token = session['refresh_token']
+            
+            if refresh_token:
                 # Refresh the session
-                response = self.supabase.auth.refresh_session(session['refresh_token'])
+                response = self.supabase.auth.refresh_session(refresh_token)
                 
                 if response and response.session:
                     # Update session state
@@ -140,7 +153,9 @@ class ImprovedSupabaseAuth:
             True if session is valid or successfully refreshed, False if user needs to log in again
         """
         # First, check if authenticated
-        if not self.is_authenticated():
+        is_auth = self.is_authenticated()
+        print(f"Auth check: is_authenticated = {is_auth}")
+        if not is_auth:
             return False
             
         # Check if we need to refresh based on time

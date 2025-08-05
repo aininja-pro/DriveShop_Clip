@@ -10,7 +10,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUp
 from src.utils.logger import logger
 from src.utils.sentiment_analysis import run_sentiment_analysis
 from src.utils.fms_api import FMSAPIClient
-from src.utils.auth import SupabaseAuth
+from src.utils.auth_improved import ImprovedSupabaseAuth as SupabaseAuth
 from src.dashboard.strategic_intelligence_json_display import display_strategic_intelligence_tab
 from src.dashboard.message_pullthrough_clean import display_pullthrough_analysis_tab
 from src.dashboard.oem_messaging_ui import display_oem_messaging_tab
@@ -1472,7 +1472,9 @@ with st.sidebar:
 
 # Check authentication and refresh session if needed
 # Session timeout is configurable via SESSION_TIMEOUT_HOURS environment variable
-session_timeout = int(os.environ.get('SESSION_TIMEOUT_HOURS', '24'))
+# Increased default to 48 hours to reduce logout frequency
+session_timeout = int(os.environ.get('SESSION_TIMEOUT_HOURS', '48'))
+# Only check session periodically, not on every page interaction
 if not auth.check_and_refresh_session(session_timeout_hours=session_timeout):
     # Apply dark background for login page
     st.markdown("""
