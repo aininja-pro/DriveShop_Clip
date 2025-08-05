@@ -369,6 +369,13 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
             if not result.get('extracted_content') and result.get('content'):
                 result['extracted_content'] = result['content']
             
+            # Debug logging for date tracking
+            if result.get('published_date'):
+                logger.info(f"📅 Result has published_date: {result.get('published_date')}")
+            else:
+                logger.warning(f"⚠️ Result missing published_date for {result_url}")
+                logger.info(f"Result keys: {list(result.keys())}")
+            
             clip_results.append(result)
             successful_urls += 1
             # Continue processing all URLs to find the BEST clip
@@ -454,7 +461,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                     'activity_id': loan.get('activity_id'),  # FIX: Get Activity_ID from loan data, not clip_result
                     'clip_url': clip_result.get('clip_url'),
                     'extracted_content': clip_result.get('extracted_content'),
-                    'published_date': clip_result.get('published_date').isoformat() if clip_result.get('published_date') else None,
+                    'published_date': clip_result.get('published_date').isoformat() if clip_result.get('published_date') and hasattr(clip_result.get('published_date'), 'isoformat') else clip_result.get('published_date'),
                     'attribution_strength': clip_result.get('attribution_strength'),
                     'byline_author': clip_result.get('byline_author'),
                     'tier_used': clip_result.get('processing_method', 'Unknown'),

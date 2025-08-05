@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from src.utils.logger import setup_logger
 from src.utils.rate_limiter import rate_limiter
 from src.utils.config import YOUTUBE_SCRAPFLY_CONFIG
+from src.utils.youtube_relative_date_parser import extract_youtube_date_from_html, parse_youtube_relative_date, extract_video_upload_date
 
 logger = setup_logger(__name__)
 
@@ -581,12 +582,47 @@ def get_video_metadata_fallback(video_id, known_title=None):
                 channel_name = channel_match.group(1)
                 break
         
+        # Try to extract upload date with more precision
+        upload_date = None
+        try:
+            # Look for upload date in specific JSON structure first
+            upload_patterns = [
+                # YouTube's structured data for the specific video
+                r'"uploadDate"\s*:\s*"([^"]+)"',
+                r'"datePublished"\s*:\s*"([^"]+)"',
+                # In videoDetails
+                r'"publishDate"\s*:\s*"([^"]+)"',
+            ]
+            
+            for pattern in upload_patterns:
+                date_match = re.search(pattern, html_content)
+                if date_match:
+                    date_str = date_match.group(1)
+                    try:
+                        # Parse ISO date format
+                        upload_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        logger.info(f"📅 Found upload date in JSON for video {video_id}: {upload_date.strftime('%Y-%m-%d')}")
+                        break
+                    except:
+                        pass
+            
+            # If no structured date found, use the more precise video upload date extractor
+            if not upload_date:
+                upload_date = extract_video_upload_date(html_content)
+                if upload_date:
+                    logger.info(f"📅 Extracted precise upload date for video {video_id}: {upload_date.strftime('%Y-%m-%d')}")
+            
+        except Exception as e:
+            logger.debug(f"Could not extract upload date: {e}")
+        
         # 🚀 ENHANCED: Create richer content for GPT analysis
         content_text = f"Video Title: {title}\n"
         content_text += f"Channel: {channel_name}\n"
         if description and len(description) > 10:
             content_text += f"Video Description: {description}\n"
         content_text += f"View Count: {view_count}\n"
+        if upload_date:
+            content_text += f"Upload Date: {upload_date.strftime('%Y-%m-%d')}\n"
         
         # Add context cues for GPT to understand this is a car review
         if any(keyword in title.lower() for keyword in ['review', 'test', 'drive', 'driving', 'commute', 'ownership']):
@@ -594,7 +630,7 @@ def get_video_metadata_fallback(video_id, known_title=None):
         
         content_text += f"URL: {url}"
         
-        return {
+        metadata = {
             'title': title,
             'description': description,
             'channel_name': channel_name,
@@ -602,6 +638,18 @@ def get_video_metadata_fallback(video_id, known_title=None):
             'content_text': content_text,
             'url': url
         }
+        
+        # Add upload date if found
+        if upload_date:
+            # Store as datetime object, not string
+            metadata['upload_date'] = upload_date
+            metadata['published_date'] = upload_date
+            metadata['date_source'] = 'video_page_extraction'
+            logger.info(f"📅 Added upload date to metadata: {upload_date}")
+        else:
+            logger.warning(f"⚠️ No upload date found for video {video_id}")
+        
+        return metadata
         
     except Exception as e:
         logger.error(f"Error fetching video metadata for {video_id}: {e}")
@@ -739,7 +787,48 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                         # Extract href (video URL)
                         href = link_elem.get('href') if link_elem else ""
                         
-                        logger.info(f"🔍 Video {i+1}: Title='{title}', Href='{href}'")
+                        # Try to find the date for this specific video
+                        published_date = None
+                        date_text = None
+                        
+                        # Look for metadata in the parent container
+                        parent = title_elem.parent if title_elem else None
+                        if parent:
+                            # Method 1: Look for metadata spans
+                            metadata_spans = parent.find_all('span', class_=re.compile('inline-metadata-item|metadata'))
+                            if i < 3:  # Debug first few videos
+                                logger.debug(f"   Found {len(metadata_spans)} metadata spans for video {i+1}")
+                            for span in metadata_spans:
+                                span_text = span.get_text(strip=True)
+                                if re.search(r'\d+\s*(second|minute|hour|day|week|month|year)s?\s*ago', span_text, re.I):
+                                    date_text = span_text
+                                    published_date = parse_youtube_relative_date(date_text)
+                                    if published_date:
+                                        logger.info(f"   📅 Found date for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
+                                        break
+                            
+                            # Method 2: If not found, look in parent's parent for aria-label
+                            if not published_date and parent.parent:
+                                grandparent = parent.parent
+                                aria_label = grandparent.get('aria-label', '')
+                                date_match = re.search(r'(\d+\s*(?:second|minute|hour|day|week|month|year)s?\s*ago)', aria_label, re.I)
+                                if date_match:
+                                    date_text = date_match.group(1)
+                                    published_date = parse_youtube_relative_date(date_text)
+                                    if published_date:
+                                        logger.debug(f"   📅 Found date in aria-label for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
+                            
+                            # Method 3: Search broader in the parent for any text containing date
+                            if not published_date:
+                                # Use string instead of text (deprecated)
+                                date_strings = parent.find_all(string=re.compile(r'\d+\s*(second|minute|hour|day|week|month|year)s?\s*ago', re.I))
+                                if date_strings:
+                                    date_text = date_strings[0].strip()
+                                    published_date = parse_youtube_relative_date(date_text)
+                                    if published_date:
+                                        logger.debug(f"   📅 Found date in text for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
+                        
+                        logger.info(f"🔍 Video {i+1}: Title='{title}', Href='{href}', Date='{date_text or 'Not found'}'")
                         
                         if title and href and '/watch?v=' in href:
                             # Extract video ID
@@ -758,6 +847,12 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                                     'url': f"https://www.youtube.com/watch?v={video_id}",
                                     'method': 'scrapfly'
                                 }
+                                
+                                # Add the published date if we found it
+                                if published_date:
+                                    video_info['published'] = published_date.isoformat()
+                                    video_info['date_source'] = 'relative_date_parser'
+                                    video_info['date_text'] = date_text
                                 
                                 videos_found.append(video_info)
                                 logger.info(f"   ✅ Added video: {title}")
@@ -816,6 +911,12 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                             logger.info(f"   ❌ Make '{make_lower}' not found in title")
                     
                     logger.info(f"🎬 ScrapFly found {len(relevant_videos)} relevant videos for {make} {model}")
+                    
+                    # If we didn't find dates individually, log but don't attempt bulk extraction
+                    # Bulk extraction is unreliable as it assigns dates in order without matching to specific videos
+                    if relevant_videos and not any(video.get('published') for video in relevant_videos):
+                        logger.info("📅 No individual video dates found - dates will be extracted when processing individual videos")
+                        # Don't attempt bulk extraction as it leads to incorrect date assignments
                     
                     if relevant_videos:
                         return relevant_videos[:10]  # Return top 10 most relevant

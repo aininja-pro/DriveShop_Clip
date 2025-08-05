@@ -49,6 +49,7 @@ from src.analysis.gpt_analysis import analyze_clip
 from src.utils.date_extractor import extract_date_from_html, extract_youtube_upload_date, parse_date_string
 from src.utils.tiktok_handler import process_tiktok_video, search_channel_for_vehicle as search_tiktok_channel
 from src.utils.instagram_handler import process_instagram_post, search_profile_for_vehicle as search_instagram_profile
+from src.utils.enhanced_date_filter import is_content_acceptable
 
 logger = setup_logger(__name__)
 
@@ -185,31 +186,22 @@ def parse_start_date(date_str: str) -> Optional[datetime]:
         logger.warning(f"Could not parse date '{date_str}': {e}")
         return None
 
+# Legacy function - kept for backward compatibility but now uses enhanced filter
 def is_content_within_date_range(content_date: Optional[datetime], 
                                 start_date: Optional[datetime], 
-                                days_forward: int = 90) -> bool:
+                                days_forward: int = 90,
+                                content_type: str = "unknown",
+                                content_url: str = None) -> bool:
     """
-    Check if content publication date is within the acceptable range.
-    Content should be published AFTER the loan start date (not before).
-    
-    Args:
-        content_date: When the content was published
-        start_date: Loan start date (reference point)
-        days_forward: How many days forward from start_date to allow
-        
-    Returns:
-        True if content is within range, False otherwise
+    Legacy wrapper around the enhanced date filter.
+    Now uses platform-aware filtering.
     """
-    # FIXED: If we can't determine dates, REJECT the content (don't bypass date filtering)
-    # This prevents generic/navigation content from passing through
-    if not content_date or not start_date:
-        return False
-    
-    # Calculate the latest acceptable date (start_date + days_forward)
-    latest_date = start_date + timedelta(days=days_forward)
-    
-    # Content should be published AFTER the start date and before the end of the window
-    return start_date <= content_date <= latest_date
+    return is_content_acceptable(
+        content_date=content_date,
+        loan_start_date=start_date,
+        content_type=content_type,
+        content_url=content_url
+    )
 
 # NOTE: Make guessing functions removed - now using direct Make column from CSV
 
@@ -541,7 +533,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
             days_attempted = [90, 180]
             
             for days_forward in days_attempted:
-                if is_content_within_date_range(video_date, start_date, days_forward):
+                if is_content_within_date_range(video_date, start_date, days_forward, content_type="youtube", content_url=url):
                     if video_date and start_date:
                         if video_date >= start_date:
                             days_diff = (video_date - start_date).days
@@ -686,11 +678,20 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                 
                 # Extract video upload date
                 video_date = None
+                logger.info(f"DEBUG: Video data keys: {list(video.keys())}")
                 if 'published' in video:
-                    video_date = parse_date_string(str(video['published']))
+                    published_str = str(video['published'])
+                    logger.info(f"DEBUG: Found published field: {published_str}")
+                    video_date = parse_date_string(published_str)
+                    if video_date:
+                        logger.info(f"DEBUG: ✅ Parsed date successfully: {video_date}")
+                    else:
+                        logger.warning(f"DEBUG: ❌ parse_date_string returned None for: {published_str}")
+                else:
+                    logger.warning(f"DEBUG: ❌ No 'published' field in video data for: {video.get('title', 'Unknown')}")
                 
                 # Check if video is within acceptable date range
-                if not is_content_within_date_range(video_date, start_date, days_forward):
+                if not is_content_within_date_range(video_date, start_date, days_forward, content_type="youtube", content_url=video.get('url')):
                     if video_date and start_date:
                         if video_date < start_date:
                             days_diff = (start_date - video_date).days
@@ -711,20 +712,36 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                 logger.info(f"✅ Found relevant video by title match ('{model_var}'): {video['title']}")
                             
                             video_id = video['video_id']
+                            
+                            # Always fetch metadata to get the date from the video page
+                            metadata = get_video_metadata_fallback(video_id, known_title=video['title'])
+                            
+                            # Extract date from metadata if we don't have one from RSS
+                            if not video_date and metadata:
+                                video_date = metadata.get('upload_date') or metadata.get('published_date')
+                                if video_date and isinstance(video_date, str):
+                                    video_date = parse_date_string(video_date)
+                                if video_date:
+                                    logger.info(f"📅 Extracted date from video metadata: {video_date}")
+                            
                             transcript = get_transcript(video_id, video_url=video['url'])
                             
                             if transcript:
-                                return {
+                                result_dict = {
                                     'url': video['url'],
                                     'content': transcript,
                                     'content_type': 'video',
                                     'title': video['title'],
                                     'published_date': video_date
                                 }
+                                logger.info(f"📅 Returning YouTube result with published_date: {video_date}")
+                                return result_dict
                             else:
                                 # Fallback to metadata if no transcript
                                 logger.info(f"No transcript for {video_id}, trying metadata fallback")
-                                metadata = get_video_metadata_fallback(video_id)
+                                # Re-fetch metadata only if we didn't already get it
+                                if not metadata:
+                                    metadata = get_video_metadata_fallback(video_id)
                                 if metadata and metadata.get('content_text'):
                                     return {
                                         'url': video['url'],
@@ -772,6 +789,21 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                     metadata = get_video_metadata_fallback(video_id, known_title=video_info['title'])
                     if metadata and metadata.get('content_text'):
                         logger.info(f"✅ ScrapFly + metadata success: {video_info['title']}")
+                        # Get published date from various possible sources
+                        # Priority: 1) RSS feed date, 2) metadata extracted date, 3) other sources
+                        published_date = video_info.get('published') or video_info.get('published_date') or metadata.get('upload_date')
+                        
+                        # If we have a date from RSS/ScrapFly, parse it if needed
+                        if published_date and isinstance(published_date, str):
+                            parsed_date = parse_date_string(published_date)
+                            if parsed_date:
+                                published_date = parsed_date
+                        
+                        if published_date:
+                            logger.info(f"📅 Using published date for clip: {published_date}")
+                        else:
+                            logger.warning(f"⚠️ No published date found for video: {video_info['title']}")
+                        
                         video_result = {
                             'url': video_info['url'],
                             'content': metadata['content_text'],
@@ -779,7 +811,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                             'title': metadata.get('title', video_info['title']),
                             'channel_name': metadata.get('channel_name', ''),
                             'view_count': metadata.get('view_count', '0'),
-                            'published_date': video_info.get('published_date')
+                            'published_date': published_date
                         }
                         successful_videos.append(video_result)
                         continue
@@ -793,7 +825,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                             'content': transcript,
                             'content_type': 'video',
                             'title': video_info['title'],
-                            'published_date': video_info.get('published_date')
+                            'published_date': video_info.get('published') or video_info.get('published_date')
                         }
                         successful_videos.append(video_result)
                 
