@@ -12,6 +12,9 @@ from src.utils.sentiment_analysis import run_sentiment_analysis
 from src.utils.fms_api import FMSAPIClient
 from src.utils.auth import SupabaseAuth
 from src.dashboard.strategic_intelligence_json_display import display_strategic_intelligence_tab
+from src.dashboard.message_pullthrough_clean import display_pullthrough_analysis_tab
+from src.dashboard.oem_messaging_ui import display_oem_messaging_tab
+from src.dashboard.historical_reprocessing import display_historical_reprocessing_tab
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -2435,11 +2438,14 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, export_tab = st.tabs([
+bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, export_tab = st.tabs([
     "Bulk Review", 
     "Approved Queue",
     "Rejected/Issues", 
-    "Strategic Intelligence", 
+    "Strategic Intelligence",
+    "Message Pull-Through",
+    "OEM Messaging",
+    "Re-Process Historical",
     "Export"
 ])
 
@@ -5971,6 +5977,18 @@ with analysis_tab:
 
 # Remove all old Strategic Intelligence code - it's now handled by display_strategic_intelligence_tab
 # The old code from here to the export tab is no longer needed
+
+# ========== MESSAGE PULL-THROUGH TAB ==========
+with pullthrough_tab:
+    display_pullthrough_analysis_tab()
+
+# ========== OEM MESSAGING TAB ==========
+with oem_tab:
+    display_oem_messaging_tab()
+
+# ========== HISTORICAL RE-PROCESSING TAB ==========
+with reprocess_tab:
+    display_historical_reprocessing_tab()
 
 # ========== EXPORT TAB ==========
 with export_tab:
