@@ -5993,8 +5993,8 @@ with oem_tab:
 
 # ========== HISTORICAL RE-PROCESSING TAB ==========
 with reprocess_tab:
-    # Pass the cached database connection to avoid duplicate connections
-    display_historical_reprocessing_tab(db=get_cached_database())
+    # The function handles its own database connection
+    display_historical_reprocessing_tab()
 
 # ========== EXPORT TAB ==========
 with export_tab:
