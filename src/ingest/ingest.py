@@ -70,9 +70,60 @@ def flexible_model_match(video_title: str, model_variation: str) -> bool:
     Returns:
         True if enough words from model_variation appear in video_title
     """
+    # First, check for exact model number patterns to prevent false matches (e.g., CX-50 vs CX-5)
+    # Extract model number patterns from both strings
+    model_number_pattern = r'\b([a-z]+[-\s]?\d+)\b'
+    
+    # Find all model numbers in the variation (e.g., "cx-50", "es 350", "3 series")
+    model_numbers_in_variation = re.findall(model_number_pattern, model_variation)
+    
+    # If we have model numbers in the variation, check for exact matches
+    if model_numbers_in_variation:
+        # Find all model numbers in the title
+        model_numbers_in_title = re.findall(model_number_pattern, video_title)
+        
+        # Normalize model numbers by removing spaces/hyphens for comparison
+        normalized_variation_models = [re.sub(r'[-\s]+', '', m.lower()) for m in model_numbers_in_variation]
+        normalized_title_models = [re.sub(r'[-\s]+', '', m.lower()) for m in model_numbers_in_title]
+        
+        # Check if ANY model number from variation appears in title
+        model_number_found = False
+        for var_model in normalized_variation_models:
+            if var_model in normalized_title_models:
+                model_number_found = True
+                break
+        
+        # If we're looking for a specific model number but it's not in the title, reject
+        if not model_number_found:
+            # Special check: make sure we're not matching partial model numbers
+            # e.g., "cx50" should not match "cx5" in "#cx5"
+            for var_model in normalized_variation_models:
+                # Check if this model number appears as a substring anywhere
+                # but ensure it's not part of a different model number
+                for title_model in normalized_title_models:
+                    if var_model != title_model and (var_model in title_model or title_model in var_model):
+                        # This is a partial match (e.g., "cx5" in "cx50" or vice versa)
+                        logger.debug(f"❌ Rejecting partial model match: '{var_model}' vs '{title_model}'")
+                        return False
+            
+            # If no model number match at all, might still match on other criteria
+            # but log it for debugging
+            logger.debug(f"⚠️ Model number mismatch: looking for {normalized_variation_models} but found {normalized_title_models}")
+    
     # Split model variation into words, handling hyphens as word boundaries
-    model_words = re.split(r'[-\s]+', model_variation.strip())
-    model_words = [word for word in model_words if word]  # Remove empty strings
+    # BUT preserve model numbers as single units
+    model_words = []
+    remaining_text = model_variation.strip()
+    
+    # First extract model numbers as complete units
+    for model_num in model_numbers_in_variation:
+        remaining_text = remaining_text.replace(model_num, ' ', 1)
+        # Add the model number as a single word (normalized)
+        model_words.append(re.sub(r'[-\s]+', '', model_num.lower()))
+    
+    # Then split the remaining text into words
+    other_words = re.split(r'[-\s]+', remaining_text.strip())
+    model_words.extend([word for word in other_words if word])
     
     if not model_words:
         return False
@@ -85,10 +136,18 @@ def flexible_model_match(video_title: str, model_variation: str) -> bool:
     optional_words = {'awd', '4wd', 'fwd', 'rwd', '2wd', 'drive', 'wheel', 'all'}
     
     for word in model_words:
-        if word in video_title:
-            matches += 1
-            if word not in optional_words:
+        # For model numbers, check exact normalized match
+        if re.match(r'[a-z]+\d+', word):
+            # This is a model number - check for exact match in normalized title models
+            if word in normalized_title_models:
+                matches += 1
                 core_matches += 1
+        else:
+            # Regular word - check if it appears in the title
+            if word in video_title:
+                matches += 1
+                if word not in optional_words:
+                    core_matches += 1
     
     # Calculate match percentage
     match_percentage = matches / len(model_words)

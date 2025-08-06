@@ -128,6 +128,12 @@ class WhisperTranscriber:
             ydl_opts = self.ydl_opts.copy()
             ydl_opts['outtmpl'] = output_path.replace('.mp3', '.%(ext)s')
             
+            # Add proxy support if configured
+            proxy_url = os.environ.get('YOUTUBE_PROXY_URL')
+            if proxy_url:
+                logger.info(f"Using proxy for YouTube download")
+                ydl_opts['proxy'] = proxy_url
+            
             # Remove FFmpeg postprocessor if not available
             try:
                 subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
