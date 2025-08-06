@@ -383,11 +383,37 @@ def get_latest_videos(channel_id, max_videos=25):
             title = entry.find('.//atom:title', namespaces).text
             published = entry.find('.//atom:published', namespaces).text
             
+            # Fetch the actual upload date from the video page to fix RSS date issues
+            video_url = f'https://www.youtube.com/watch?v={video_id}'
+            actual_date = None
+            
+            try:
+                # Apply rate limiting before fetching
+                rate_limiter.wait_if_needed('youtube.com')
+                
+                # Get the video page to extract real upload date
+                response = requests.get(video_url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                })
+                
+                if response.status_code == 200:
+                    # Try to extract the actual upload date from the page
+                    actual_date = extract_video_upload_date(response.text)
+                    if actual_date:
+                        logger.info(f"📅 Fixed date for '{title}': RSS={published} -> Actual={actual_date.strftime('%Y-%m-%d')}")
+                        # Use ISO format for consistency
+                        published = actual_date.isoformat()
+                    else:
+                        logger.warning(f"⚠️ Could not extract actual date for '{title}', using RSS date")
+            except Exception as e:
+                logger.debug(f"Error fetching actual date for video {video_id}: {e}")
+            
             videos.append({
                 'video_id': video_id,
                 'title': title,
                 'published': published,
-                'url': f'https://www.youtube.com/watch?v={video_id}'
+                'url': video_url,
+                'actual_date_extracted': actual_date is not None
             })
         
         return videos

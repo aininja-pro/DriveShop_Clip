@@ -6,7 +6,7 @@ Handles extracting publication dates from various sources and formats.
 import re
 import json
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import dateutil.parser
 import logging
@@ -366,9 +366,11 @@ def parse_date_string(date_str: str) -> Optional[datetime]:
         
         # Basic sanity check
         current_date = datetime.now()
-        if parsed_date > current_date:
-            # Date is in the future, probably parsed incorrectly
-            logger.warning(f"⚠️ DATE PARSE WARNING: Future date detected: {parsed_date.strftime('%Y-%m-%d')} > {current_date.strftime('%Y-%m-%d')}")
+        # Allow dates up to 30 days in the future (for scheduled posts/timezone differences)
+        future_threshold = current_date + timedelta(days=30)
+        if parsed_date > future_threshold:
+            # Date is too far in the future, probably parsed incorrectly
+            logger.warning(f"⚠️ DATE PARSE WARNING: Date too far in future: {parsed_date.strftime('%Y-%m-%d')} > {future_threshold.strftime('%Y-%m-%d')}")
             return None
         
         if (current_date - parsed_date).days > 3650:
