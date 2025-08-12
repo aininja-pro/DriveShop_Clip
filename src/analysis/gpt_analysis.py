@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from src.utils.logger import setup_logger
 from src.utils.rate_limiter import rate_limiter
 from src.utils.content_extractor import extract_article_content
+from src.utils.openai_semaphore import openai_semaphore
 
 logger = setup_logger(__name__)
 
@@ -430,21 +431,26 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
     # Set API key for older OpenAI client version
     openai.api_key = api_key
     
+    # Apply rate limiting before API calls
+    rate_limiter.wait_if_needed('openai.com')
+    
     for attempt in range(max_retries):
         try:
             # Use the older OpenAI client format (compatible with openai==0.27.0)
-            response = openai.ChatCompletion.create(
-                model="gpt-4-turbo",
-                messages=[
-                    {
-                        "role": "user", 
-                        "content": prompt
-                    }
-                ],
-                max_tokens=2000,
-                temperature=0.3,
-                request_timeout=120
-            )
+            # Acquire semaphore to limit concurrent API calls
+            with openai_semaphore.acquire():
+                response = openai.ChatCompletion.create(
+                    model="gpt-4-turbo",
+                    messages=[
+                        {
+                            "role": "user", 
+                            "content": prompt
+                        }
+                    ],
+                    max_tokens=2000,
+                    temperature=0.3,
+                    request_timeout=120
+                )
             
             # Extract response content
             response_content = response.choices[0].message.content.strip()
@@ -576,16 +582,21 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
     # Set API key for older OpenAI client version
     openai.api_key = api_key
     
+    # Apply rate limiting before API calls
+    rate_limiter.wait_if_needed('openai.com')
+    
     try:
         logger.info(f"Making relevance-only GPT call for {make} {model}")
         
-        response = openai.ChatCompletion.create(
-            model="gpt-4-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=100,
-            temperature=0.1,
-            request_timeout=30
-        )
+        # Acquire semaphore to limit concurrent API calls
+        with openai_semaphore.acquire():
+            response = openai.ChatCompletion.create(
+                model="gpt-4-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=100,
+                temperature=0.1,
+                request_timeout=30
+            )
         
         response_content = response.choices[0].message.content.strip()
         logger.info(f"GPT relevance response: {response_content}")
@@ -619,7 +630,59 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
             return {'relevance_score': 0}
             
     except Exception as e:
+        error_msg = str(e)
         logger.error(f"Error in relevance analysis: {e}")
+        
+        # Check if it's a quota/billing/rate limit error
+        if any(x in error_msg.lower() for x in ['quota', 'billing', 'rate', 'limit', 'tpm', 'rpm']):
+            logger.warning("Quota/billing issue detected - falling back to gpt-3.5-turbo")
+            try:
+                # Apply rate limiting for fallback attempt
+                rate_limiter.wait_if_needed('openai.com')
+                
+                # Retry with cheaper model with semaphore
+                with openai_semaphore.acquire():
+                    response = openai.ChatCompletion.create(
+                        model="gpt-3.5-turbo",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=100,
+                        temperature=0.1,
+                        request_timeout=30
+                    )
+                
+                response_content = response.choices[0].message.content.strip()
+                logger.info(f"GPT relevance response (fallback model): {response_content}")
+                
+                # Parse the response (same logic as above)
+                try:
+                    import json
+                    if '{' in response_content and '}' in response_content:
+                        json_start = response_content.find('{')
+                        json_end = response_content.rfind('}') + 1
+                        json_str = response_content[json_start:json_end]
+                        result = json.loads(json_str)
+                        
+                        relevance_score = result.get('relevance_score', 0)
+                        logger.info(f"✅ Relevance analysis successful (fallback): {relevance_score}/10")
+                        return {'relevance_score': relevance_score}
+                    else:
+                        # Try to extract number from response
+                        relevance_match = re.search(r'(\d+)', response_content)
+                        if relevance_match:
+                            relevance_score = int(relevance_match.group(1))
+                            logger.info(f"✅ Extracted relevance score from text (fallback): {relevance_score}/10")
+                            return {'relevance_score': relevance_score}
+                        else:
+                            logger.warning("Could not extract relevance score from fallback response")
+                            return {'relevance_score': 0}
+                except Exception as parse_error:
+                    logger.error(f"Error parsing fallback relevance response: {parse_error}")
+                    return {'relevance_score': 0}
+                    
+            except Exception as fallback_error:
+                logger.error(f"Fallback model also failed: {fallback_error}")
+                return {'relevance_score': 0}
+        
         return {'relevance_score': 0}
 
 def _create_fallback_analysis(content: str, make: str, model: str) -> Dict[str, Any]:
@@ -753,23 +816,47 @@ class GPTAnalyzer:
         attempt = 0
         while attempt < max_retries:
             try:
-                response = openai.ChatCompletion.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_message},
-                        {"role": "user", "content": content}
-                    ],
-                    timeout=timeout,
-                    temperature=0.1,  # Low temperature for more deterministic responses
-                )
+                # Acquire semaphore to limit concurrent API calls
+                with openai_semaphore.acquire():
+                    response = openai.ChatCompletion.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": system_message},
+                            {"role": "user", "content": content}
+                        ],
+                        timeout=timeout,
+                        temperature=0.1,  # Low temperature for more deterministic responses
+                    )
                 
                 # Extract and parse the response
                 result = self._parse_gpt_response(response)
                 logger.info(f"Successfully analyzed content for {vehicle_make} {vehicle_model}")
                 return result
                 
-            except openai.error.RateLimitError:
-                logger.warning("OpenAI rate limit reached, waiting before retry")
+            except openai.error.RateLimitError as e:
+                error_msg = str(e)
+                logger.warning(f"OpenAI rate limit reached: {e}")
+                
+                # Try fallback to gpt-3.5-turbo
+                if 'gpt-4' in self.model.lower():
+                    logger.info("Falling back to gpt-3.5-turbo due to rate limit")
+                    try:
+                        with openai_semaphore.acquire():
+                            response = openai.ChatCompletion.create(
+                                model="gpt-3.5-turbo-16k",
+                                messages=[
+                                    {"role": "system", "content": system_message},
+                                    {"role": "user", "content": content}
+                                ],
+                                timeout=timeout,
+                                temperature=0.1,
+                            )
+                        result = self._parse_gpt_response(response)
+                        logger.info(f"Successfully analyzed with fallback model for {vehicle_make} {vehicle_model}")
+                        return result
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback also failed: {fallback_error}")
+                
                 time.sleep(30)  # Wait 30 seconds before retrying
                 attempt += 1
                 
@@ -784,7 +871,29 @@ class GPTAnalyzer:
                 attempt += 1
                 
             except Exception as e:
+                error_msg = str(e)
                 logger.error(f"Unexpected error during content analysis: {e}")
+                
+                # Check if it's a quota/billing error
+                if any(x in error_msg.lower() for x in ['quota', 'billing', 'exceeded']):
+                    logger.warning("Quota/billing issue detected - trying fallback to gpt-3.5-turbo")
+                    try:
+                        with openai_semaphore.acquire():
+                            response = openai.ChatCompletion.create(
+                                model="gpt-3.5-turbo-16k",
+                                messages=[
+                                    {"role": "system", "content": system_message},
+                                    {"role": "user", "content": content}
+                                ],
+                                timeout=timeout,
+                                temperature=0.1,
+                            )
+                        result = self._parse_gpt_response(response)
+                        logger.info(f"Successfully analyzed with fallback model after quota error")
+                        return result
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback also failed after quota error: {fallback_error}")
+                
                 return self._empty_result()
         
         logger.error(f"Failed to analyze content after {max_retries} attempts")
