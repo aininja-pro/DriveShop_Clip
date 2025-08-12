@@ -15,6 +15,7 @@ from src.dashboard.strategic_intelligence_json_display import display_strategic_
 from src.dashboard.message_pullthrough_clean import display_pullthrough_analysis_tab
 from src.dashboard.oem_messaging_ui import display_oem_messaging_tab
 from src.dashboard.historical_reprocessing import display_historical_reprocessing_tab
+from src.dashboard.active_jobs_tab import display_active_jobs_tab, submit_job_to_queue
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1583,7 +1584,16 @@ with st.sidebar:
     
     user = auth.get_current_user()
     if user:
-        st.markdown(f"**Logged in as:** {user.email}")
+        # Persist user email in session state for job attribution
+        try:
+            user_email = getattr(user, 'email', None) or (user.get('email') if isinstance(user, dict) else None)
+        except Exception:
+            user_email = None
+        if user_email:
+            st.session_state['user_email'] = user_email
+            st.markdown(f"**Logged in as:** {user_email}")
+        else:
+            st.markdown("**Logged in**")
     
     st.markdown("---")
 
@@ -2285,125 +2295,86 @@ with st.sidebar:
         if st.button("Process Filtered", key='process_from_url_filtered'):
             # Only proceed if data has been loaded and filtered
             if 'filtered_df' in locals() and not filtered_df.empty:
-                # Create progress tracking containers
-                progress_container = st.container()
-                with progress_container:
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    time_text = st.empty()
-                    spinner_placeholder = st.empty()
-                    
-                    # Store progress tracking in session state
-                    st.session_state['processing_progress'] = {
-                        'current': 0,
-                        'total': len(filtered_df),
-                        'start_time': time.time()
-                    }
-                    
-                    status_text.text(f"Processing 0 of {len(filtered_df)} records...")
-                    
-                    from src.ingest.ingest_database import run_ingest_database_with_filters
-                    
-                    # Convert filtered dataframe to list of records
-                    records_to_process = filtered_df.to_dict('records')
+                from datetime import datetime
+                
+                # Convert filtered dataframe to list of records
+                records_to_process = filtered_df.to_dict('records')
 
-                    # FIX: Remap dataframe columns to the format the backend expects
-                    remapped_records = []
-                    for record in records_to_process:
-                        # Split the 'Links' string into a list of URLs
-                        urls = []
-                        if 'Links' in record and pd.notna(record['Links']):
-                            urls = [url.strip() for url in str(record['Links']).split(',') if url.strip()]
+                # Remap dataframe columns to the format the backend expects
+                remapped_records = []
+                for record in records_to_process:
+                    urls = []
+                    if 'Links' in record and pd.notna(record['Links']):
+                        urls = [url.strip() for url in str(record['Links']).split(',') if url.strip()]
 
-                        remapped_records.append({
-                            'work_order': record.get('WO #'),
-                            'model': record.get('Model'),
-                            'model_short': record.get('Model Short Name'),  # CRITICAL: Add short model for hierarchical search
-                            'to': record.get('To'),
-                            'affiliation': record.get('Affiliation'),
-                            'urls': urls,
-                            'start_date': record.get('Start Date'),
-                            'make': record.get('Make'),
-                            'activity_id': record.get('ActivityID'),  # FIXED: Use ActivityID (no underscore) - this is the actual column name in source data
-                            'person_id': record.get('Person_ID'),
-                            'office': record.get('Office')
-                        })
-                    
-                    # Debug information can be logged instead of shown in UI
-                    logger.debug(f"Sending {len(remapped_records)} records to backend")
+                    # Clean up any NaN/Infinity values that can't be serialized to JSON
+                    def clean_value(val):
+                        if pd.isna(val) or (isinstance(val, float) and (val != val or val == float('inf') or val == float('-inf'))):
+                            return None
+                        return val
 
-                    # Show initial status
-                    total_records = len(remapped_records)
-                    status_text.text(f"Starting to process {total_records} records...")
-                    time_text.text("This may take several minutes. Progress may appear uneven due to varying processing times.")
+                    remapped_records.append({
+                        'work_order': clean_value(record.get('WO #')),
+                        'model': clean_value(record.get('Model')),
+                        'model_short': clean_value(record.get('Model Short Name')),
+                        'to': clean_value(record.get('To')),
+                        'affiliation': clean_value(record.get('Affiliation')),
+                        'urls': urls,
+                        'start_date': str(record.get('Start Date')) if pd.notna(record.get('Start Date')) else None,
+                        'make': clean_value(record.get('Make')),
+                        'activity_id': clean_value(record.get('ActivityID')),
+                        'person_id': clean_value(record.get('Person_ID')),
+                        'office': clean_value(record.get('Office'))
+                    })
+                
+                # Get user email for job tracking
+                user_email = st.session_state.get('user_email', 'System')
+                # Note: Jobs created by System show they were submitted via UI
+                # Jobs with 'anonymous' are a bug from worker claiming
+                
+                # Create job parameters - don't include the full records, just the URL and filters
+                job_params = {
+                    'url': loans_url,
+                    'filters': {
+                        'office': selected_office if 'selected_office' in locals() else 'All',
+                        'make': selected_make if 'selected_make' in locals() else 'All',
+                        'reporter': selected_reporter_name if 'selected_reporter_name' in locals() else 'All',
+                        'wo_numbers': wo_number_filter if 'wo_number_filter' in locals() else '',
+                        'activity_ids': activity_id_filter if 'activity_id_filter' in locals() else '',
+                        'skip_records': skip_records if 'skip_records' in locals() else 0,
+                        # Include date range for worker-side filtering
+                        'date_from': str(start_date_filter) if 'start_date_filter' in locals() and start_date_filter else None,
+                        'date_to': str(end_date_filter) if 'end_date_filter' in locals() and end_date_filter else None
+                    },
+                    'limit': limit_records if 'limit_records' in locals() else 0,
+                    'record_count': len(remapped_records)  # Just store the count for info
+                }
+                
+                # Create run name
+                run_name = f"CSV Process - {len(remapped_records)} records - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                
+                try:
+                    # Submit job to queue
+                    job_id = submit_job_to_queue(
+                        job_type='csv_upload',
+                        job_params=job_params,
+                        run_name=run_name,
+                        user_email=user_email
+                    )
                     
-                    # Add a spinner to show continuous activity
-                    with spinner_placeholder.container():
-                        with st.spinner('🔄 Processing records... (this may take a while)'):
-                            # Define progress callback that updates the UI
-                            def progress_update(current, total):
-                                # Update progress bar
-                                progress = current / total if total > 0 else 0
-                                progress_bar.progress(progress)
-                                
-                                # Update status text - just show count, no time estimates
-                                status_text.text(f"Completed {current} of {total} records ({int(progress * 100)}%)")
-                                
-                                # Show elapsed time only (no predictions)
-                                elapsed = time.time() - st.session_state['processing_progress']['start_time']
-                                time_text.text(f"Time elapsed: {format_time(elapsed)}")
+                    st.success(f"""
+                    ✅ **Job submitted successfully!**
+                    
+                    Job ID: `{job_id[:8]}...`
+                    
+                    Navigate to the **"🚀 Active Jobs"** tab to monitor progress.
+                    """)
                             
-                            # Call the backend with progress tracking
-                            success = run_ingest_database_with_filters(
-                                filtered_loans=remapped_records, 
-                                limit=limit_records,
-                                progress_callback=progress_update
-                            )
-                    
-                    # Update to show completion
-                    progress_bar.progress(1.0)
-                    status_text.text(f"✅ Completed processing {total_records} records!")
-                    elapsed = time.time() - st.session_state['processing_progress']['start_time']
-                    time_text.text(f"Total time: {format_time(elapsed)}")
-                    
-                    if success:
-                        # Store batch processing info for next batch suggestion
-                        if remapped_records:
-                            # Get the last Activity ID from the processed records
-                            processed_activity_ids = [r.get('activity_id') for r in remapped_records if r.get('activity_id')]
-                            if processed_activity_ids:
-                                last_processed_id = processed_activity_ids[-1]
-                                
-                                # Find the next Activity ID in the original data for batch suggestion
-                                original_df = st.session_state.loaded_loans_df
-                                if 'Activity_ID' in original_df.columns:
-                                    # Convert to numeric and sort to find next ID
-                                    original_df_sorted = original_df.copy()
-                                    original_df_sorted['Activity_ID_numeric'] = pd.to_numeric(original_df_sorted['Activity_ID'], errors='coerce')
-                                    original_df_sorted = original_df_sorted.dropna(subset=['Activity_ID_numeric']).sort_values('Activity_ID_numeric')
-                                    
-                                    # Find the next ID after the last processed one
-                                    last_processed_numeric = pd.to_numeric(last_processed_id, errors='coerce')
-                                    next_ids = original_df_sorted[original_df_sorted['Activity_ID_numeric'] > last_processed_numeric]['Activity_ID']
-                                    
-                                    if not next_ids.empty:
-                                        next_suggested_id = str(int(next_ids.iloc[0]))
-                                        st.session_state.batch_info = {
-                                            'last_processed_id': str(last_processed_id),
-                                            'next_suggested_id': next_suggested_id,
-                                            'records_processed': len(remapped_records),
-                                            'timestamp': datetime.now().strftime("%H:%M:%S")
-                                        }
-                        
-                        st.session_state.last_run_timestamp = datetime.now()
-                        # Clear cache so Bulk Review shows new clips
-                        st.cache_data.clear()
-                        st.rerun()
-                    else:
-                        st.error("❌ Filtered processing failed.")
+                except Exception as e:
+                    st.error(f"❌ Failed to submit job: {str(e)}")
+                    logger.error(f"Job submission failed: {e}", exc_info=True)
             else:
                 st.warning("No data loaded or no records match filters. Please load data first.")
-            
     if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
         info = st.session_state.get('loans_data_info', {})
         st.markdown(f"📊 Data loaded: **{info.get('total_records', 0)}** total records, **{info.get('offices_count', 0)}** offices, **{info.get('makes_count', 0)}** makes")
@@ -2446,8 +2417,9 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, export_tab = st.tabs([
-    "Bulk Review", 
+active_jobs_tab, bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, export_tab = st.tabs([
+    "Active Jobs",
+    "Bulk Review",
     "Approved Queue",
     "Rejected/Issues", 
     "Strategic Intelligence",
@@ -2458,6 +2430,10 @@ bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab
 ])
 
 # ========== CREATORIQ TAB ========== (REMOVED)
+
+# ========== ACTIVE JOBS TAB ==========
+with active_jobs_tab:
+    display_active_jobs_tab()
 
 # ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_review_tab:

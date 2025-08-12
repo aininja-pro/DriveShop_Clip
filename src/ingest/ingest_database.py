@@ -242,7 +242,25 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
     # Collect results from all URLs to pick the best one
     all_results = []
     
+    # Lazy import to avoid circulars; used for cancellation checks
+    from src.utils.database import get_database as _get_db
+    db_for_cancel = None
+    try:
+        db_for_cancel = _get_db()
+    except Exception:
+        db_for_cancel = None
+
     for url in urls:
+        # Cooperative cancellation: check DB before each heavy URL processing
+        try:
+            if db_for_cancel and run_id:
+                status_result = db_for_cancel.supabase.table('processing_runs').select('job_status').eq('id', run_id).single().execute()
+                if status_result.data and status_result.data.get('job_status') == 'cancelled':
+                    logger.info(f"Cancellation detected for run {run_id} before processing URL; aborting loan {wo_number}")
+                    raise Exception("Job cancelled by user")
+        except Exception:
+            # If status check fails, continue; do not crash
+            pass
         # Redirect MotorTrend automobilemag URLs to car-reviews
         if 'motortrend.com/automobilemag' in url:
             original_url = url
@@ -278,8 +296,18 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
             
         # Process the URL based on platform
         try:
+            # Helper to reuse in nested calls
+            def _cancelled():
+                try:
+                    if db_for_cancel and run_id:
+                        st = db_for_cancel.supabase.table('processing_runs').select('job_status').eq('id', run_id).single().execute()
+                        return bool(st.data and st.data.get('job_status') == 'cancelled')
+                except Exception:
+                    return False
+                return False
+
             if 'youtube.com' in url or 'youtu.be' in url:
-                result = process_youtube_url(url, loan)
+                result = process_youtube_url(url, loan, cancel_check=_cancelled)
             elif 'tiktok.com' in url or 'vm.tiktok.com' in url:
                 # Import the TikTok processing function
                 from src.ingest.ingest import process_tiktok_url
@@ -289,11 +317,14 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
                 from src.ingest.ingest import process_instagram_url
                 result = process_instagram_url(url, loan)
             else:
-                result = process_web_url(url, loan)
+                result = process_web_url(url, loan, cancel_check=_cancelled)
             
             if result and (result.get('clip_url') or result.get('url')):
                 all_results.append((url, result))
         except Exception as e:
+            # Bubble up cancellation quickly
+            if 'cancelled by user' in str(e).lower():
+                raise
             logger.error(f"❌ Error processing URL {url}: {e}")
             # Continue processing other URLs even if this one fails
     
@@ -569,6 +600,16 @@ async def process_loans_database_concurrent(
     results = []
     for i, task in enumerate(asyncio.as_completed(tasks)):
         try:
+            # Cooperative cancellation: check job status before awaiting each task
+            try:
+                current_run = db.supabase.table('processing_runs').select('job_status').eq('id', run_id).single().execute()
+                if current_run.data and current_run.data.get('job_status') == 'cancelled':
+                    logger.info(f"Run {run_id} cancelled - stopping further processing")
+                    break
+            except Exception:
+                # If we can't read status, continue but don't crash
+                pass
+
             result = await task
             results.append(result)
             

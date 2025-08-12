@@ -559,7 +559,7 @@ def load_loans_data(file_path: str) -> List[Dict[str, Any]]:
         logger.error(f"Error loading loans data from {file_path}: {e}")
         return []
 
-def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def process_youtube_url(url: str, loan: Dict[str, Any], cancel_check: Optional[callable] = None) -> Optional[Dict[str, Any]]:
     """
     Process a YouTube URL to extract video content with date filtering.
     Implements graceful degradation: 90 days -> 180 days if nothing found.
@@ -572,6 +572,9 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         Dictionary with video content or None if not found
     """
     try:
+        # Early cancellation
+        if cancel_check and cancel_check():
+            raise Exception("Job cancelled by user")
         # Import the new fallback function
         from src.utils.youtube_handler import get_video_metadata_fallback
         
@@ -579,6 +582,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         video_id = extract_video_id(url)
         
         if video_id:
+            if cancel_check and cancel_check():
+                raise Exception("Job cancelled by user")
             # Direct video URL - get metadata first to check upload date
             logger.info(f"Processing YouTube video: {url}")
             metadata = get_video_metadata_fallback(video_id)
@@ -620,6 +625,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                     return None
             
             # If date is acceptable, proceed with content extraction
+            if cancel_check and cancel_check():
+                raise Exception("Job cancelled by user")
             transcript = get_transcript(video_id, video_url=url)
             
             if transcript:
@@ -651,6 +658,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                     return None
         
         # If not a direct video, try as a channel
+        if cancel_check and cancel_check():
+            raise Exception("Job cancelled by user")
         channel_id = get_channel_id(url)
         
         if not channel_id:
@@ -662,6 +671,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         videos = []
         if channel_id:
             logger.info(f"Fetching latest videos for channel: {channel_id}")
+            if cancel_check and cancel_check():
+                raise Exception("Job cancelled by user")
             videos = get_latest_videos(channel_id, max_videos=25)
             
             if not videos:
@@ -729,9 +740,13 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         days_attempted = [90, 180]  # Graceful degradation: 90 days forward, then 180 days forward
         
         for days_forward in days_attempted:
+            if cancel_check and cancel_check():
+                raise Exception("Job cancelled by user")
             logger.info(f"Looking for YouTube videos within {days_forward} days forward of start date")
             
             for video in videos:
+                if cancel_check and cancel_check():
+                    raise Exception("Job cancelled by user")
                 video_title = video.get('title', '').lower()
                 logger.info(f"Checking video: {video['title']}")
                 
@@ -773,6 +788,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                             video_id = video['video_id']
                             
                             # Always fetch metadata to get the date from the video page
+                            if cancel_check and cancel_check():
+                                raise Exception("Job cancelled by user")
                             metadata = get_video_metadata_fallback(video_id, known_title=video['title'])
                             
                             # Extract date from metadata if we don't have one from RSS
@@ -783,6 +800,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                                 if video_date:
                                     logger.info(f"📅 Extracted date from video metadata: {video_date}")
                             
+                            if cancel_check and cancel_check():
+                                raise Exception("Job cancelled by user")
                             transcript = get_transcript(video_id, video_url=video['url'])
                             
                             if transcript:
@@ -876,6 +895,8 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
                         continue
                     
                     # Only try transcript as fallback if metadata failed
+                    if cancel_check and cancel_check():
+                        raise Exception("Job cancelled by user")
                     transcript = get_transcript(video_id, video_url=video_info['url'])
                     if transcript:
                         logger.info(f"✅ ScrapFly + transcript success: {video_info['title']}")
@@ -942,7 +963,7 @@ def process_youtube_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, An
         logger.error(f"Error processing YouTube URL {url}: {e}")
         return None
 
-def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def process_web_url(url: str, loan: Dict[str, Any], cancel_check: Optional[callable] = None) -> Optional[Dict[str, Any]]:
     """
     Process a web URL to extract article content with date filtering.
     Implements graceful degradation: 90 days -> 180 days if nothing found.
@@ -955,6 +976,8 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         Dictionary with article content or None if not found
     """
     try:
+        if cancel_check and cancel_check():
+            raise Exception("Job cancelled by user")
         # Redirect MotorTrend automobilemag URLs to car-reviews
         if 'motortrend.com/automobilemag' in url:
             original_url = url
@@ -989,6 +1012,8 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         start_date = loan.get('start_date')
         
         # Use the new enhanced crawler with 5-tier escalation and hierarchical search
+        if cancel_check and cancel_check():
+            raise Exception("Job cancelled by user")
         result = crawler_manager.crawl_url(
             url=url,
             make=make,
@@ -1006,6 +1031,8 @@ def process_web_url(url: str, loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             return None
         
         # Extract publication date for both logging and saving to results
+        if cancel_check and cancel_check():
+            raise Exception("Job cancelled by user")
         html_content = result.get('content', '')
         final_url = result.get('url', url)
         published_date = None
