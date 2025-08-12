@@ -24,8 +24,10 @@ class RateLimiter:
         })
         
         # Default limits for common services
+        # OpenAI Tier 1: gpt-4-turbo = 500 RPM, gpt-3.5-turbo = 3500 RPM
+        # Set to 80% of limit to be safe
         self.default_rates = {
-            'openai.com': {'rate': 5, 'per': 60},  # 5 requests per minute
+            'openai.com': {'rate': 400, 'per': 60},  # 400 requests per minute (80% of 500 RPM for gpt-4-turbo)
             'youtube.com': {'rate': 10, 'per': 60},  # 10 requests per minute
             'default': {'rate': 1, 'per': 2}  # 1 request per 2 seconds for unknown domains
         }

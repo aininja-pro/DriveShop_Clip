@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from src.utils.logger import setup_logger
 from src.utils.rate_limiter import rate_limiter
 from src.utils.content_extractor import extract_article_content
+from src.utils.openai_semaphore import openai_semaphore
 
 logger = setup_logger(__name__)
 
@@ -226,21 +227,26 @@ def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None,
     # Set API key for older OpenAI client version
     openai.api_key = api_key
     
+    # Apply rate limiting before API calls
+    rate_limiter.wait_if_needed('openai.com')
+    
     for attempt in range(max_retries):
         try:
-            # Use the older OpenAI client format (compatible with openai==0.27.0)
-            response = openai.ChatCompletion.create(
-                model="gpt-4-turbo",
-                messages=[
-                    {
-                        "role": "user", 
-                        "content": prompt
-                    }
-                ],
-                max_tokens=2000,
-                temperature=0.3,
-                request_timeout=120
-            )
+            # Acquire semaphore to limit concurrent API calls
+            with openai_semaphore.acquire():
+                # Use the older OpenAI client format (compatible with openai==0.27.0)
+                response = openai.ChatCompletion.create(
+                    model="gpt-4-turbo",
+                    messages=[
+                        {
+                            "role": "user", 
+                            "content": prompt
+                        }
+                    ],
+                    max_tokens=2000,
+                    temperature=0.3,
+                    request_timeout=120
+                )
             
             # Extract response content
             response_content = response.choices[0].message.content.strip()
@@ -299,13 +305,72 @@ def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None,
                 return None
                 
         except Exception as e:
+            error_msg = str(e)
             logger.error(f"Error in enhanced analysis (attempt {attempt + 1}/{max_retries}): {e}")
+            
+            # Check if it's a quota/billing/rate limit error
+            if any(x in error_msg.lower() for x in ['quota', 'billing', 'rate', 'limit', 'tpm', 'rpm']):
+                logger.warning("Quota/billing issue detected - falling back to gpt-3.5-turbo")
+                try:
+                    # Apply rate limiting for fallback attempt
+                    rate_limiter.wait_if_needed('openai.com')
+                    
+                    # Retry with cheaper model with semaphore
+                    with openai_semaphore.acquire():
+                        response = openai.ChatCompletion.create(
+                            model="gpt-3.5-turbo-16k",  # Use 16k for longer content
+                            messages=[
+                                {
+                                    "role": "user", 
+                                    "content": prompt
+                                }
+                            ],
+                            max_tokens=2000,
+                            temperature=0.3,
+                            request_timeout=120
+                        )
+                    
+                    # Process response same as above
+                    response_content = response.choices[0].message.content.strip()
+                    logger.info(f"Received enhanced analysis response from OpenAI (fallback model)")
+                    
+                    # Parse JSON response
+                    if response_content.startswith('```json'):
+                        response_content = response_content[7:]
+                    if response_content.endswith('```'):
+                        response_content = response_content[:-3]
+                    
+                    analysis_result = json.loads(response_content.strip())
+                    
+                    if analysis_result:
+                        # Add same processing as successful response above
+                        features_count = len(analysis_result.get('key_features_mentioned', []))
+                        attributes_count = len(analysis_result.get('brand_attributes_captured', []))
+                        drivers_count = len(analysis_result.get('purchase_drivers', []))
+                        
+                        relevance_score = min(10, max(1, 
+                            3 + min(4, features_count) + min(2, attributes_count) + min(1, drivers_count)
+                        ))
+                        
+                        analysis_result['relevance_score'] = relevance_score
+                        analysis_result['summary'] = analysis_result.get('sentiment_classification', {}).get('rationale', '')
+                        
+                        brand_sentiments = [attr.get('sentiment', 'neutral') for attr in analysis_result.get('brand_attributes_captured', [])]
+                        positive_brand = sum(1 for s in brand_sentiments if s == 'reinforced')
+                        negative_brand = sum(1 for s in brand_sentiments if s == 'challenged')
+                        analysis_result['brand_alignment'] = positive_brand > negative_brand
+                        
+                        return analysis_result
+                except Exception as fallback_error:
+                    logger.error(f"Fallback model also failed: {fallback_error}")
             
             if attempt < max_retries - 1:
                 # Exponential backoff
                 wait_time = 2 ** attempt
                 logger.info(f"Retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
+                # Apply rate limiting before retry
+                rate_limiter.wait_if_needed('openai.com')
             else:
                 logger.error(f"Failed after {max_retries} attempts, cannot analyze content")
                 return None

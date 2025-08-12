@@ -5,10 +5,15 @@ Allows manual input and file/URL extraction
 import streamlit as st
 import json
 from datetime import datetime
-from src.utils.database import DatabaseManager
+from src.utils.database import get_database
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+# Use cached database connection
+@st.cache_resource
+def get_cached_db():
+    return get_database()
 
 def display_oem_messaging_tab():
     """Display the OEM Messaging input interface"""
@@ -235,7 +240,7 @@ def display_pdf_extraction():
                             
                             try:
                                 # Check if exists and update
-                                db = DatabaseManager()
+                                db = get_cached_db()
                                 existing = db.supabase.table('oem_model_messaging')\
                                     .select('id')\
                                     .eq('make', model_data['make'])\
@@ -302,7 +307,7 @@ def display_url_extraction():
 def save_oem_messaging(data):
     """Save OEM messaging to database"""
     try:
-        db = DatabaseManager()
+        db = get_cached_db()
         
         # Create source record
         source_data = {
@@ -381,7 +386,7 @@ def display_existing_messages():
     """Show existing OEM messages in the database"""
     st.markdown("### 📚 Existing OEM Messages")
     
-    db = DatabaseManager()
+    db = get_cached_db()
     messages = db.supabase.table('oem_model_messaging').select('*').order('created_at', desc=True).execute()
     
     if messages.data:

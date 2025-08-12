@@ -16,6 +16,7 @@ from src.dashboard.message_pullthrough_clean import display_pullthrough_analysis
 from src.dashboard.oem_messaging_ui import display_oem_messaging_tab
 from src.dashboard.historical_reprocessing import display_historical_reprocessing_tab
 from src.dashboard.active_jobs_tab import display_active_jobs_tab, submit_job_to_queue
+from src.dashboard.cooldown_management import display_cooldown_management_tab
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -2417,7 +2418,7 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-active_jobs_tab, bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, export_tab = st.tabs([
+active_jobs_tab, bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, cooldown_tab, export_tab = st.tabs([
     "Active Jobs",
     "Bulk Review",
     "Approved Queue",
@@ -2426,6 +2427,7 @@ active_jobs_tab, bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab
     "Message Pull-Through",
     "OEM Messaging",
     "Re-Process Historical",
+    "Cooldown Mgmt",
     "Export"
 ])
 
@@ -5992,6 +5994,11 @@ with oem_tab:
 with reprocess_tab:
     # The function handles its own database connection
     display_historical_reprocessing_tab()
+
+# ========== COOLDOWN MANAGEMENT TAB ==========
+with cooldown_tab:
+    # Display the cooldown management interface
+    display_cooldown_management_tab()
 
 # ========== EXPORT TAB ==========
 with export_tab:
