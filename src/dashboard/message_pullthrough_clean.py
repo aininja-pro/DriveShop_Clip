@@ -4,7 +4,7 @@ Clean Message Pull-Through Analysis - Side-by-side comparison view
 import streamlit as st
 import pandas as pd
 import json
-from src.utils.database import DatabaseManager
+from src.utils.database import get_database
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -15,7 +15,12 @@ def display_pullthrough_analysis_tab():
     st.markdown("Compare OEM intended messages vs. actual media coverage")
     st.markdown("---")
     
-    db = DatabaseManager()
+    # Use cached database connection
+    @st.cache_resource
+    def get_cached_db():
+        return get_database()
+    
+    db = get_cached_db()
     
     # Initialize session state
     if 'pullthrough_analysis_active' not in st.session_state:
@@ -23,11 +28,53 @@ def display_pullthrough_analysis_tab():
     if 'selected_vehicle' not in st.session_state:
         st.session_state.selected_vehicle = None
     
-    # Get OEM messages
-    oem_messages = db.supabase.table('oem_model_messaging').select('*').order('make, model, year').execute()
+    # Cache OEM messages for 5 minutes - return just the data
+    @st.cache_data(ttl=300, show_spinner=False)
+    def load_oem_messages():
+        # Lightweight projection for initial UI population
+        result = db.supabase.table('oem_model_messaging')\
+            .select('id, make, model, year')\
+            .order('make, model, year')\
+            .limit(500)\
+            .execute()
+        return result.data if result.data else []
     
-    if not oem_messages.data:
-        st.warning("No OEM messaging found. Please add OEM messages first.")
+    # Get OEM messages with caching
+    try:
+        with st.spinner("Loading OEM messages..."):
+            oem_messages_data = load_oem_messages()
+        
+        # Only show debug in development mode
+        if st.checkbox("Show Debug Info", value=False, key="debug_mode"):
+            st.sidebar.markdown("### Debug Info")
+            st.sidebar.write(f"OEM records found: {len(oem_messages_data)}")
+        
+        if not oem_messages_data:
+            st.warning("No OEM messaging found. Please add OEM messages first.")
+            
+            # Show more debug info
+            st.info("Checking database connection...")
+            
+            # Try a simpler query to test connection
+            test_query = db.supabase.table('oem_model_messaging').select('count', count='exact').execute()
+            st.write(f"Table exists with {test_query.count} total records")
+            
+            # Check if this is an RLS issue
+            st.info("💡 This might be a Row Level Security (RLS) issue. The table exists but no rows are visible.")
+            st.info("To fix: Check if RLS is enabled on 'oem_model_messaging' table in Supabase and add appropriate policies.")
+            
+            # Try to show what tables we CAN access
+            st.markdown("### Tables we can access:")
+            try:
+                clips_test = db.supabase.table('clips').select('count', count='exact').execute()
+                st.write(f"✅ clips table: {clips_test.count} records")
+            except:
+                st.write("❌ clips table: Cannot access")
+            
+            return
+    except Exception as e:
+        st.error(f"Error querying OEM messages: {str(e)}")
+        logger.error(f"Database query error: {str(e)}")
         return
     
     # Vehicle selector
@@ -36,7 +83,7 @@ def display_pullthrough_analysis_tab():
     with col1:
         # Create unique model list
         model_options = []
-        for msg in oem_messages.data:
+        for msg in oem_messages_data:
             option = f"{msg['make']} {msg['model']} ({msg['year']})"
             if option not in model_options:
                 model_options.append(option)
@@ -52,10 +99,14 @@ def display_pullthrough_analysis_tab():
             make = make_model[0]
             model = make_model[1]
             
-            # Get matching reviews
-            reviews = db.supabase.table('clips').select('wo_number, media_outlet, published_date').eq('make', make).like('model', f"{model}%").eq('sentiment_completed', True).execute()
+            # Cache review counts
+            @st.cache_data(ttl=300, show_spinner=False)
+            def get_review_count(make, model):
+                result = db.supabase.table('clips').select('count', count='exact').eq('make', make).like('model', f"{model}%").eq('sentiment_completed', True).execute()
+                return result.count
             
-            st.metric("Reviews with Sentiment", len(reviews.data))
+            review_count = get_review_count(make, model)
+            st.metric("Reviews with Sentiment", review_count)
     
     if selected_model != "Choose..." and st.button("🔍 Analyze Pull-Through", type="primary"):
         st.session_state.pullthrough_analysis_active = True
@@ -71,28 +122,39 @@ def analyze_model_pullthrough(make, model, year, db):
     
     with st.spinner("Analyzing message pull-through..."):
         
-        # Get OEM messaging
-        oem_data = db.supabase.table('oem_model_messaging').select('*').eq('make', make).eq('model', model).eq('year', year).single().execute()
+        # Cache OEM messaging and reviews - return just the data
+        @st.cache_data(ttl=300, show_spinner=False)
+        def get_vehicle_data(make, model, year):
+            oem_result = db.supabase.table('oem_model_messaging')\
+                .select('id, make, model, year, messaging_data_enhanced')\
+                .eq('make', make).eq('model', model).eq('year', year)\
+                .single().execute()
+            reviews_result = db.supabase.table('clips')\
+                .select('id, wo_number, make, model, media_outlet, published_date, sentiment_data_enhanced, clip_url')\
+                .eq('make', make).like('model', f"{model}%").eq('sentiment_completed', True)\
+                .limit(500)\
+                .execute()
+            return oem_result.data, reviews_result.data if reviews_result.data else []
         
-        if not oem_data.data:
+        with st.spinner(f"Loading data for {make} {model}..."):
+            oem_data, reviews_data = get_vehicle_data(make, model, year)
+        
+        if not oem_data:
             st.error("OEM messaging not found")
             return
         
-        # Get reviews
-        reviews = db.supabase.table('clips').select('*').eq('make', make).like('model', f"{model}%").eq('sentiment_completed', True).execute()
-        
-        if not reviews.data:
+        if not reviews_data:
             st.warning(f"No reviews found for {make} {model}")
             return
         
         # Parse OEM messaging
         try:
-            oem_messaging = json.loads(oem_data.data['messaging_data_enhanced'])
+            oem_messaging = json.loads(oem_data['messaging_data_enhanced'])
         except:
             st.error("Error parsing OEM messaging data")
             return
         
-        st.success(f"Found {len(reviews.data)} review(s) to analyze")
+        st.success(f"Found {len(reviews_data)} review(s) to analyze")
         
         # Show OEM messaging overview
         st.markdown("### 📢 OEM Intended Messaging")
@@ -122,40 +184,41 @@ def analyze_model_pullthrough(make, model, year, db):
         # Review selector - compact dropdown
         st.markdown("### 📰 Select Review to Analyze")
         
-        # Filter reviews to only those with valid enhanced sentiment data
-        valid_reviews = []
-        for r in reviews.data:
-            if r.get('sentiment_data_enhanced'):
-                try:
-                    data = json.loads(r['sentiment_data_enhanced'])
-                    if 'key_features_mentioned' in data:  # Check for new format
-                        valid_reviews.append(r)
-                except:
-                    continue
+        # Quick review analysis
+        reviews_with_enhanced = sum(1 for r in reviews_data if r.get('sentiment_data_enhanced'))
         
-        if not valid_reviews:
-            st.error("No reviews found with enhanced sentiment analysis. Please run sentiment analysis on some reviews first.")
+        # Only show debug if enabled
+        if st.session_state.get('debug_mode', False):
+            st.sidebar.markdown("### Review Analysis")
+            st.sidebar.write(f"Total: {len(reviews_data)}")
+            st.sidebar.write(f"Enhanced: {reviews_with_enhanced}")
+        
+        # Show ALL reviews, marking which have enhanced sentiment
+        if not reviews_data:
+            st.error("No reviews found for this vehicle.")
             return
         
-        # Show count difference if applicable
-        if len(valid_reviews) < len(reviews.data):
-            st.info(f"📌 {len(valid_reviews)} of {len(reviews.data)} reviews have enhanced sentiment data. Others need re-processing.")
+        # Instead of filtering out, show all and mark status
+        st.info(f"Found {len(reviews_data)} reviews. {reviews_with_enhanced} have enhanced sentiment analysis.")
         
-        # Create review options
-        review_options = [
-            f"{r['media_outlet']} - {r['wo_number']} ({r['published_date']})"
-            for r in valid_reviews
-        ]
+        # Create review options showing ALL reviews with status indicators
+        review_options = []
+        review_dict = {}  # To map display string to review data
         
-        selected_review_idx = st.selectbox(
+        for r in reviews_data:
+            has_enhanced = "✅" if r.get('sentiment_data_enhanced') else "❌"
+            option = f"{has_enhanced} {r.get('media_outlet', 'Unknown')} - {r.get('wo_number', 'No WO')} - {r.get('published_date', 'No date')[:10]}"
+            review_options.append(option)
+            review_dict[option] = r
+        
+        selected_review_str = st.selectbox(
             "Choose a review:",
-            range(len(review_options)),
-            format_func=lambda x: review_options[x],
+            review_options,
             key="review_selector"
         )
         
-        if selected_review_idx is not None:
-            selected_review = valid_reviews[selected_review_idx]
+        if selected_review_str:
+            selected_review = review_dict[selected_review_str]
             
             try:
                 review_data = json.loads(selected_review['sentiment_data_enhanced'])

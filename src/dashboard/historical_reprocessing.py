@@ -118,32 +118,45 @@ def display_grid_fragment(display_df, clips, db, get_reprocessing_clips_func):
 # Removed show_processing_dialog - processing now happens in the fragment
 
 
-def display_historical_reprocessing_tab():
-    """Display the Historical Clips Re-Processing interface"""
+def display_historical_reprocessing_tab(db=None):
+    """Display the Historical Clips Re-Processing interface
+    
+    Args:
+        db: Optional database connection. If not provided, will create one.
+    """
     
     st.markdown("Re-process historical clips with enhanced Message Pull-Through sentiment analysis")
     
-    # Initialize session state
+    # Initialize session state - ALWAYS reset on page load to prevent background processing
     if 'reprocess_queue' not in st.session_state:
         st.session_state.reprocess_queue = []
     if 'reprocess_status' not in st.session_state:
         st.session_state.reprocess_status = 'idle'  # idle, processing, completed
+    else:
+        # Reset status if it was processing (prevent auto-continue on restart)
+        if st.session_state.reprocess_status == 'processing':
+            st.session_state.reprocess_status = 'idle'
+            st.warning("⚠️ Previous processing was interrupted. Please select clips and start again.")
+    
     if 'reprocess_progress' not in st.session_state:
         st.session_state.reprocess_progress = {'current': 0, 'total': 0, 'succeeded': 0, 'failed': 0}
     if 'reprocess_page' not in st.session_state:
         st.session_state.reprocess_page = 1
     
-    # Use cached database connection - EXACTLY like Approved Queue
-    @st.cache_resource
-    def get_cached_db():
-        return get_database()
-    
-    db = get_cached_db()
+    # Use provided database connection or create one
+    if db is None:
+        # Only create if not provided
+        @st.cache_resource
+        def get_cached_db():
+            return get_database()
+        
+        db = get_cached_db()
     
     # Load clips with cache - EXACTLY like Approved Queue
-    @st.cache_data
+    @st.cache_data(ttl=300, show_spinner=False)
     def get_reprocessing_clips():
-        return load_clips_for_reprocessing(db, True)  # Only get clips that need work
+        # Only get clips that need work; cached for snappy tab load
+        return load_clips_for_reprocessing(db, True)
     
     clips = get_reprocessing_clips()
     
@@ -176,22 +189,58 @@ def display_historical_reprocessing_tab():
 def load_clips_for_reprocessing(db, only_needs_reprocessing: bool = False) -> List[Dict[str, Any]]:
     """Load approved clips that might need reprocessing with a reasonable limit"""
     try:
-        # Start with a basic query - use * like other tabs
-        query = db.supabase.table('clips').select('*').eq('status', 'approved')
+        # More selective query - only get necessary columns first
+        # Note: removed 'year' and 'trim' as they don't exist in clips table
+        columns = 'id, wo_number, make, model, published_date, sentiment_completed, sentiment_version, sentiment_data_enhanced, status, processed_date, media_outlet, clip_url, extracted_content'
         
-        if only_needs_reprocessing:
-            # Only get clips that need reprocessing
-            query = query.or_('sentiment_data_enhanced.is.null,sentiment_version.eq.v1,sentiment_completed.eq.false')
+        # Get recent approved clips - smaller batch to avoid timeout
+        query = db.supabase.table('clips').select(columns).eq('status', 'approved')
         
-        # Limit to reasonable amount for performance
-        result = query.order('processed_date', desc=True).limit(500).execute()
+        # Order by processed_date and limit to avoid timeout
+        result = query.order('processed_date', desc=True).limit(200).execute()
         
-        return result.data
+        if only_needs_reprocessing and result.data:
+            # Filter in Python instead of complex SQL
+            filtered_clips = []
+            for clip in result.data:
+                # Check if needs reprocessing
+                needs_work = False
+                
+                # Check various conditions
+                if not clip.get('sentiment_completed'):
+                    needs_work = True  # Never analyzed
+                elif not clip.get('sentiment_data_enhanced'):
+                    needs_work = True  # Missing enhanced data
+                elif clip.get('sentiment_version') == 'v1':
+                    needs_work = True  # Old version
+                
+                if needs_work:
+                    filtered_clips.append(clip)
+            
+            # If we need more data for a full clip, fetch it separately
+            # This is more efficient than fetching everything upfront
+            return filtered_clips[:100]  # Limit to 100 to keep UI responsive
+        
+        return result.data[:100] if result.data else []
     
     except Exception as e:
-        logger.error(f"Failed to load clips: {e}")
-        st.error(f"Failed to load clips: {str(e)}")
-        return []
+        error_msg = str(e)
+        logger.error(f"Failed to load clips: {error_msg}")
+        
+        # Check for specific timeout error
+        if '57014' in error_msg or 'timeout' in error_msg.lower():
+            st.error("⏱️ Database query timed out. Loading a smaller dataset...")
+            # Try with even smaller limit
+            try:
+                columns = 'id, wo_number, make, model, published_date, sentiment_completed, sentiment_version, status'
+                result = db.supabase.table('clips').select(columns).eq('status', 'approved').limit(50).execute()
+                return result.data if result.data else []
+            except:
+                st.error("Unable to load clips. Please try again later.")
+                return []
+        else:
+            st.error(f"Failed to load clips: {error_msg}")
+            return []
 
 
 def prepare_display_dataframe_for_grid(clips: List[Dict[str, Any]]) -> pd.DataFrame:
@@ -245,6 +294,11 @@ def get_status_color(status: str) -> str:
 def process_clips_queue(db, all_clips: List[Dict[str, Any]], queue_ids: List[str]):
     """Process the selected clips with enhanced sentiment analysis"""
     
+    # Safety check - don't process if no clips selected
+    if not queue_ids:
+        logger.warning("process_clips_queue called with no queue_ids")
+        return
+    
     # Update status
     st.session_state.reprocess_status = 'processing'
     st.session_state.reprocess_progress = {
@@ -255,8 +309,27 @@ def process_clips_queue(db, all_clips: List[Dict[str, Any]], queue_ids: List[str
         'current_clip': ''
     }
     
-    # Get clips to process
-    clips_to_process = [c for c in all_clips if c['id'] in queue_ids]
+    # Get clips to process - fetch full data if needed
+    clips_to_process = []
+    for clip_id in queue_ids:
+        # First check if we have the clip in our list
+        clip = next((c for c in all_clips if c['id'] == clip_id), None)
+        
+        if clip:
+            # Check if we have extracted_content, if not fetch full clip
+            if not clip.get('extracted_content'):
+                try:
+                    # Fetch full clip data
+                    full_clip_result = db.supabase.table('clips').select('*').eq('id', clip_id).single().execute()
+                    if full_clip_result.data:
+                        clips_to_process.append(full_clip_result.data)
+                    else:
+                        clips_to_process.append(clip)  # Use partial data
+                except Exception as e:
+                    logger.error(f"Failed to fetch full clip data for {clip_id}: {e}")
+                    clips_to_process.append(clip)  # Use partial data
+            else:
+                clips_to_process.append(clip)
     
     # Create a progress dialog
     with st.container():

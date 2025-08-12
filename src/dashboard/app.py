@@ -5944,10 +5944,31 @@ with analysis_tab:
     try:
         # Use the already cached database instance instead of getting a new one
         # db is already available from the main cached database instance
-        
-        # Load data from database for analysis (all approved clips with sentiment)
-        sentiment_result = db.supabase.table('clips').select('*').eq('sentiment_completed', True).execute()
-        sentiment_clips = sentiment_result.data if sentiment_result.data else []
+
+        # Cached lightweight fetch (projection + limit) to speed initial render
+        @st.cache_data(ttl=300, show_spinner=False)
+        def load_sentiment_clips():
+            projection = 'wo_number, make, model, contact, media_outlet, overall_sentiment, published_date, sentiment_data_enhanced, clip_url'
+            result = (
+                db.supabase
+                .table('clips')
+                .select(projection)
+                .eq('sentiment_completed', True)
+                .order('published_date', desc=True)
+                .limit(500)
+                .execute()
+            )
+            return result.data if result.data else []
+
+        # Optional refresh to bust the cache explicitly
+        refresh_col1, _ = st.columns([1, 5])
+        with refresh_col1:
+            if st.button('🔄 Refresh Data', key='refresh_strategic_cache'):
+                load_sentiment_clips.clear()
+                st.rerun()
+
+        with st.spinner('Loading clips with sentiment...'):
+            sentiment_clips = load_sentiment_clips()
         
         # Use the new single column display
         display_strategic_intelligence_tab(sentiment_clips)

@@ -67,13 +67,17 @@ def display_strategic_intelligence_tab(sentiment_clips):
     st.markdown("---")
     info_cols = st.columns(4)
     with info_cols[0]:
-        st.markdown(f"**👤 Media Contact**  \n{selected_clip.get('contact_first_name', '')} {selected_clip.get('contact_last_name', '')}")
+        # Support either split name fields or a single 'contact' field
+        contact_name = selected_clip.get('contact') or f"{selected_clip.get('contact_first_name', '')} {selected_clip.get('contact_last_name', '')}".strip()
+        st.markdown(f"**👤 Media Contact**  \n{contact_name or 'Unknown'}")
     with info_cols[1]:
         st.markdown(f"**📰 Publication**  \n{selected_clip.get('media_outlet', 'N/A')}")
     with info_cols[2]:
         st.markdown(f"**🚗 Vehicle**  \n{selected_clip.get('make', '')} {selected_clip.get('model', '')}")
     with info_cols[3]:
-        st.markdown(f"**📅 Date**  \n{selected_clip.get('publish_date', 'N/A')}")
+        # Support both publish_date and published_date
+        date_val = selected_clip.get('publish_date') or selected_clip.get('published_date') or 'N/A'
+        st.markdown(f"**📅 Date**  \n{date_val}")
     
     st.markdown("---")
     
