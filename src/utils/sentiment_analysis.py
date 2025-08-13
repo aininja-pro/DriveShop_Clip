@@ -59,18 +59,25 @@ class SentimentAnalyzer:
                     'video_title' in content.lower() or 'channel_name' in content.lower()
                 )
                 
-                # If content is too short (likely just metadata), re-extract
+                # If content is too short (likely just metadata), try to re-extract
                 if not content or len(content) < 1000 or is_metadata:
-                    logger.info(f"YouTube clip {clip_data.get('wo_number')} has insufficient content ({len(content or '')} chars), re-extracting...")
+                    logger.info(f"YouTube clip {clip_data.get('wo_number')} has insufficient content ({len(content or '')} chars), attempting re-extraction...")
                     
                     video_id = extract_video_id(clip_data.get('clip_url', ''))
                     if video_id:
-                        # Re-extract with Whisper fallback
-                        new_content = get_transcript(video_id, video_url=clip_data.get('clip_url', ''), use_whisper_fallback=True)
-                        
-                        if new_content and len(new_content) > len(content or ''):
-                            logger.info(f"✅ Re-extracted YouTube content: {len(new_content)} chars (was {len(content or '')} chars)")
-                            content = new_content
+                        try:
+                            # Re-extract with Whisper fallback - but with timeout protection
+                            new_content = get_transcript(video_id, video_url=clip_data.get('clip_url', ''), use_whisper_fallback=True)
+                            
+                            if new_content and len(new_content) > len(content or ''):
+                                logger.info(f"✅ Re-extracted YouTube content: {len(new_content)} chars (was {len(content or '')} chars)")
+                                content = new_content
+                            else:
+                                logger.warning(f"Re-extraction failed or returned no better content, using original {len(content or '')} chars")
+                        except Exception as e:
+                            logger.error(f"Failed to re-extract YouTube content: {e}")
+                            logger.warning(f"Falling back to minimal content ({len(content or '')} chars) for sentiment analysis")
+                            # Continue with what we have rather than failing
                             
                             # Update the database with new content
                             self.db.supabase.table('clips').update({

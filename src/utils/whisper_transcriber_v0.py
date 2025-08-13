@@ -108,48 +108,86 @@ class WhisperTranscriber:
         except Exception as e:
             logger.warning(f"Error saving cache for {video_id}: {e}")
     
-    def download_audio(self, video_url: str, video_id: str) -> Optional[str]:
+    def download_audio(self, video_url: str, video_id: str, max_retries: int = 2) -> Optional[str]:
         """
-        Download audio from YouTube video
+        Download audio from YouTube video with retry limit
         
         Args:
             video_url: Full YouTube URL
             video_id: YouTube video ID
+            max_retries: Maximum number of download attempts (default: 2)
             
         Returns:
             Path to downloaded audio file or None if failed
         """
-        try:
-            # Create temp directory for this download
-            temp_dir = tempfile.mkdtemp()
-            output_path = os.path.join(temp_dir, f"{video_id}.mp3")
-            
-            # Update options with specific output path
-            ydl_opts = self.ydl_opts.copy()
-            ydl_opts['outtmpl'] = output_path.replace('.mp3', '.%(ext)s')
-            
-            # Add proxy support if configured
-            proxy_url = os.environ.get('YOUTUBE_PROXY_URL')
-            if proxy_url:
-                logger.info(f"Using proxy for YouTube download")
-                ydl_opts['proxy'] = proxy_url
-            
-            # Remove FFmpeg postprocessor if not available
+        for attempt in range(max_retries):
             try:
-                subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
-            except:
-                logger.warning("FFmpeg not available - downloading audio without conversion")
-                ydl_opts['format'] = 'bestaudio'
-                ydl_opts['postprocessors'] = []
-            
-            logger.info(f"Downloading audio for video {video_id}...")
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Apply rate limiting
-                rate_limiter.wait_if_needed('youtube.com')
+                logger.info(f"Download attempt {attempt + 1}/{max_retries} for video {video_id}")
                 
-                # Download the video
-                info = ydl.extract_info(video_url, download=True)
+                # Create temp directory for this download
+                temp_dir = tempfile.mkdtemp()
+                output_path = os.path.join(temp_dir, f"{video_id}.mp3")
+                
+                # Update options with specific output path
+                ydl_opts = self.ydl_opts.copy()
+                ydl_opts['outtmpl'] = output_path.replace('.mp3', '.%(ext)s')
+                
+                # Add socket timeout to prevent hanging
+                ydl_opts['socket_timeout'] = 30  # 30 second socket timeout
+                
+                # Add proxy support if configured
+                proxy_url = os.environ.get('YOUTUBE_PROXY_URL')
+                if proxy_url:
+                    logger.info(f"Using proxy for YouTube download")
+                    ydl_opts['proxy'] = proxy_url
+                
+                # Remove FFmpeg postprocessor if not available
+                try:
+                    subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True, timeout=5)
+                except:
+                    logger.warning("FFmpeg not available - downloading audio without conversion")
+                    ydl_opts['format'] = 'bestaudio'
+                    ydl_opts['postprocessors'] = []
+                
+                logger.info(f"Downloading audio for video {video_id}...")
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # Apply rate limiting
+                    rate_limiter.wait_if_needed('youtube.com')
+                    
+                    # Download the video with a timeout wrapper
+                    import threading
+                    download_complete = threading.Event()
+                    download_result = [None]  # Use list to store result from thread
+                    download_error = [None]
+                    
+                    def download_thread():
+                        try:
+                            download_result[0] = ydl.extract_info(video_url, download=True)
+                            download_complete.set()
+                        except Exception as e:
+                            download_error[0] = e
+                            download_complete.set()
+                    
+                    thread = threading.Thread(target=download_thread)
+                    thread.daemon = True
+                    thread.start()
+                    
+                    # Wait for download with timeout (90 seconds per attempt)
+                    if not download_complete.wait(timeout=90):
+                        logger.error(f"Download timeout after 90 seconds (attempt {attempt + 1}/{max_retries})")
+                        # Try to clean up temp directory
+                        try:
+                            import shutil
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                        except:
+                            pass
+                        continue  # Try next attempt
+                    
+                    if download_error[0]:
+                        raise download_error[0]
+                    
+                    info = download_result[0]
                 
                 # Get video duration
                 duration = info.get('duration', 0)
@@ -177,12 +215,34 @@ class WhisperTranscriber:
                     logger.info(f"Audio downloaded successfully: {audio_path}")
                     return audio_path
                 else:
-                    logger.error(f"No audio file found after download")
-                    return None
+                    logger.error(f"No audio file found after download (attempt {attempt + 1}/{max_retries})")
+                    # Clean up and try next attempt
+                    try:
+                        import shutil
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                    except:
+                        pass
+                    continue
+                    
+            except Exception as e:
+                logger.error(f"Error downloading audio for {video_id} (attempt {attempt + 1}/{max_retries}): {e}")
+                # Clean up temp directory if it exists
+                try:
+                    import shutil
+                    if 'temp_dir' in locals() and temp_dir:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                except:
+                    pass
                 
-        except Exception as e:
-            logger.error(f"Error downloading audio for {video_id}: {e}")
-            return None
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying download after error...")
+                    import time
+                    time.sleep(2)  # Brief pause before retry
+                    continue
+        
+        # All attempts failed
+        logger.error(f"Failed to download audio after {max_retries} attempts")
+        return None
     
     def transcribe_audio(self, audio_path: str) -> Optional[str]:
         """
