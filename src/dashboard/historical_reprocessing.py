@@ -151,14 +151,39 @@ def display_historical_reprocessing_tab(db=None):
             return get_database()
         
         db = get_cached_db()
-    
+
+    # Controls: search + paging
+    if 'reprocess_limit' not in st.session_state:
+        st.session_state.reprocess_limit = 100
+    if 'reprocess_search_wo' not in st.session_state:
+        st.session_state.reprocess_search_wo = ''
+
+    ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([2, 1, 1])
+    with ctrl_col1:
+        st.session_state.reprocess_search_wo = st.text_input(
+            "Search by WO # (exact match)",
+            value=st.session_state.reprocess_search_wo,
+            placeholder="e.g., 1182796"
+        )
+    with ctrl_col2:
+        if st.button("Load more (+100)"):
+            st.session_state.reprocess_limit += 100
+            get_reprocessing_clips.clear()
+            st.rerun()
+    with ctrl_col3:
+        if st.button("Reset"):
+            st.session_state.reprocess_limit = 100
+            st.session_state.reprocess_search_wo = ''
+            get_reprocessing_clips.clear()
+            st.rerun()
+
     # Load clips with cache - EXACTLY like Approved Queue
     @st.cache_data(ttl=300, show_spinner=False)
-    def get_reprocessing_clips():
+    def get_reprocessing_clips(limit: int, search_wo: str):
         # Only get clips that need work; cached for snappy tab load
-        return load_clips_for_reprocessing(db, True)
-    
-    clips = get_reprocessing_clips()
+        return load_clips_for_reprocessing(db, True, limit=limit, search_wo=search_wo)
+
+    clips = get_reprocessing_clips(st.session_state.reprocess_limit, st.session_state.reprocess_search_wo.strip())
     
     # Display summary
     if clips:
@@ -186,7 +211,7 @@ def display_historical_reprocessing_tab(db=None):
         st.warning("No clips found matching the selected filters")
 
 
-def load_clips_for_reprocessing(db, only_needs_reprocessing: bool = False) -> List[Dict[str, Any]]:
+def load_clips_for_reprocessing(db, only_needs_reprocessing: bool = False, *, limit: int = 100, search_wo: Optional[str] = None) -> List[Dict[str, Any]]:
     """Load approved clips that might need reprocessing with a reasonable limit"""
     try:
         # More selective query - only get necessary columns first
@@ -195,9 +220,14 @@ def load_clips_for_reprocessing(db, only_needs_reprocessing: bool = False) -> Li
         
         # Get recent approved clips - smaller batch to avoid timeout
         query = db.supabase.table('clips').select(columns).eq('status', 'approved')
+
+        # Optional server-side search by WO
+        if search_wo:
+            query = query.eq('wo_number', search_wo)
         
         # Order by processed_date and limit to avoid timeout
-        result = query.order('processed_date', desc=True).limit(200).execute()
+        # Use a higher cap (200) to allow room for post-filtering, but slice to `limit` later
+        result = query.order('processed_date', desc=True).limit(max(200, limit)).execute()
         
         if only_needs_reprocessing and result.data:
             # Filter in Python instead of complex SQL
@@ -219,9 +249,9 @@ def load_clips_for_reprocessing(db, only_needs_reprocessing: bool = False) -> Li
             
             # If we need more data for a full clip, fetch it separately
             # This is more efficient than fetching everything upfront
-            return filtered_clips[:100]  # Limit to 100 to keep UI responsive
+            return filtered_clips[:limit]
         
-        return result.data[:100] if result.data else []
+        return result.data[:limit] if result.data else []
     
     except Exception as e:
         error_msg = str(e)
@@ -233,7 +263,7 @@ def load_clips_for_reprocessing(db, only_needs_reprocessing: bool = False) -> Li
             # Try with even smaller limit
             try:
                 columns = 'id, wo_number, make, model, published_date, sentiment_completed, sentiment_version, status'
-                result = db.supabase.table('clips').select(columns).eq('status', 'approved').limit(50).execute()
+                result = db.supabase.table('clips').select(columns).eq('status', 'approved').limit(min(50, limit)).execute()
                 return result.data if result.data else []
             except:
                 st.error("Unable to load clips. Please try again later.")
