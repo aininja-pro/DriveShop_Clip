@@ -43,7 +43,16 @@ class WhisperTranscriber:
         self.cache_dir = cache_dir
         os.makedirs(cache_dir, exist_ok=True)
         
-        # Audio download settings
+        # Choose a persistent tmp directory to avoid ephemeral /tmp cleanup
+        self.tmp_dir = os.environ.get('TMPDIR', '/app/data/tmp')
+        try:
+            os.makedirs(self.tmp_dir, exist_ok=True)
+        except Exception:
+            # Fallback to /var/tmp if /app/data/tmp is unavailable
+            self.tmp_dir = '/var/tmp'
+            os.makedirs(self.tmp_dir, exist_ok=True)
+
+        # Audio download settings (stable writes, no fragmented parts, no proxy)
         self.ydl_opts = {
             'format': 'bestaudio/best',
             'postprocessors': [{
@@ -51,7 +60,13 @@ class WhisperTranscriber:
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
-            'outtmpl': '%(id)s.%(ext)s',
+            'outtmpl': os.path.join(self.tmp_dir, '%(id)s.%(ext)s'),
+            'paths': { 'home': self.tmp_dir, 'temp': self.tmp_dir },
+            'nopart': True,                 # write final files directly (no .part-Frag)
+            'concurrent_fragment_downloads': 1,
+            'retries': 5,
+            'fragment_retries': 3,
+            'proxy': '',                    # disable any proxy usage
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
@@ -121,13 +136,13 @@ class WhisperTranscriber:
             Path to downloaded audio file or None if failed
         """
         try:
-            # Create temp directory for this download
-            temp_dir = tempfile.mkdtemp()
-            output_path = os.path.join(temp_dir, f"{video_id}.mp3")
-            
-            # Update options with specific output path
-            ydl_opts = self.ydl_opts.copy()
-            ydl_opts['outtmpl'] = output_path.replace('.mp3', '.%(ext)s')
+            # Ensure temp dir exists and set specific output template
+            os.makedirs(self.tmp_dir, exist_ok=True)
+            output_path = os.path.join(self.tmp_dir, f"{video_id}.mp3")
+
+            # Clone ydl options (avoid mutating shared dict)
+            ydl_opts = dict(self.ydl_opts)
+            ydl_opts['outtmpl'] = os.path.join(self.tmp_dir, f"{video_id}.%(ext)s")
             
             logger.info(f"Downloading audio for video {video_id}...")
             
@@ -156,11 +171,11 @@ class WhisperTranscriber:
                         return potential_path
                 
                 # If no file found, check temp directory
-                files = os.listdir(temp_dir)
+                files = os.listdir(self.tmp_dir)
                 audio_files = [f for f in files if f.startswith(video_id) and f.endswith(('.mp3', '.m4a', '.wav'))]
                 
                 if audio_files:
-                    audio_path = os.path.join(temp_dir, audio_files[0])
+                    audio_path = os.path.join(self.tmp_dir, audio_files[0])
                     logger.info(f"Audio downloaded successfully: {audio_path}")
                     return audio_path
                 else:
@@ -226,10 +241,7 @@ class WhisperTranscriber:
                 # Remove the audio file
                 os.remove(audio_path)
                 
-                # Remove the temp directory if empty
-                temp_dir = os.path.dirname(audio_path)
-                if os.path.exists(temp_dir) and not os.listdir(temp_dir):
-                    os.rmdir(temp_dir)
+                # Do not remove the persistent tmp dir; only remove file
                     
                 logger.info("Cleaned up temporary files")
         except Exception as e:
