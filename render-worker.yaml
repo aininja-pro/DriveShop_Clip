@@ -1,0 +1,59 @@
+# Render configuration for background worker service
+# This creates a separate background worker that processes jobs from the queue
+
+services:
+  # Background Worker Service
+  - type: worker
+    name: driveshop-clip-worker
+    runtime: python
+    region: oregon  # Change if needed
+    plan: starter  # Upgrade as needed (starter, standard, pro)
+    
+    # Build configuration
+    buildCommand: pip install -r requirements.txt
+    
+    # Start command for the worker
+    startCommand: python -m src.worker.background_worker
+    
+    # Environment variables (these will be shared with your main app)
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      
+      - key: WORKER_ID
+        generateValue: true  # Auto-generate unique worker ID
+      
+      - key: LOG_LEVEL
+        value: INFO
+      
+      # Database connection (sync with your main app)
+      - key: SUPABASE_URL
+        sync: false  # Set to true if sharing with main app
+      
+      - key: SUPABASE_KEY
+        sync: false  # Set to true if sharing with main app
+      
+      - key: OPENAI_API_KEY
+        sync: false  # Set to true if sharing with main app
+      
+      # Worker-specific settings
+      - key: MAX_CONCURRENT_JOBS
+        value: "1"  # Process one job at a time per worker
+      
+      - key: HEARTBEAT_INTERVAL
+        value: "30"  # Send heartbeat every 30 seconds
+      
+      - key: JOB_TIMEOUT
+        value: "10800"  # 3 hours max per job
+    
+    # Health check (optional)
+    healthCheckPath: /health
+    
+    # Auto-deploy on push to main branch
+    autoDeploy: false  # Set to true for production
+    
+    # Scaling (for paid plans)
+    scaling:
+      minInstances: 1
+      maxInstances: 3  # Scale up to 3 workers based on load
+      targetCPUPercent: 70  # Scale when CPU usage exceeds 70%

@@ -1,0 +1,11 @@
+# TikTok Handler Requirements
+
+# Core dependencies
+yt-dlp>=2024.1.0  # For TikTok video extraction
+openai>=0.27.0    # For Whisper API (you already have this)
+
+# Optional but recommended
+ffmpeg-python>=0.2.0  # For audio extraction
+
+# Note: Remove openai-whisper since we're using the API
+# No need for: openai-whisper (local model)

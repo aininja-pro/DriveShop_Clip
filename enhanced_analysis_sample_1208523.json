@@ -1,0 +1,74 @@
+{
+  "clip_info": {
+    "id": "44e1a6ed-697f-4ceb-a63e-b4cf5d07a119",
+    "wo_number": "1208523",
+    "vehicle": "Hyundai Palisade Calligraphy AWD",
+    "url": "https://www.ellatinodehoy.com/hyundai-palisade-calligraphy-2025/"
+  },
+  "v1_analysis": {
+    "relevance_score": 7,
+    "overall_sentiment": "positive",
+    "brand_alignment": true,
+    "summary": "The Hyundai Palisade Calligraphy AWD is well-received for its luxury and suitability for large families, presenting a strong market opportunity."
+  },
+  "v2_enhanced_analysis": {
+    "sentiment_classification": {
+      "overall": "positive",
+      "confidence": 0.85,
+      "rationale": "The review highlights the luxury models and generous feature list of the Hyundai Palisade, positioning it as a strong contender in its segment, especially for families with large needs."
+    },
+    "key_features_mentioned": [
+      {
+        "feature": "luxury models",
+        "sentiment": "positive",
+        "quote": "Los modelos de lujo de Hyundai y una generosa lista de caracter\u00edsticas ayudaron al Palisade a desafiar inmediatamente el status quo de las tres filas de asientos"
+      },
+      {
+        "feature": "generous feature list",
+        "sentiment": "positive",
+        "quote": "Los modelos de lujo de Hyundai y una generosa lista de caracter\u00edsticas ayudaron al Palisade a desafiar inmediatamente el status quo de las tres filas de asientos"
+      },
+      {
+        "feature": "three rows of seats",
+        "sentiment": "positive",
+        "quote": "Los modelos de lujo de Hyundai y una generosa lista de caracter\u00edsticas ayudaron al Palisade a desafiar inmediatamente el status quo de las tres filas de asientos"
+      }
+    ],
+    "brand_attributes_captured": [
+      {
+        "attribute": "luxury",
+        "sentiment": "reinforced",
+        "evidence": "Los modelos de lujo de Hyundai y una generosa lista de caracter\u00edsticas ayudaron al Palisade a desafiar inmediatamente el status quo de las tres filas de asientos"
+      },
+      {
+        "attribute": "family-friendly",
+        "sentiment": "reinforced",
+        "evidence": "para este 2025 el Palisade sigue siendo uno de los principales contendientes para las familias con grandes necesidades"
+      }
+    ],
+    "purchase_drivers": [
+      {
+        "reason": "luxury features",
+        "sentiment": "positive",
+        "strength": "primary",
+        "quote": "Los modelos de lujo de Hyundai y una generosa lista de caracter\u00edsticas ayudaron al Palisade a desafiar inmediatamente el status quo de las tres filas de asientos"
+      },
+      {
+        "reason": "suitable for large families",
+        "sentiment": "positive",
+        "strength": "primary",
+        "quote": "para este 2025 el Palisade sigue siendo uno de los principales contendientes para las familias con grandes necesidades"
+      }
+    ],
+    "competitive_context": {
+      "direct_comparisons": [],
+      "market_positioning": "The review positions the Hyundai Palisade as a strong contender in the mid-size SUV segment, especially for families needing three rows of seats."
+    },
+    "vehicle_identifier": "Hyundai Palisade Calligraphy AWD",
+    "content_type": "Web Article",
+    "overall_sentiment": "positive",
+    "relevance_score": 9,
+    "summary": "The review highlights the luxury models and generous feature list of the Hyundai Palisade, positioning it as a strong contender in its segment, especially for families with large needs.",
+    "brand_alignment": true
+  }
+}

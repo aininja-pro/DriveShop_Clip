@@ -469,7 +469,9 @@ class DatabaseManager:
     def get_rejected_clips(self, run_id: str = None) -> List[Dict[str, Any]]:
         """Get clips that have been rejected"""
         try:
-            query = self.supabase.table('clips').select('*').eq('status', 'rejected')
+            # Select only required fields for performance
+            fields = 'wo_number,office,make,model,contact,media_outlet,status,processed_date,clip_url,processing_run_id'
+            query = self.supabase.table('clips').select(fields).eq('status', 'rejected')
             
             if run_id:
                 query = query.eq('processing_run_id', run_id)
@@ -1131,8 +1133,10 @@ class DatabaseManager:
             List of failed clip records
         """
         try:
+            # Select only required fields for performance
+            fields = 'wo_number,office,make,model,contact,media_outlet,status,processed_date,original_urls,urls_attempted,failure_reason,tier_used,attempt_count,processing_run_id'
             # Get both types of failed clips
-            query = self.supabase.table('clips').select('*').in_('status', ['no_content_found', 'processing_failed'])
+            query = self.supabase.table('clips').select(fields).in_('status', ['no_content_found', 'processing_failed'])
             
             # Apply filters
             if run_id:

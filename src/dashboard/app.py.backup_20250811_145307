@@ -15,8 +15,6 @@ from src.dashboard.strategic_intelligence_json_display import display_strategic_
 from src.dashboard.message_pullthrough_clean import display_pullthrough_analysis_tab
 from src.dashboard.oem_messaging_ui import display_oem_messaging_tab
 from src.dashboard.historical_reprocessing import display_historical_reprocessing_tab
-from src.dashboard.active_jobs_tab import display_active_jobs_tab, submit_job_to_queue
-from src.dashboard.cooldown_management import display_cooldown_management_tab
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1585,16 +1583,7 @@ with st.sidebar:
     
     user = auth.get_current_user()
     if user:
-        # Persist user email in session state for job attribution
-        try:
-            user_email = getattr(user, 'email', None) or (user.get('email') if isinstance(user, dict) else None)
-        except Exception:
-            user_email = None
-        if user_email:
-            st.session_state['user_email'] = user_email
-            st.markdown(f"**Logged in as:** {user_email}")
-        else:
-            st.markdown("**Logged in**")
+        st.markdown(f"**Logged in as:** {user.email}")
     
     st.markdown("---")
 
@@ -2296,86 +2285,125 @@ with st.sidebar:
         if st.button("Process Filtered", key='process_from_url_filtered'):
             # Only proceed if data has been loaded and filtered
             if 'filtered_df' in locals() and not filtered_df.empty:
-                from datetime import datetime
-                
-                # Convert filtered dataframe to list of records
-                records_to_process = filtered_df.to_dict('records')
-
-                # Remap dataframe columns to the format the backend expects
-                remapped_records = []
-                for record in records_to_process:
-                    urls = []
-                    if 'Links' in record and pd.notna(record['Links']):
-                        urls = [url.strip() for url in str(record['Links']).split(',') if url.strip()]
-
-                    # Clean up any NaN/Infinity values that can't be serialized to JSON
-                    def clean_value(val):
-                        if pd.isna(val) or (isinstance(val, float) and (val != val or val == float('inf') or val == float('-inf'))):
-                            return None
-                        return val
-
-                    remapped_records.append({
-                        'work_order': clean_value(record.get('WO #')),
-                        'model': clean_value(record.get('Model')),
-                        'model_short': clean_value(record.get('Model Short Name')),
-                        'to': clean_value(record.get('To')),
-                        'affiliation': clean_value(record.get('Affiliation')),
-                        'urls': urls,
-                        'start_date': str(record.get('Start Date')) if pd.notna(record.get('Start Date')) else None,
-                        'make': clean_value(record.get('Make')),
-                        'activity_id': clean_value(record.get('ActivityID')),
-                        'person_id': clean_value(record.get('Person_ID')),
-                        'office': clean_value(record.get('Office'))
-                    })
-                
-                # Get user email for job tracking
-                user_email = st.session_state.get('user_email', 'System')
-                # Note: Jobs created by System show they were submitted via UI
-                # Jobs with 'anonymous' are a bug from worker claiming
-                
-                # Create job parameters - don't include the full records, just the URL and filters
-                job_params = {
-                    'url': loans_url,
-                    'filters': {
-                        'office': selected_office if 'selected_office' in locals() else 'All',
-                        'make': selected_make if 'selected_make' in locals() else 'All',
-                        'reporter': selected_reporter_name if 'selected_reporter_name' in locals() else 'All',
-                        'wo_numbers': wo_number_filter if 'wo_number_filter' in locals() else '',
-                        'activity_ids': activity_id_filter if 'activity_id_filter' in locals() else '',
-                        'skip_records': skip_records if 'skip_records' in locals() else 0,
-                        # Include date range for worker-side filtering
-                        'date_from': str(start_date_filter) if 'start_date_filter' in locals() and start_date_filter else None,
-                        'date_to': str(end_date_filter) if 'end_date_filter' in locals() and end_date_filter else None
-                    },
-                    'limit': limit_records if 'limit_records' in locals() else 0,
-                    'record_count': len(remapped_records)  # Just store the count for info
-                }
-                
-                # Create run name
-                run_name = f"CSV Process - {len(remapped_records)} records - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                
-                try:
-                    # Submit job to queue
-                    job_id = submit_job_to_queue(
-                        job_type='csv_upload',
-                        job_params=job_params,
-                        run_name=run_name,
-                        user_email=user_email
-                    )
+                # Create progress tracking containers
+                progress_container = st.container()
+                with progress_container:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    time_text = st.empty()
+                    spinner_placeholder = st.empty()
                     
-                    st.success(f"""
-                    ✅ **Job submitted successfully!**
+                    # Store progress tracking in session state
+                    st.session_state['processing_progress'] = {
+                        'current': 0,
+                        'total': len(filtered_df),
+                        'start_time': time.time()
+                    }
                     
-                    Job ID: `{job_id[:8]}...`
+                    status_text.text(f"Processing 0 of {len(filtered_df)} records...")
                     
-                    Navigate to the **"🚀 Active Jobs"** tab to monitor progress.
-                    """)
+                    from src.ingest.ingest_database import run_ingest_database_with_filters
+                    
+                    # Convert filtered dataframe to list of records
+                    records_to_process = filtered_df.to_dict('records')
+
+                    # FIX: Remap dataframe columns to the format the backend expects
+                    remapped_records = []
+                    for record in records_to_process:
+                        # Split the 'Links' string into a list of URLs
+                        urls = []
+                        if 'Links' in record and pd.notna(record['Links']):
+                            urls = [url.strip() for url in str(record['Links']).split(',') if url.strip()]
+
+                        remapped_records.append({
+                            'work_order': record.get('WO #'),
+                            'model': record.get('Model'),
+                            'model_short': record.get('Model Short Name'),  # CRITICAL: Add short model for hierarchical search
+                            'to': record.get('To'),
+                            'affiliation': record.get('Affiliation'),
+                            'urls': urls,
+                            'start_date': record.get('Start Date'),
+                            'make': record.get('Make'),
+                            'activity_id': record.get('ActivityID'),  # FIXED: Use ActivityID (no underscore) - this is the actual column name in source data
+                            'person_id': record.get('Person_ID'),
+                            'office': record.get('Office')
+                        })
+                    
+                    # Debug information can be logged instead of shown in UI
+                    logger.debug(f"Sending {len(remapped_records)} records to backend")
+
+                    # Show initial status
+                    total_records = len(remapped_records)
+                    status_text.text(f"Starting to process {total_records} records...")
+                    time_text.text("This may take several minutes. Progress may appear uneven due to varying processing times.")
+                    
+                    # Add a spinner to show continuous activity
+                    with spinner_placeholder.container():
+                        with st.spinner('🔄 Processing records... (this may take a while)'):
+                            # Define progress callback that updates the UI
+                            def progress_update(current, total):
+                                # Update progress bar
+                                progress = current / total if total > 0 else 0
+                                progress_bar.progress(progress)
+                                
+                                # Update status text - just show count, no time estimates
+                                status_text.text(f"Completed {current} of {total} records ({int(progress * 100)}%)")
+                                
+                                # Show elapsed time only (no predictions)
+                                elapsed = time.time() - st.session_state['processing_progress']['start_time']
+                                time_text.text(f"Time elapsed: {format_time(elapsed)}")
                             
-                except Exception as e:
-                    st.error(f"❌ Failed to submit job: {str(e)}")
-                    logger.error(f"Job submission failed: {e}", exc_info=True)
+                            # Call the backend with progress tracking
+                            success = run_ingest_database_with_filters(
+                                filtered_loans=remapped_records, 
+                                limit=limit_records,
+                                progress_callback=progress_update
+                            )
+                    
+                    # Update to show completion
+                    progress_bar.progress(1.0)
+                    status_text.text(f"✅ Completed processing {total_records} records!")
+                    elapsed = time.time() - st.session_state['processing_progress']['start_time']
+                    time_text.text(f"Total time: {format_time(elapsed)}")
+                    
+                    if success:
+                        # Store batch processing info for next batch suggestion
+                        if remapped_records:
+                            # Get the last Activity ID from the processed records
+                            processed_activity_ids = [r.get('activity_id') for r in remapped_records if r.get('activity_id')]
+                            if processed_activity_ids:
+                                last_processed_id = processed_activity_ids[-1]
+                                
+                                # Find the next Activity ID in the original data for batch suggestion
+                                original_df = st.session_state.loaded_loans_df
+                                if 'Activity_ID' in original_df.columns:
+                                    # Convert to numeric and sort to find next ID
+                                    original_df_sorted = original_df.copy()
+                                    original_df_sorted['Activity_ID_numeric'] = pd.to_numeric(original_df_sorted['Activity_ID'], errors='coerce')
+                                    original_df_sorted = original_df_sorted.dropna(subset=['Activity_ID_numeric']).sort_values('Activity_ID_numeric')
+                                    
+                                    # Find the next ID after the last processed one
+                                    last_processed_numeric = pd.to_numeric(last_processed_id, errors='coerce')
+                                    next_ids = original_df_sorted[original_df_sorted['Activity_ID_numeric'] > last_processed_numeric]['Activity_ID']
+                                    
+                                    if not next_ids.empty:
+                                        next_suggested_id = str(int(next_ids.iloc[0]))
+                                        st.session_state.batch_info = {
+                                            'last_processed_id': str(last_processed_id),
+                                            'next_suggested_id': next_suggested_id,
+                                            'records_processed': len(remapped_records),
+                                            'timestamp': datetime.now().strftime("%H:%M:%S")
+                                        }
+                        
+                        st.session_state.last_run_timestamp = datetime.now()
+                        # Clear cache so Bulk Review shows new clips
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error("❌ Filtered processing failed.")
             else:
                 st.warning("No data loaded or no records match filters. Please load data first.")
+            
     if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
         info = st.session_state.get('loans_data_info', {})
         st.markdown(f"📊 Data loaded: **{info.get('total_records', 0)}** total records, **{info.get('offices_count', 0)}** offices, **{info.get('makes_count', 0)}** makes")
@@ -2418,24 +2446,18 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-active_jobs_tab, bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, cooldown_tab, export_tab = st.tabs([
-    "Active Jobs",
-    "Bulk Review",
+bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, export_tab = st.tabs([
+    "Bulk Review", 
     "Approved Queue",
     "Rejected/Issues", 
     "Strategic Intelligence",
     "Message Pull-Through",
     "OEM Messaging",
     "Re-Process Historical",
-    "Cooldown Mgmt",
     "Export"
 ])
 
 # ========== CREATORIQ TAB ========== (REMOVED)
-
-# ========== ACTIVE JOBS TAB ==========
-with active_jobs_tab:
-    display_active_jobs_tab()
 
 # ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_review_tab:
@@ -4684,10 +4706,7 @@ with approved_queue_tab:
                 )
             
             # Configure ADVANCED AgGrid for approved queue (same as Bulk Review)
-            # Lazy render: limit rows initially to speed first paint, allow full view on demand
-            max_initial_rows = 300
-            initial_df = clean_df.head(max_initial_rows)
-            gb = GridOptionsBuilder.from_dataframe(initial_df)
+            gb = GridOptionsBuilder.from_dataframe(clean_df)
             
             # *** ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
             gb.configure_side_bar()  # Enable filtering sidebar
@@ -5323,37 +5342,27 @@ with rejected_tab:
         
         # Cache the current run data to avoid duplicate calls
         @st.cache_data(ttl=300)  # Cache for 5 minutes
-        def get_current_run_data():
+        def get_current_run_data(_db):
             """Get current run data with caching to prevent duplicate DB calls
             
             Args:
-                none
+                _db: Database connection (prefixed with _ to exclude from cache key)
             """
-            local_db = get_cached_database()
-            latest_id = local_db.get_latest_processing_run_id()
-            failed_clips = local_db.get_current_run_failed_clips()
+            latest_id = _db.get_latest_processing_run_id()
+            failed_clips = _db.get_current_run_failed_clips()
             return latest_id, failed_clips
         
         # Choose data source based on mode
         if st.session_state.rejected_view_mode == 'current_run':
             # Current run mode - get only the most recent processing run
-            latest_run_id, current_run_failed_clips = get_current_run_data()
+            latest_run_id, current_run_failed_clips = get_current_run_data(db)
             
             # Also get clips that were skipped in the current run
             current_run_skipped_clips = []
             if latest_run_id:
-                @st.cache_data(ttl=300)
-                def get_skipped_clips_by_run(run_id: int):
-                    # Conservative projection (avoid non-existent columns)
-                    projection = 'wo_number, office, make, model, contact, media_outlet, processed_date, original_urls, urls_attempted, failure_reason, last_skip_run_id'
-                    return (
-                        db.supabase
-                        .table('clips')
-                        .select(projection)
-                        .eq('last_skip_run_id', run_id)
-                        .execute()
-                    ).data or []
-                current_run_skipped_clips = get_skipped_clips_by_run(latest_run_id)
+                skipped_result = db.supabase.table('clips').select('*').eq('last_skip_run_id', latest_run_id).execute()
+                if skipped_result.data:
+                    current_run_skipped_clips = skipped_result.data
             
             # Get run info for display
             if (current_run_failed_clips or current_run_skipped_clips) and latest_run_id:
@@ -5369,7 +5378,6 @@ with rejected_tab:
             for clip in current_run_failed_clips:
                 # Add retry status to rejection reason if in cooldown
                 rejection_reason = 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed'
-                # Some deployments may not have retry_status/ retry_after columns
                 if clip.get('retry_status') == 'in_cooldown':
                     retry_date = clip.get('retry_after', '')
                     if retry_date:
@@ -5388,7 +5396,7 @@ with rejected_tab:
                     'Make': clip.get('make', ''),
                     'Model': clip.get('model', ''),
                     'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                    'Affiliation': clip.get('office', ''),
                     'Rejection_Reason': rejection_reason,
                     'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
                     'Processed_Date': clip.get('processed_date', ''),
@@ -5396,7 +5404,6 @@ with rejected_tab:
                     'original_urls': clip.get('original_urls', ''),
                     'urls_attempted': clip.get('urls_attempted', 0),
                     'failure_reason': clip.get('failure_reason', ''),
-                    # These fields may not exist in all schemas; keep optional
                     'retry_status': clip.get('retry_status', ''),
                     'attempt_count': clip.get('attempt_count', 1)
                 })
@@ -5418,7 +5425,7 @@ with rejected_tab:
                     'Make': clip.get('make', ''),
                     'Model': clip.get('model', ''),
                     'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                    'Affiliation': clip.get('office', ''),
                     'Rejection_Reason': f'Skipped: {rejection_reason}',
                     'URL_Details': f"Skipped in current run",
                     'Processed_Date': clip.get('processed_date', ''),
@@ -5435,12 +5442,7 @@ with rejected_tab:
             start_date_str = start_date.strftime('%Y-%m-%d') if start_date else None
             end_date_str = end_date.strftime('%Y-%m-%d') if end_date else None
             
-            @st.cache_data(ttl=300)
-            def cached_get_all_failed_clips(start_date: str|None, end_date: str|None):
-                local_db = get_cached_database()
-                return local_db.get_all_failed_clips(start_date=start_date, end_date=end_date)
-
-            all_failed_clips = cached_get_all_failed_clips(
+            all_failed_clips = db.get_all_failed_clips(
                 start_date=start_date_str,
                 end_date=end_date_str
             )
@@ -5464,7 +5466,7 @@ with rejected_tab:
                     'Make': clip.get('make', ''),
                     'Model': clip.get('model', ''),
                     'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                    'Affiliation': clip.get('office', ''),
                     'Rejection_Reason': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
                     'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
                     'Processed_Date': clip.get('processed_date', ''),
@@ -5488,21 +5490,21 @@ with rejected_tab:
                 rejected_clips = []
         else:
             # For historical view, get all rejected clips (with optional date filtering)
-            @st.cache_data(ttl=300)
-            def cached_get_rejected_clips_hist():
-                local_db = get_cached_database()
-                return local_db.get_rejected_clips()
+            @st.cache_data
+            def cached_get_rejected_clips():
+                db = get_cached_database()
+                return db.get_rejected_clips()
             
-            rejected_clips = cached_get_rejected_clips_hist()
+            rejected_clips = cached_get_rejected_clips()
         
         for clip in rejected_clips:
-                combined_issues.append({
+            combined_issues.append({
                 'WO #': clip['wo_number'],
                 'Office': clip.get('office', ''),
                 'Make': clip.get('make', ''),
                 'Model': clip.get('model', ''),
-                    'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                'To': clip.get('contact', ''),
+                'Affiliation': clip.get('office', ''),
                 'Rejection_Reason': 'User Rejected Clip',
                 'URL_Details': clip.get('clip_url', ''),
                 'Processed_Date': clip.get('processed_date', ''),
@@ -5778,14 +5780,10 @@ with rejected_tab:
             # Build grid options
             grid_options = gb.build()
             
-            # Implement lazy loading - start with first 50 rows for performance
-            max_initial_rows = 50
-            initial_df = clean_df.head(max_initial_rows) if len(clean_df) > max_initial_rows else clean_df
-            
             # Display AgGrid table for rejected records
             st.markdown("**📋 Rejected Records**")
             selected_rejected = AgGrid(
-                initial_df,
+                clean_df,  # Pass full dataframe so JavaScript can access hidden columns
                 gridOptions=grid_options,
                 height=400,
                 width='100%',
@@ -5795,35 +5793,9 @@ with rejected_tab:
                 theme='streamlit',
                 enable_enterprise_modules=True,
                 allow_unsafe_jscode=True,
-                reload_data=False,  # Disable auto-reload for performance
+                reload_data=True,
                 columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW'  # Enable auto-sizing
             )
-
-            # Option to load all rows (may be heavy)
-            if len(clean_df) > max_initial_rows:
-                if st.button(f"Load all {len(clean_df)} records", key="load_all_rejected"):
-                    gb_full = GridOptionsBuilder.from_dataframe(clean_df)
-                    # Reuse same column configurations
-                    for hidden_col in hidden_columns:
-                        if hidden_col in clean_df.columns:
-                            gb_full.configure_column(hidden_col, hide=True)
-                    gb_full.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
-                    gb_full.configure_side_bar()
-                    grid_options_full = gb_full.build()
-                    AgGrid(
-                        clean_df,
-                        gridOptions=grid_options_full,
-                        height=500,
-                        width='100%',
-                        data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
-                        update_mode=GridUpdateMode.SELECTION_CHANGED,
-                        fit_columns_on_grid_load=True,
-                        theme='streamlit',
-                        enable_enterprise_modules=True,
-                        allow_unsafe_jscode=True,
-                        reload_data=True,
-                        columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW'
-                    )
             
             # Optional: Add functionality to move selected rejected records back to Bulk Review
             if st.button("🔄 Move Selected to Bulk Review", key="move_to_bulk_review"):
@@ -5996,31 +5968,10 @@ with analysis_tab:
     try:
         # Use the already cached database instance instead of getting a new one
         # db is already available from the main cached database instance
-
-        # Cached lightweight fetch (projection + limit) to speed initial render
-        @st.cache_data(ttl=300, show_spinner=False)
-        def load_sentiment_clips():
-            projection = 'wo_number, make, model, contact, media_outlet, overall_sentiment, published_date, sentiment_data_enhanced, clip_url'
-            result = (
-                db.supabase
-                .table('clips')
-                .select(projection)
-                .eq('sentiment_completed', True)
-                .order('published_date', desc=True)
-                .limit(500)
-                .execute()
-            )
-            return result.data if result.data else []
-
-        # Optional refresh to bust the cache explicitly
-        refresh_col1, _ = st.columns([1, 5])
-        with refresh_col1:
-            if st.button('🔄 Refresh Data', key='refresh_strategic_cache'):
-                load_sentiment_clips.clear()
-                st.rerun()
-
-        with st.spinner('Loading clips with sentiment...'):
-            sentiment_clips = load_sentiment_clips()
+        
+        # Load data from database for analysis (all approved clips with sentiment)
+        sentiment_result = db.supabase.table('clips').select('*').eq('sentiment_completed', True).execute()
+        sentiment_clips = sentiment_result.data if sentiment_result.data else []
         
         # Use the new single column display
         display_strategic_intelligence_tab(sentiment_clips)
@@ -6044,11 +5995,6 @@ with oem_tab:
 with reprocess_tab:
     # The function handles its own database connection
     display_historical_reprocessing_tab()
-
-# ========== COOLDOWN MANAGEMENT TAB ==========
-with cooldown_tab:
-    # Display the cooldown management interface
-    display_cooldown_management_tab()
 
 # ========== EXPORT TAB ==========
 with export_tab:

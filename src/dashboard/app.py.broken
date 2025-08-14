@@ -1,3 +1,4 @@
+import sys; sys.path.insert(0, "/app")
 import streamlit as st
 import pandas as pd
 import os
@@ -10,13 +11,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, JsCode, DataReturnMode, GridUp
 from src.utils.logger import logger
 from src.utils.sentiment_analysis import run_sentiment_analysis
 from src.utils.fms_api import FMSAPIClient
-from src.utils.auth_improved import ImprovedSupabaseAuth as SupabaseAuth
-from src.dashboard.strategic_intelligence_json_display import display_strategic_intelligence_tab
-from src.dashboard.message_pullthrough_clean import display_pullthrough_analysis_tab
-from src.dashboard.oem_messaging_ui import display_oem_messaging_tab
-from src.dashboard.historical_reprocessing import display_historical_reprocessing_tab
-from src.dashboard.active_jobs_tab import display_active_jobs_tab, submit_job_to_queue
-from src.dashboard.cooldown_management import display_cooldown_management_tab
+from src.utils.auth import SupabaseAuth
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -96,12 +91,6 @@ except ImportError:
     def get_database():
         st.error("Database module not available")
         return None
-
-# Cache the database connection to prevent multiple connections
-@st.cache_resource
-def get_cached_database():
-    """Get a cached database connection that persists across reruns"""
-    return get_database()
 
 @st.cache_data
 def load_person_outlets_mapping():
@@ -287,65 +276,29 @@ def apply_custom_sidebar_styling():
         color: #000000 !important;
     }
     
-    /* Tab styling - Active tab colored, inactive tabs off-white */
+    /* Tab styling */
     .stTabs {
         background-color: #ffffff !important;
     }
     
     .stTabs [data-baseweb="tab-list"] {
-        background-color: transparent !important;
-        gap: 4px;
-        padding: 0 8px;
+        background-color: #f0f2f6 !important;
     }
     
-    /* Base tab styling - All tabs start with off-white */
     .stTabs [data-baseweb="tab"] {
-        height: 45px !important;
-        padding-left: 24px !important;
-        padding-right: 24px !important;
-        border-radius: 8px 8px 0 0 !important;
-        border: none !important;
-        font-weight: 500 !important;
-        transition: all 0.2s ease !important;
-        margin-bottom: 0 !important;
-        background-color: #f5f5f5 !important;
-        color: #666666 !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
     }
     
-    /* Hover effect for inactive tabs */
-    .stTabs [data-baseweb="tab"]:not([aria-selected="true"]):hover {
-        background-color: #e8e8e8 !important;
-        color: #333333 !important;
-    }
-    
-    /* Active tab styling - Blue with white text */
     .stTabs [aria-selected="true"] {
-        background-color: #1976d2 !important;
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border-bottom-color: #ff4b4b !important;
     }
     
-    /* Active tab text color */
-    .stTabs [aria-selected="true"] p {
-        color: #ffffff !important;
-    }
-    
-    /* Inactive tab text color */
-    .stTabs [aria-selected="false"] p {
-        color: #666666 !important;
-    }
-    
-    /* Remove the default bottom border indicator */
-    .stTabs [data-baseweb="tab-highlight"] {
-        background-color: transparent !important;
-    }
-    
-    /* Tab text styling */
+    /* Fix tab text visibility */
     .stTabs [data-baseweb="tab"] p {
-        font-size: 14px !important;
-        margin: 0 !important;
-        line-height: 1.5 !important;
+        color: #000000 !important;
     }
     
     /* Ensure all text is black in main content */
@@ -550,7 +503,7 @@ def apply_custom_sidebar_styling():
     /* Button styling in sidebar - LIGHT BLUE BUTTONS with DARK TEXT for visibility */
     .stSidebar .stButton > button {
         background-color: #e3f2fd !important;
-        color: #000000 !important;
+        color: #1565c0 !important;
         border: 2px solid #90caf9 !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
@@ -575,11 +528,11 @@ def apply_custom_sidebar_styling():
     
     /* Force dark blue text on all sidebar buttons - override any inherited styles */
     .stSidebar .stButton > button * {
-        color: #000000 !important;
+        color: #1565c0 !important;
     }
     
     .stSidebar .stButton > button span {
-        color: #000000 !important;
+        color: #1565c0 !important;
     }
     
     .stSidebar .stButton > button:hover * {
@@ -1480,9 +1433,7 @@ with st.sidebar:
 
 # Check authentication and refresh session if needed
 # Session timeout is configurable via SESSION_TIMEOUT_HOURS environment variable
-# Increased default to 48 hours to reduce logout frequency
-session_timeout = int(os.environ.get('SESSION_TIMEOUT_HOURS', '48'))
-# Only check session periodically, not on every page interaction
+session_timeout = int(os.environ.get('SESSION_TIMEOUT_HOURS', '24'))
 if not auth.check_and_refresh_session(session_timeout_hours=session_timeout):
     # Apply dark background for login page
     st.markdown("""
@@ -1585,16 +1536,7 @@ with st.sidebar:
     
     user = auth.get_current_user()
     if user:
-        # Persist user email in session state for job attribution
-        try:
-            user_email = getattr(user, 'email', None) or (user.get('email') if isinstance(user, dict) else None)
-        except Exception:
-            user_email = None
-        if user_email:
-            st.session_state['user_email'] = user_email
-            st.markdown(f"**Logged in as:** {user_email}")
-        else:
-            st.markdown("**Logged in**")
+        st.markdown(f"**Logged in as:** {user.email}")
     
     st.markdown("---")
 
@@ -1617,61 +1559,25 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* Tab styling - Active tab colored, inactive tabs off-white */
+    /* Tab styling for light mode */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: transparent !important;
-        gap: 4px;
-        padding: 0 8px;
+        background-color: #f0f2f6 !important;
     }
     
-    /* Base tab styling - All tabs start with off-white */
     .stTabs [data-baseweb="tab"] {
-        height: 45px !important;
-        padding-left: 24px !important;
-        padding-right: 24px !important;
-        border-radius: 8px 8px 0 0 !important;
-        border: none !important;
-        font-weight: 500 !important;
-        transition: all 0.2s ease !important;
-        margin-bottom: 0 !important;
-        background-color: #f5f5f5 !important;
-        color: #666666 !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
     }
     
-    /* Hover effect for inactive tabs */
-    .stTabs [data-baseweb="tab"]:not([aria-selected="true"]):hover {
-        background-color: #e8e8e8 !important;
-        color: #333333 !important;
-    }
-    
-    /* Active tab styling - Blue with white text */
     .stTabs [aria-selected="true"] {
-        background-color: #1976d2 !important;
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
     }
     
-    /* Active tab text color */
-    .stTabs [aria-selected="true"] p {
-        color: #ffffff !important;
-    }
-    
-    /* Inactive tab text color */
-    .stTabs [aria-selected="false"] p {
-        color: #666666 !important;
-    }
-    
-    /* Remove the default bottom border indicator */
-    .stTabs [data-baseweb="tab-highlight"] {
-        background-color: transparent !important;
-    }
-    
-    /* Tab text styling */
-    .stTabs [data-baseweb="tab"] p {
-        font-size: 14px !important;
-        margin: 0 !important;
-        line-height: 1.5 !important;
+    /* Fix tab text visibility */
+    .stTabs [data-baseweb="tab"] p,
+    .stTabs [data-baseweb="tab"] span {
+        color: #000000 !important;
     }
     
     /* ULTRA COMPACT layout - maximum table space */
@@ -2296,86 +2202,125 @@ with st.sidebar:
         if st.button("Process Filtered", key='process_from_url_filtered'):
             # Only proceed if data has been loaded and filtered
             if 'filtered_df' in locals() and not filtered_df.empty:
-                from datetime import datetime
-                
-                # Convert filtered dataframe to list of records
-                records_to_process = filtered_df.to_dict('records')
-
-                # Remap dataframe columns to the format the backend expects
-                remapped_records = []
-                for record in records_to_process:
-                    urls = []
-                    if 'Links' in record and pd.notna(record['Links']):
-                        urls = [url.strip() for url in str(record['Links']).split(',') if url.strip()]
-
-                    # Clean up any NaN/Infinity values that can't be serialized to JSON
-                    def clean_value(val):
-                        if pd.isna(val) or (isinstance(val, float) and (val != val or val == float('inf') or val == float('-inf'))):
-                            return None
-                        return val
-
-                    remapped_records.append({
-                        'work_order': clean_value(record.get('WO #')),
-                        'model': clean_value(record.get('Model')),
-                        'model_short': clean_value(record.get('Model Short Name')),
-                        'to': clean_value(record.get('To')),
-                        'affiliation': clean_value(record.get('Affiliation')),
-                        'urls': urls,
-                        'start_date': str(record.get('Start Date')) if pd.notna(record.get('Start Date')) else None,
-                        'make': clean_value(record.get('Make')),
-                        'activity_id': clean_value(record.get('ActivityID')),
-                        'person_id': clean_value(record.get('Person_ID')),
-                        'office': clean_value(record.get('Office'))
-                    })
-                
-                # Get user email for job tracking
-                user_email = st.session_state.get('user_email', 'System')
-                # Note: Jobs created by System show they were submitted via UI
-                # Jobs with 'anonymous' are a bug from worker claiming
-                
-                # Create job parameters - don't include the full records, just the URL and filters
-                job_params = {
-                    'url': loans_url,
-                    'filters': {
-                        'office': selected_office if 'selected_office' in locals() else 'All',
-                        'make': selected_make if 'selected_make' in locals() else 'All',
-                        'reporter': selected_reporter_name if 'selected_reporter_name' in locals() else 'All',
-                        'wo_numbers': wo_number_filter if 'wo_number_filter' in locals() else '',
-                        'activity_ids': activity_id_filter if 'activity_id_filter' in locals() else '',
-                        'skip_records': skip_records if 'skip_records' in locals() else 0,
-                        # Include date range for worker-side filtering
-                        'date_from': str(start_date_filter) if 'start_date_filter' in locals() and start_date_filter else None,
-                        'date_to': str(end_date_filter) if 'end_date_filter' in locals() and end_date_filter else None
-                    },
-                    'limit': limit_records if 'limit_records' in locals() else 0,
-                    'record_count': len(remapped_records)  # Just store the count for info
-                }
-                
-                # Create run name
-                run_name = f"CSV Process - {len(remapped_records)} records - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                
-                try:
-                    # Submit job to queue
-                    job_id = submit_job_to_queue(
-                        job_type='csv_upload',
-                        job_params=job_params,
-                        run_name=run_name,
-                        user_email=user_email
-                    )
+                # Create progress tracking containers
+                progress_container = st.container()
+                with progress_container:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    time_text = st.empty()
+                    spinner_placeholder = st.empty()
                     
-                    st.success(f"""
-                    ✅ **Job submitted successfully!**
+                    # Store progress tracking in session state
+                    st.session_state['processing_progress'] = {
+                        'current': 0,
+                        'total': len(filtered_df),
+                        'start_time': time.time()
+                    }
                     
-                    Job ID: `{job_id[:8]}...`
+                    status_text.text(f"Processing 0 of {len(filtered_df)} records...")
                     
-                    Navigate to the **"🚀 Active Jobs"** tab to monitor progress.
-                    """)
+                    from src.ingest.ingest_database import run_ingest_database_with_filters
+                    
+                    # Convert filtered dataframe to list of records
+                    records_to_process = filtered_df.to_dict('records')
+
+                    # FIX: Remap dataframe columns to the format the backend expects
+                    remapped_records = []
+                    for record in records_to_process:
+                        # Split the 'Links' string into a list of URLs
+                        urls = []
+                        if 'Links' in record and pd.notna(record['Links']):
+                            urls = [url.strip() for url in str(record['Links']).split(',') if url.strip()]
+
+                        remapped_records.append({
+                            'work_order': record.get('WO #'),
+                            'model': record.get('Model'),
+                            'model_short': record.get('Model Short Name'),  # CRITICAL: Add short model for hierarchical search
+                            'to': record.get('To'),
+                            'affiliation': record.get('Affiliation'),
+                            'urls': urls,
+                            'start_date': record.get('Start Date'),
+                            'make': record.get('Make'),
+                            'activity_id': record.get('ActivityID'),  # FIXED: Use ActivityID (no underscore) - this is the actual column name in source data
+                            'person_id': record.get('Person_ID'),
+                            'office': record.get('Office')
+                        })
+                    
+                    # Debug information can be logged instead of shown in UI
+                    logger.debug(f"Sending {len(remapped_records)} records to backend")
+
+                    # Show initial status
+                    total_records = len(remapped_records)
+                    status_text.text(f"Starting to process {total_records} records...")
+                    time_text.text("This may take several minutes. Progress may appear uneven due to varying processing times.")
+                    
+                    # Add a spinner to show continuous activity
+                    with spinner_placeholder.container():
+                        with st.spinner('🔄 Processing records... (this may take a while)'):
+                            # Define progress callback that updates the UI
+                            def progress_update(current, total):
+                                # Update progress bar
+                                progress = current / total if total > 0 else 0
+                                progress_bar.progress(progress)
+                                
+                                # Update status text - just show count, no time estimates
+                                status_text.text(f"Completed {current} of {total} records ({int(progress * 100)}%)")
+                                
+                                # Show elapsed time only (no predictions)
+                                elapsed = time.time() - st.session_state['processing_progress']['start_time']
+                                time_text.text(f"Time elapsed: {format_time(elapsed)}")
                             
-                except Exception as e:
-                    st.error(f"❌ Failed to submit job: {str(e)}")
-                    logger.error(f"Job submission failed: {e}", exc_info=True)
+                            # Call the backend with progress tracking
+                            success = run_ingest_database_with_filters(
+                                filtered_loans=remapped_records, 
+                                limit=limit_records,
+                                progress_callback=progress_update
+                            )
+                    
+                    # Update to show completion
+                    progress_bar.progress(1.0)
+                    status_text.text(f"✅ Completed processing {total_records} records!")
+                    elapsed = time.time() - st.session_state['processing_progress']['start_time']
+                    time_text.text(f"Total time: {format_time(elapsed)}")
+                    
+                    if success:
+                        # Store batch processing info for next batch suggestion
+                        if remapped_records:
+                            # Get the last Activity ID from the processed records
+                            processed_activity_ids = [r.get('activity_id') for r in remapped_records if r.get('activity_id')]
+                            if processed_activity_ids:
+                                last_processed_id = processed_activity_ids[-1]
+                                
+                                # Find the next Activity ID in the original data for batch suggestion
+                                original_df = st.session_state.loaded_loans_df
+                                if 'Activity_ID' in original_df.columns:
+                                    # Convert to numeric and sort to find next ID
+                                    original_df_sorted = original_df.copy()
+                                    original_df_sorted['Activity_ID_numeric'] = pd.to_numeric(original_df_sorted['Activity_ID'], errors='coerce')
+                                    original_df_sorted = original_df_sorted.dropna(subset=['Activity_ID_numeric']).sort_values('Activity_ID_numeric')
+                                    
+                                    # Find the next ID after the last processed one
+                                    last_processed_numeric = pd.to_numeric(last_processed_id, errors='coerce')
+                                    next_ids = original_df_sorted[original_df_sorted['Activity_ID_numeric'] > last_processed_numeric]['Activity_ID']
+                                    
+                                    if not next_ids.empty:
+                                        next_suggested_id = str(int(next_ids.iloc[0]))
+                                        st.session_state.batch_info = {
+                                            'last_processed_id': str(last_processed_id),
+                                            'next_suggested_id': next_suggested_id,
+                                            'records_processed': len(remapped_records),
+                                            'timestamp': datetime.now().strftime("%H:%M:%S")
+                                        }
+                        
+                        st.session_state.last_run_timestamp = datetime.now()
+                        # Clear cache so Bulk Review shows new clips
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error("❌ Filtered processing failed.")
             else:
                 st.warning("No data loaded or no records match filters. Please load data first.")
+            
     if 'loans_data_loaded' in st.session_state and st.session_state.loans_data_loaded:
         info = st.session_state.get('loans_data_info', {})
         st.markdown(f"📊 Data loaded: **{info.get('total_records', 0)}** total records, **{info.get('offices_count', 0)}** offices, **{info.get('makes_count', 0)}** makes")
@@ -2418,24 +2363,241 @@ with st.sidebar:
                 st.error("❌ Failed")
 
 # Create tabs for different user workflows  
-active_jobs_tab, bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, cooldown_tab, export_tab = st.tabs([
-    "Active Jobs",
-    "Bulk Review",
-    "Approved Queue",
-    "Rejected/Issues", 
-    "Strategic Intelligence",
-    "Message Pull-Through",
-    "OEM Messaging",
-    "Re-Process Historical",
-    "Cooldown Mgmt",
-    "Export"
+bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, creatoriq_tab, export_tab, history_tab = st.tabs([
+    "📋 Bulk Review", 
+    "✅ Approved Queue",
+    "⚠️ Rejected/Issues", 
+    "🚀 Strategic Intelligence", 
+    "🎬 CreatorIQ Export",
+    "📊 Export",
+    "📚 File History"
 ])
 
-# ========== CREATORIQ TAB ========== (REMOVED)
+# ========== CREATORIQ TAB ==========
+with creatoriq_tab:
+    # Import CreatorIQ modules
+    try:
+        from src.creatoriq import playwright_scraper, parser, exporter
+        
+        # Compact header styling
+        st.markdown("### 🎬 CreatorIQ Scraper")
+        st.markdown("Extract social media post URLs from CreatorIQ campaign reports")
+        
+        # Input section with tight layout
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            url = st.text_input(
+                "CreatorIQ Report URL:",
+                placeholder="https://report.driveshop.com/report/audi_media_spotl-dcMIG3Mp5APt/posts",
+                help="Paste the CreatorIQ campaign report URL here"
+            )
+        
+        with col2:
+            scrolls = st.slider("Scroll cycles:", 5, 50, 20, help="Number of scroll cycles to load all posts")
+        
+        # Action buttons
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            scrape_button = st.button("🚀 Scrape", use_container_width=True)
+        
+        with col2:
+            if st.button("📋 Clear", use_container_width=True):
+                if 'creatoriq_urls' in st.session_state:
+                    del st.session_state.creatoriq_urls
+                if 'creatoriq_export_path' in st.session_state:
+                    del st.session_state.creatoriq_export_path
+                st.rerun()
+        
+        # Scraping logic
+        if scrape_button:
+            if url:
+                with st.spinner("🔄 Scraping CreatorIQ... this may take 1-3 minutes."):
+                    try:
+                        # Get HTML content and API responses with network interception
+                        html, api_responses = playwright_scraper.get_creatoriq_data(url, scrolls=scrolls)
+                        
+                        # Extract URLs using both HTML and captured API responses
+                        urls = parser.extract_social_urls(html, api_responses)
+                        
+                        # Store in session state
+                        st.session_state.creatoriq_urls = urls
+                        
+                        # Create export directory
+                        os.makedirs("data/creatoriq_exports", exist_ok=True)
+                        export_path = f"data/creatoriq_exports/creatoriq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                        
+                        # Export to CSV
+                        exporter.export_to_csv(urls, export_path)
+                        st.session_state.creatoriq_export_path = export_path
+                        
+                        st.success(f"✅ Extraction complete: {len(urls)} URLs found")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error during scraping: {str(e)}")
+            else:
+                st.warning("⚠️ Please enter a valid CreatorIQ report URL")
+        
+        # Results display
+        if 'creatoriq_urls' in st.session_state and st.session_state.creatoriq_urls:
+            urls = st.session_state.creatoriq_urls
+            
+            # Metrics row
+            col1, col2, col3, col4 = st.columns(4)
+            
+            # Count URLs by platform
+            platform_counts = {}
+            for url in urls:
+                if 'instagram.com' in url:
+                    platform_counts['Instagram'] = platform_counts.get('Instagram', 0) + 1
+                elif 'tiktok.com' in url:
+                    platform_counts['TikTok'] = platform_counts.get('TikTok', 0) + 1
+                elif 'youtube.com' in url:
+                    platform_counts['YouTube'] = platform_counts.get('YouTube', 0) + 1
+                elif 'twitter.com' in url:
+                    platform_counts['Twitter'] = platform_counts.get('Twitter', 0) + 1
+                elif 'facebook.com' in url:
+                    platform_counts['Facebook'] = platform_counts.get('Facebook', 0) + 1
+            
+            with col1:
+                st.metric("Total URLs", len(urls))
+            with col2:
+                st.metric("Instagram", platform_counts.get('Instagram', 0))
+            with col3:
+                st.metric("TikTok", platform_counts.get('TikTok', 0))
+            with col4:
+                st.metric("YouTube", platform_counts.get('YouTube', 0))
+            
+            # Create DataFrame for AgGrid display
+            data = []
+            for i, url in enumerate(urls, 1):
+                platform = exporter.get_platform(url)
+                data.append({
+                    "#": i,
+                    "Platform": platform,
+                    "Post URL": url,
+                    "Creator": "",  # Will be extracted later
+                    "Status": "✅ Found"
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Create proper cellRenderer for clickable URLs (same as Bulk Review)
+            cellRenderer_url = JsCode("""
+            class UrlCellRenderer {
+              init(params) {
+                this.eGui = document.createElement('a');
+                this.eGui.innerText = '🔗 View';
+                this.eGui.href = params.value;
+                this.eGui.target = '_blank';
+                this.eGui.style.color = '#1f77b4';
+                this.eGui.style.textDecoration = 'underline';
+                this.eGui.style.cursor = 'pointer';
+              }
 
-# ========== ACTIVE JOBS TAB ==========
-with active_jobs_tab:
-    display_active_jobs_tab()
+              getGui() {
+                return this.eGui;
+              }
+
+              refresh(params) {
+                return false;
+              }
+            }
+            """)
+            
+            # Configure AgGrid with EXACT same settings as Bulk Review
+            gb = GridOptionsBuilder.from_dataframe(df)
+            
+            # *** ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
+            gb.configure_side_bar()  # Enable filtering sidebar
+            gb.configure_default_column(
+                filter="agSetColumnFilter",  # CHECKBOX FILTERS with search
+                sortable=True,  # Enable sorting
+                resizable=True,  # Enable column resizing
+                editable=False, 
+                groupable=True, 
+                value=True, 
+                enableRowGroup=True, 
+                enablePivot=True, 
+                enableValue=True,
+                filterParams={
+                    "buttons": ["reset", "apply"],
+                    "closeOnApply": True,
+                    "newRowsAction": "keep"
+                }
+            )
+            
+            # Configure columns with proper widths and features
+            gb.configure_column("#", minWidth=60, pinned="left")
+            gb.configure_column("Platform", minWidth=120, pinned="left")
+            gb.configure_column("Post URL", 
+                cellRenderer=cellRenderer_url,
+                minWidth=120,
+                sortable=False,
+                filter=False
+            )
+            gb.configure_column("Creator", minWidth=180)
+            gb.configure_column("Status", minWidth=120)
+            
+            # Configure selection
+            gb.configure_selection(selection_mode="multiple", use_checkbox=False)
+            
+            gridOptions = gb.build()
+            
+            # Display table with EXACT same AgGrid call as Bulk Review
+            st.markdown("#### 📊 Extracted URLs")
+            selected_rows = AgGrid(
+                df,
+                gridOptions=gridOptions,
+                allow_unsafe_jscode=True,
+                update_mode=GridUpdateMode.SELECTION_CHANGED,
+                height=650,  # Same height as Bulk Review
+                fit_columns_on_grid_load=True,
+                columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',  # Auto-size all columns
+                theme="alpine",
+                enable_enterprise_modules=True  # REQUIRED for Set Filters with checkboxes
+            )
+            
+            # Download section
+            if 'creatoriq_export_path' in st.session_state:
+                export_path = st.session_state.creatoriq_export_path
+                
+                if os.path.exists(export_path):
+                    with open(export_path, 'rb') as f:
+                        csv_data = f.read()
+                    
+                    st.download_button(
+                        label="📥 Download CSV",
+                        data=csv_data,
+                        file_name=f"creatoriq_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+        
+        # Help section
+        with st.expander("ℹ️ How to use CreatorIQ Scraper"):
+            st.markdown("""
+            **Steps:**
+            1. **Get URL**: Copy the CreatorIQ campaign report URL (must end with `/posts`)
+            2. **Adjust Scrolls**: Set scroll cycles (20 is usually enough for 500+ posts)
+            3. **Scrape**: Click 'Scrape' and wait 1-3 minutes for completion
+            4. **Review**: Check the extracted URLs in the table below
+            5. **Download**: Export the results as CSV for further analysis
+            
+            **Supported Platforms:**
+            - Instagram (profiles and posts)
+            - TikTok (videos)
+            - YouTube (videos)
+            - Twitter (posts)
+            - Facebook (posts)
+            
+            **Note**: The scraper extracts post URLs only. Creator names and engagement metrics will be added in future versions.
+            """)
+    
+    except ImportError as e:
+        st.error(f"❌ CreatorIQ module not available: {str(e)}")
+        st.info("Please ensure the CreatorIQ module is properly installed.")
 
 # ========== BULK REVIEW TAB (Compact Interface) ==========
 with bulk_review_tab:
@@ -2503,7 +2665,7 @@ with bulk_review_tab:
     # Cache database calls to improve performance
     @st.cache_data(ttl=300)  # Cache for 5 minutes to allow fresh data
     def cached_get_pending_clips():
-        db = get_cached_database()
+        db = get_database()
         return db.get_pending_clips()
     
     # Try to load results from database
@@ -2577,8 +2739,8 @@ with bulk_review_tab:
                     st.success("✅ Record successfully rejected and moved to Rejected/Issues tab!")
                     st.session_state.rejection_success = False  # Clear the flag
 
-                # Quick stats overview - only show relevant metrics for pending review
-                col1, col2, col3 = st.columns(3)
+                # Quick stats overview 
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.metric("Total Clips", len(df))
                 with col2:
@@ -2587,6 +2749,19 @@ with bulk_review_tab:
                 with col3:
                     high_quality = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns and not df.empty else 0
                     st.metric("High Quality", high_quality)
+                with col4:
+                    # Check approved count from database
+                    @st.cache_data
+                    def cached_get_approved_clips_count():
+                        db = get_database()
+                        return len(db.get_approved_clips())
+                    
+                    try:
+                        approved_count = cached_get_approved_clips_count()
+                    except Exception as e:
+                        logger.error(f"Error getting approved clips count: {e}")
+                        approved_count = 0
+                    st.metric("Approved", approved_count)
                 
                 
                 # Display filtered results with AgGrid
@@ -3779,7 +3954,7 @@ with bulk_review_tab:
                                 new_outlet = st.session_state.last_saved_outlets[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_cached_database()
+                                    db = get_database()
                                     
                                     # Get outlet data for this WO
                                     outlet_id = None
@@ -3841,7 +4016,7 @@ with bulk_review_tab:
                                 new_byline = st.session_state.last_saved_bylines[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_cached_database()
+                                    db = get_database()
                                     # Update the clip in database using the new method
                                     success = db.update_clip_byline_author(wo_num, new_byline)
                                     if success:
@@ -3892,7 +4067,7 @@ with bulk_review_tab:
                                 new_date = st.session_state.last_saved_dates[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_cached_database()
+                                    db = get_database()
                                     # Update the clip in database using the new method
                                     success = db.update_clip_published_date(wo_num, new_date)
                                     if success:
@@ -3950,7 +4125,7 @@ with bulk_review_tab:
                                 new_url = st.session_state.edited_urls[wo_num]
                                 try:
                                     # Get database connection
-                                    db = get_cached_database()
+                                    db = get_database()
                                     # Update the clip in database
                                     success = db.update_clip_url(wo_num, new_url)
                                     if success:
@@ -4101,7 +4276,7 @@ with bulk_review_tab:
                     # Manual Save Progress button
                     if st.button("💾 Save Progress", help="Save all UI selections to database"):
                         try:
-                            db = get_cached_database()
+                            db = get_database()
                             saved_count = 0
                             
                             # Save viewed states
@@ -4200,7 +4375,7 @@ with bulk_review_tab:
                                 # Update clips in database to approved status (workflow_stage stays 'found' for Approved Queue)
                                 try:
                                     # Get database connection
-                                    db = get_cached_database()
+                                    db = get_database()
                                     
                                     # First, approve the clips with Media Outlet data
                                     approved_clips = []
@@ -4343,7 +4518,7 @@ with bulk_review_tab:
                             if selected_rejected_wos:
                                 try:
                                     # Get database instance
-                                    db = get_cached_database()
+                                    db = get_database()
                                     if not db:
                                         st.error("Database connection not available")
                                         st.session_state.show_rejection_dialog = False
@@ -4526,8 +4701,12 @@ with approved_queue_tab:
     
     # Load clips based on selected filter
     try:
-        # Use the global cached database connection
-        db = get_cached_database()
+        # Use cached database connection
+        @st.cache_resource
+        def get_cached_db():
+            return get_database()
+        
+        db = get_cached_db()
         
         # One-time migration: Update any existing clips with 'exported' status to have proper workflow_stage
         # This ensures legacy exported clips show up in Recent Complete
@@ -4684,10 +4863,7 @@ with approved_queue_tab:
                 )
             
             # Configure ADVANCED AgGrid for approved queue (same as Bulk Review)
-            # Lazy render: limit rows initially to speed first paint, allow full view on demand
-            max_initial_rows = 300
-            initial_df = clean_df.head(max_initial_rows)
-            gb = GridOptionsBuilder.from_dataframe(initial_df)
+            gb = GridOptionsBuilder.from_dataframe(clean_df)
             
             # *** ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
             gb.configure_side_bar()  # Enable filtering sidebar
@@ -5318,42 +5494,18 @@ with rejected_tab:
     
     # Load rejected clips and failed processing attempts from database
     try:
-        # Get cached database connection
-        db = get_cached_database()
-        
-        # Cache the current run data to avoid duplicate calls
-        @st.cache_data(ttl=300)  # Cache for 5 minutes
-        def get_current_run_data():
-            """Get current run data with caching to prevent duplicate DB calls
-            
-            Args:
-                none
-            """
-            local_db = get_cached_database()
-            latest_id = local_db.get_latest_processing_run_id()
-            failed_clips = local_db.get_current_run_failed_clips()
-            return latest_id, failed_clips
-        
         # Choose data source based on mode
         if st.session_state.rejected_view_mode == 'current_run':
             # Current run mode - get only the most recent processing run
-            latest_run_id, current_run_failed_clips = get_current_run_data()
+            latest_run_id = db.get_latest_processing_run_id()
+            current_run_failed_clips = db.get_current_run_failed_clips()
             
             # Also get clips that were skipped in the current run
             current_run_skipped_clips = []
             if latest_run_id:
-                @st.cache_data(ttl=300)
-                def get_skipped_clips_by_run(run_id: int):
-                    # Conservative projection (avoid non-existent columns)
-                    projection = 'wo_number, office, make, model, contact, media_outlet, processed_date, original_urls, urls_attempted, failure_reason, last_skip_run_id'
-                    return (
-                        db.supabase
-                        .table('clips')
-                        .select(projection)
-                        .eq('last_skip_run_id', run_id)
-                        .execute()
-                    ).data or []
-                current_run_skipped_clips = get_skipped_clips_by_run(latest_run_id)
+                skipped_result = db.supabase.table('clips').select('*').eq('last_skip_run_id', latest_run_id).execute()
+                if skipped_result.data:
+                    current_run_skipped_clips = skipped_result.data
             
             # Get run info for display
             if (current_run_failed_clips or current_run_skipped_clips) and latest_run_id:
@@ -5369,7 +5521,6 @@ with rejected_tab:
             for clip in current_run_failed_clips:
                 # Add retry status to rejection reason if in cooldown
                 rejection_reason = 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed'
-                # Some deployments may not have retry_status/ retry_after columns
                 if clip.get('retry_status') == 'in_cooldown':
                     retry_date = clip.get('retry_after', '')
                     if retry_date:
@@ -5388,7 +5539,7 @@ with rejected_tab:
                     'Make': clip.get('make', ''),
                     'Model': clip.get('model', ''),
                     'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                    'Affiliation': clip.get('office', ''),
                     'Rejection_Reason': rejection_reason,
                     'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
                     'Processed_Date': clip.get('processed_date', ''),
@@ -5396,7 +5547,6 @@ with rejected_tab:
                     'original_urls': clip.get('original_urls', ''),
                     'urls_attempted': clip.get('urls_attempted', 0),
                     'failure_reason': clip.get('failure_reason', ''),
-                    # These fields may not exist in all schemas; keep optional
                     'retry_status': clip.get('retry_status', ''),
                     'attempt_count': clip.get('attempt_count', 1)
                 })
@@ -5418,7 +5568,7 @@ with rejected_tab:
                     'Make': clip.get('make', ''),
                     'Model': clip.get('model', ''),
                     'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                    'Affiliation': clip.get('office', ''),
                     'Rejection_Reason': f'Skipped: {rejection_reason}',
                     'URL_Details': f"Skipped in current run",
                     'Processed_Date': clip.get('processed_date', ''),
@@ -5435,12 +5585,7 @@ with rejected_tab:
             start_date_str = start_date.strftime('%Y-%m-%d') if start_date else None
             end_date_str = end_date.strftime('%Y-%m-%d') if end_date else None
             
-            @st.cache_data(ttl=300)
-            def cached_get_all_failed_clips(start_date: str|None, end_date: str|None):
-                local_db = get_cached_database()
-                return local_db.get_all_failed_clips(start_date=start_date, end_date=end_date)
-
-            all_failed_clips = cached_get_all_failed_clips(
+            all_failed_clips = db.get_all_failed_clips(
                 start_date=start_date_str,
                 end_date=end_date_str
             )
@@ -5464,7 +5609,7 @@ with rejected_tab:
                     'Make': clip.get('make', ''),
                     'Model': clip.get('model', ''),
                     'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                    'Affiliation': clip.get('office', ''),
                     'Rejection_Reason': 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed',
                     'URL_Details': f"Processed with {clip.get('tier_used', 'Unknown')}",
                     'Processed_Date': clip.get('processed_date', ''),
@@ -5480,7 +5625,7 @@ with rejected_tab:
             if latest_run_id:
                 @st.cache_data
                 def cached_get_rejected_clips_by_run(run_id):
-                    db = get_cached_database()
+                    db = get_database()
                     return db.get_rejected_clips(run_id=run_id)
                 
                 rejected_clips = cached_get_rejected_clips_by_run(latest_run_id)
@@ -5488,21 +5633,21 @@ with rejected_tab:
                 rejected_clips = []
         else:
             # For historical view, get all rejected clips (with optional date filtering)
-            @st.cache_data(ttl=300)
-            def cached_get_rejected_clips_hist():
-                local_db = get_cached_database()
-                return local_db.get_rejected_clips()
+            @st.cache_data
+            def cached_get_rejected_clips():
+                db = get_database()
+                return db.get_rejected_clips()
             
-            rejected_clips = cached_get_rejected_clips_hist()
+            rejected_clips = cached_get_rejected_clips()
         
         for clip in rejected_clips:
-                combined_issues.append({
+            combined_issues.append({
                 'WO #': clip['wo_number'],
                 'Office': clip.get('office', ''),
                 'Make': clip.get('make', ''),
                 'Model': clip.get('model', ''),
-                    'To': clip.get('contact', ''),
-                    'Affiliation': clip.get('media_outlet', ''),
+                'To': clip.get('contact', ''),
+                'Affiliation': clip.get('office', ''),
                 'Rejection_Reason': 'User Rejected Clip',
                 'URL_Details': clip.get('clip_url', ''),
                 'Processed_Date': clip.get('processed_date', ''),
@@ -5778,14 +5923,10 @@ with rejected_tab:
             # Build grid options
             grid_options = gb.build()
             
-            # Implement lazy loading - start with first 50 rows for performance
-            max_initial_rows = 50
-            initial_df = clean_df.head(max_initial_rows) if len(clean_df) > max_initial_rows else clean_df
-            
             # Display AgGrid table for rejected records
             st.markdown("**📋 Rejected Records**")
             selected_rejected = AgGrid(
-                initial_df,
+                clean_df,  # Pass full dataframe so JavaScript can access hidden columns
                 gridOptions=grid_options,
                 height=400,
                 width='100%',
@@ -5795,35 +5936,9 @@ with rejected_tab:
                 theme='streamlit',
                 enable_enterprise_modules=True,
                 allow_unsafe_jscode=True,
-                reload_data=False,  # Disable auto-reload for performance
+                reload_data=True,
                 columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW'  # Enable auto-sizing
             )
-
-            # Option to load all rows (may be heavy)
-            if len(clean_df) > max_initial_rows:
-                if st.button(f"Load all {len(clean_df)} records", key="load_all_rejected"):
-                    gb_full = GridOptionsBuilder.from_dataframe(clean_df)
-                    # Reuse same column configurations
-                    for hidden_col in hidden_columns:
-                        if hidden_col in clean_df.columns:
-                            gb_full.configure_column(hidden_col, hide=True)
-                    gb_full.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
-                    gb_full.configure_side_bar()
-                    grid_options_full = gb_full.build()
-                    AgGrid(
-                        clean_df,
-                        gridOptions=grid_options_full,
-                        height=500,
-                        width='100%',
-                        data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
-                        update_mode=GridUpdateMode.SELECTION_CHANGED,
-                        fit_columns_on_grid_load=True,
-                        theme='streamlit',
-                        enable_enterprise_modules=True,
-                        allow_unsafe_jscode=True,
-                        reload_data=True,
-                        columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW'
-                    )
             
             # Optional: Add functionality to move selected rejected records back to Bulk Review
             if st.button("🔄 Move Selected to Bulk Review", key="move_to_bulk_review"):
@@ -5834,7 +5949,7 @@ with rejected_tab:
                         selected_rows = selected_rows.to_dict('records')
                     
                     # Get database instance
-                    db = get_cached_database()
+                    db = get_database()
                     if not db:
                         st.error("Database connection not available")
                     else:
@@ -5990,65 +6105,564 @@ with rejected_tab:
     else:
         st.info("📊 No rejected records found")
 
-# ========== STRATEGIC INTELLIGENCE TAB (Single Column Layout) ==========
+# ========== DETAILED ANALYSIS TAB (Existing 40/60 Interface) ==========
 with analysis_tab:
-    # Single column layout for Strategic Intelligence
-    try:
-        # Use the already cached database instance instead of getting a new one
-        # db is already available from the main cached database instance
-
-        # Cached lightweight fetch (projection + limit) to speed initial render
-        @st.cache_data(ttl=300, show_spinner=False)
-        def load_sentiment_clips():
-            projection = 'wo_number, make, model, contact, media_outlet, overall_sentiment, published_date, sentiment_data_enhanced, clip_url'
-            result = (
-                db.supabase
-                .table('clips')
-                .select(projection)
-                .eq('sentiment_completed', True)
-                .order('published_date', desc=True)
-                .limit(500)
-                .execute()
-            )
-            return result.data if result.data else []
-
-        # Optional refresh to bust the cache explicitly
-        refresh_col1, _ = st.columns([1, 5])
-        with refresh_col1:
-            if st.button('🔄 Refresh Data', key='refresh_strategic_cache'):
-                load_sentiment_clips.clear()
-                st.rerun()
-
-        with st.spinner('Loading clips with sentiment...'):
-            sentiment_clips = load_sentiment_clips()
+    # Create 40/60 split columns for detailed analysis
+    left_pane, right_pane = st.columns([0.4, 0.6])
+    
+    with left_pane:
+        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">🚀 Strategic Command Center</p>', unsafe_allow_html=True)
         
-        # Use the new single column display
-        display_strategic_intelligence_tab(sentiment_clips)
+        # Load data from database for analysis (all approved clips with sentiment)
+        try:
+            db = get_database()
+            # Get clips that have been through sentiment analysis
+            # Look for clips with workflow_stage = 'sentiment_analyzed' OR sentiment_completed = True
+            sentiment_result = db.supabase.table('clips').select('*').eq('workflow_stage', 'sentiment_analyzed').execute()
+            
+            # Also check for any clips with sentiment_completed = True (legacy or direct flag)
+            legacy_sentiment_result = db.supabase.table('clips').select('*').eq('sentiment_completed', True).execute()
+            
+            # Combine results and deduplicate
+            sentiment_clips = []
+            seen_ids = set()
+            
+            if sentiment_result.data:
+                for clip in sentiment_result.data:
+                    if clip['id'] not in seen_ids:
+                        sentiment_clips.append(clip)
+                        seen_ids.add(clip['id'])
+            
+            if legacy_sentiment_result.data:
+                for clip in legacy_sentiment_result.data:
+                    if clip['id'] not in seen_ids:
+                        sentiment_clips.append(clip)
+                        seen_ids.add(clip['id'])
+            
+            if sentiment_clips:
+                # Convert to DataFrame for analysis
+                df = pd.DataFrame(sentiment_clips)
+                
+                # Map database fields to display fields for compatibility
+                column_mapping = {
+                    'wo_number': 'WO #',
+                    'contact': 'To',
+                    'media_outlet': 'Affiliation',
+                    'relevance_score': 'Relevance Score',
+                    'overall_sentiment': 'Overall Sentiment',
+                    'make': 'Make',
+                    'model': 'Model',
+                    'office': 'Office',
+                    'clip_url': 'Clip URL',
+                    'attribution_strength': 'Attribution_Strength',
+                    'byline_author': 'Actual_Byline',
+                    'brand_alignment': 'Brand Alignment'
+                }
+                
+                # Keep all original columns including aspect_insights
+                # Don't rename columns that aren't in the mapping
+                for col in sentiment_clips[0].keys() if sentiment_clips else []:
+                    if col not in column_mapping and col not in column_mapping.values():
+                        df[col] = [clip.get(col) for clip in sentiment_clips]
+                
+                # Rename columns for consistency
+                df.rename(columns=column_mapping, inplace=True)
+                
+                # Ensure WO # is treated as string
+                if 'WO #' in df.columns:
+                    df['WO #'] = df['WO #'].astype(str)
+                
+                if not df.empty:
+                    # Overview Stats
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">🎯 Overview</p>', unsafe_allow_html=True)
+                    total_loans = len(df)
+                    avg_relevance = df['Relevance Score'].mean() if 'Relevance Score' in df.columns else 0
+                    high_relevance = len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns else 0
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total Loans", total_loans)
+                    with col2:
+                        st.metric("Avg Relevance", f"{avg_relevance:.1f}/10")
+                    with col3:
+                        st.metric("High Quality", f"{high_relevance}/{total_loans}")
+                    
+                    # Group by Media Personality
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">👥 By Media Personality</p>', unsafe_allow_html=True)
+                    
+                    # Create grouping by 'To' field (media contact)
+                    if 'To' in df.columns:
+                        personality_stats = df.groupby('To').agg({
+                            'WO #': 'count',
+                            'Relevance Score': ['mean', 'min'] if 'Relevance Score' in df.columns else 'count'
+                        }).round(1)
+                        
+                        # Flatten column names
+                        if 'Relevance Score' in df.columns:
+                            personality_stats.columns = ['Count', 'Avg_Score', 'Min_Score']
+                            personality_stats['Success_Rate'] = (personality_stats['Min_Score'] >= 7).astype(int) * 100
+                        else:
+                            personality_stats.columns = ['Count']
+                            personality_stats['Avg_Score'] = 10.0
+                            personality_stats['Success_Rate'] = 100
+                        
+                        # Sort by count and avg score
+                        personality_stats = personality_stats.sort_values(['Count', 'Avg_Score'], ascending=[False, False])
+                        
+                        # Display as interactive table
+                        selected_personality = st.selectbox(
+                            "Select Media Personality:",
+                            options=[''] + list(personality_stats.index),
+                            format_func=lambda x: f"{x} ({personality_stats.loc[x, 'Count']} loans, {personality_stats.loc[x, 'Avg_Score']:.1f}/10)" if x else "-- Select --"
+                        )
+                        
+                        # Show personality stats as metrics
+                        if selected_personality:
+                            stats = personality_stats.loc[selected_personality]
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Loans", int(stats['Count']))
+                            with col2:
+                                st.metric("Avg Score", f"{stats['Avg_Score']:.1f}/10")
+                    
+                    # Compact Loans List
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">📋 Loans List</p>', unsafe_allow_html=True)
+                    
+                    # Filter to selected personality if any
+                    filtered_df = df.copy()
+                    if selected_personality:
+                        filtered_df = filtered_df[filtered_df['To'] == selected_personality]
+                    
+                    # Display compact table
+                    if not filtered_df.empty:
+                        display_cols = ['WO #']
+                        if 'Model' in filtered_df.columns:
+                            display_cols.append('Model')
+                        display_cols.append('To')
+                        if 'Relevance Score' in filtered_df.columns:
+                            display_cols.append('Relevance Score')
+                        
+                        # Make table clickable by using selectbox
+                        def format_work_order(x):
+                            if not x:
+                                return "-- Select Loan --"
+                            row = filtered_df[filtered_df['WO #']==x].iloc[0]
+                            text = f"{x}"
+                            if 'Model' in filtered_df.columns:
+                                text += f" - {row['Model']}"
+                            if 'Relevance Score' in filtered_df.columns:
+                                text += f" ({row['Relevance Score']}/10)"
+                            return text
+                        
+                        selected_wo = st.selectbox(
+                            "Select Work Order:",
+                            options=[''] + list(filtered_df['WO #'].values),
+                            format_func=format_work_order
+                        )
+                        
+                        # Store selected work order in session state
+                        if selected_wo:
+                            st.session_state.selected_work_order = selected_wo
+                    
+                    # Action Buttons
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">⚡ Quick Actions</p>', unsafe_allow_html=True)
+                    if st.button("📤 Export All Approved", use_container_width=True, key="export_detailed"):
+                        approved_data = df.to_csv(index=False)
+                        st.download_button(
+                            "📥 Download CSV",
+                            data=approved_data,
+                            file_name=f"approved_clips_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                            key="download_detailed"
+                        )
+                    
+                    # CLIENT EXPORT SECTION
+                    st.markdown('<p style="font-size: 0.85rem; font-weight: 600; color: #5a6c7d; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">🎯 Client Reports</p>', unsafe_allow_html=True)
+                    
+                    if st.button("📊 Professional Excel Report", use_container_width=True, key="client_excel"):
+                        try:
+                            # Load approved clips if available
+                            approved_file = os.path.join(project_root, "data", "approved_clips.csv")
+                            approved_df = None
+                            if os.path.exists(approved_file):
+                                approved_df = pd.read_csv(approved_file)
+                            
+                            # Create professional Excel report
+                            wb = create_client_excel_report(df, approved_df)
+                            
+                            # Save to bytes
+                            excel_buffer = io.BytesIO()
+                            wb.save(excel_buffer)
+                            excel_buffer.seek(0)
+                            
+                            st.download_button(
+                                label="📥 Download Excel Report",
+                                data=excel_buffer.getvalue(),
+                                file_name=f"DriveShop_Media_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True,
+                                key="download_client_excel"
+                            )
+                        except Exception as e:
+                            st.error(f"Error creating Excel report: {e}")
+                    
+                    if st.button("📈 Executive Summary", use_container_width=True, key="exec_summary"):
+                        # Create executive summary data
+                        summary_data = {
+                            'Metric': [
+                                'Total Vehicles Monitored',
+                                'Media Clips Found',
+                                'Average Relevance Score',
+                                'High-Quality Clips (8+)',
+                                'Coverage Rate',
+                                'Positive Sentiment',
+                                'Brand Alignment Rate'
+                            ],
+                            'Value': [
+                                len(df),
+                                len(df[df['Relevance Score'] > 0]) if 'Relevance Score' in df.columns else len(df),
+                                f"{df['Relevance Score'].mean():.1f}/10" if 'Relevance Score' in df.columns else "N/A",
+                                len(df[df['Relevance Score'] >= 8]) if 'Relevance Score' in df.columns else 0,
+                                f"{(len(df[df['Relevance Score'] > 0])/len(df)*100):.1f}%" if 'Relevance Score' in df.columns and len(df) > 0 else "0%",
+                                len(df[df['Overall Sentiment'] == 'positive']) if 'Overall Sentiment' in df.columns else 0,
+                                f"{(len(df[df['Brand Alignment'] == True])/len(df)*100):.1f}%" if 'Brand Alignment' in df.columns and len(df) > 0 else "N/A"
+                            ]
+                        }
+                        
+                        summary_df = pd.DataFrame(summary_data)
+                        csv_data = summary_df.to_csv(index=False)
+                        
+                        st.download_button(
+                            label="📥 Download Executive Summary",
+                            data=csv_data,
+                            file_name=f"Executive_Summary_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                            key="download_exec_summary"
+                        )
+                else:
+                    st.info("No data available. Process loans to see summary.")
+            else:
+                st.info("No clips with sentiment analysis found. Run sentiment analysis on approved clips to see detailed insights.")
+        except Exception as e:
+            st.error(f"Error loading data: {e}")
+    
+    with right_pane:
+        st.markdown('<p style="font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.8rem;">🔍 Strategic Intelligence Dashboard</p>', unsafe_allow_html=True)
         
-    except Exception as e:
-        st.error(f"Error loading Strategic Intelligence: {e}")
-        logger.error(f"Strategic Intelligence tab error: {e}")
-
-# Remove all old Strategic Intelligence code - it's now handled by display_strategic_intelligence_tab
-# The old code from here to the export tab is no longer needed
-
-# ========== MESSAGE PULL-THROUGH TAB ==========
-with pullthrough_tab:
-    display_pullthrough_analysis_tab()
-
-# ========== OEM MESSAGING TAB ==========
-with oem_tab:
-    display_oem_messaging_tab()
-
-# ========== HISTORICAL RE-PROCESSING TAB ==========
-with reprocess_tab:
-    # The function handles its own database connection
-    display_historical_reprocessing_tab()
-
-# ========== COOLDOWN MANAGEMENT TAB ==========
-with cooldown_tab:
-    # Display the cooldown management interface
-    display_cooldown_management_tab()
+        # Show details if a work order is selected
+        selected_wo = st.session_state.get('selected_work_order', None)
+        
+        if selected_wo and sentiment_clips and not df.empty:
+            try:
+                # Use the same DataFrame from the database
+                selected_row = df[df['WO #'] == selected_wo]
+                if not selected_row.empty:
+                    selected_row = selected_row.iloc[0]
+                    
+                    # Header with model info
+                    st.markdown(f"#### {selected_row.get('Model', 'Unknown Model')} - WO #{selected_wo}")
+                    
+                    # Rebalanced info in 4 columns for better distribution (added attribution column)
+                    info_col1, info_col2, info_col3, info_col4 = st.columns(4)
+                    with info_col1:
+                        st.markdown(f"**👤 Contact**  \n{selected_row.get('To', 'N/A')}")
+                    with info_col2:
+                        st.markdown(f"**📰 Publication**  \n{selected_row.get('Affiliation', 'N/A')}")
+                    with info_col3:
+                        # NEW: Attribution Information
+                        attribution_strength = selected_row.get('Attribution_Strength', 'unknown')
+                        actual_byline = selected_row.get('Actual_Byline', '')
+                        
+                        if attribution_strength == 'strong':
+                            attribution_text = "✅ **Direct Attribution**"
+                        elif attribution_strength == 'delegated':
+                            attribution_text = "⚠️ **Delegated Content**"
+                            if actual_byline:
+                                attribution_text += f"  \n*By: {actual_byline}*"
+                        else:
+                            attribution_text = "❓ **Attribution Unknown**"
+                        
+                        st.markdown(f"**✍️ Attribution**  \n{attribution_text}")
+                    with info_col4:
+                        link_html = ""
+                        if 'Clip URL' in selected_row and selected_row['Clip URL']:
+                            link_html += f"**[📄 Review Link]({selected_row['Clip URL']})**  \n"
+                        if 'Links' in selected_row and selected_row['Links']:
+                            link_html += f"**[🔗 Original]({selected_row['Links']})**"
+                        if link_html:
+                            st.markdown(link_html)
+                    
+                    # Key metrics in prominent display
+                    st.markdown("---")
+                    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                    
+                    with metric_col1:
+                        overall_score = selected_row.get('Overall Score', 'N/A')
+                        st.metric("📊 Overall", f"{overall_score}/10" if overall_score != 'N/A' else 'N/A')
+                    
+                    with metric_col2:
+                        relevance_score = selected_row.get('Relevance Score', 'N/A')
+                        st.metric("🎯 Relevance", f"{relevance_score}/10" if relevance_score != 'N/A' else 'N/A')
+                    
+                    with metric_col3:
+                        # NEW: Marketing Impact Score
+                        marketing_impact = selected_row.get('marketing_impact_score', 'N/A')
+                        impact_color = "🔴" if marketing_impact and marketing_impact >= 8 else "🟡" if marketing_impact and marketing_impact >= 5 else "🔵"
+                        st.metric("💡 Marketing Impact", f"{impact_color} {marketing_impact}/10" if marketing_impact != 'N/A' else 'N/A')
+                    
+                    with metric_col4:
+                        # Purchase Intent Signal
+                        purchase_intent = selected_row.get('purchase_intent_signals', 'N/A')
+                        intent_emoji = "🚀" if purchase_intent == "strong positive" else "👍" if purchase_intent == "moderate positive" else "➖" if purchase_intent == "neutral" else "⚠️"
+                        st.metric("🛒 Purchase Intent", f"{intent_emoji} {purchase_intent.title() if purchase_intent != 'N/A' else 'N/A'}")
+                    
+                    
+                    # Detailed analysis sections (keep all existing functionality)
+                    with st.expander("📈 Aspect Breakdown", expanded=False):
+                        aspect_col1, aspect_col2, aspect_col3, aspect_col4, aspect_col5 = st.columns(5)
+                        
+                        # Parse aspect_insights JSONB field
+                        aspect_insights = selected_row.get('aspect_insights', {})
+                        
+                        # Debug logging
+                        logger.info(f"WO# {selected_row.get('WO #', 'Unknown')} - aspect_insights type: {type(aspect_insights)}")
+                        logger.info(f"aspect_insights raw value: {aspect_insights}")
+                        
+                        
+                        if isinstance(aspect_insights, str):
+                            try:
+                                aspect_insights = json.loads(aspect_insights)
+                                logger.info(f"Parsed aspect_insights: {aspect_insights}")
+                            except Exception as e:
+                                logger.error(f"Failed to parse aspect_insights: {e}")
+                                aspect_insights = {}
+                        
+                        aspects = [
+                            ('performance', '🏎️ Performance', aspect_col1),
+                            ('design', '🎨 Design', aspect_col2),
+                            ('interior', '🪑 Interior', aspect_col3),
+                            ('technology', '💻 Technology', aspect_col4),
+                            ('value', '💰 Value', aspect_col5)
+                        ]
+                        
+                        for aspect_key, label, col in aspects:
+                            with col:
+                                aspect_data = aspect_insights.get(aspect_key, {})
+                                if isinstance(aspect_data, dict):
+                                    # The actual structure has 'sentiment', 'impact', 'evidence'
+                                    sentiment = aspect_data.get('sentiment', '')
+                                    impact = aspect_data.get('impact', '')
+                                    evidence = aspect_data.get('evidence', '')
+                                    
+                                    # Convert sentiment/impact to a score
+                                    score_map = {
+                                        'positive': {'high': 9, 'medium': 7, 'low': 5},
+                                        'neutral': {'high': 6, 'medium': 5, 'low': 4},
+                                        'negative': {'high': 2, 'medium': 3, 'low': 4}
+                                    }
+                                    
+                                    score = score_map.get(sentiment, {}).get(impact, 5)
+                                    
+                                    # Create insight from evidence
+                                    insight = evidence if evidence else f"{sentiment.title()} {impact} impact"
+                                    if score:
+                                        st.metric(label, f"{score}/10", help=insight)
+                                    else:
+                                        st.metric(label, "N/A")
+                                else:
+                                    st.metric(label, "N/A")
+                    
+                    # Executive Summary (NEW)
+                    if 'executive_summary' in selected_row and selected_row['executive_summary']:
+                        with st.expander("🎯 Executive Summary", expanded=True):
+                            st.markdown(f"**CMO Briefing:** {selected_row['executive_summary']}")
+                    
+                    # Summary (Legacy)
+                    elif 'Summary' in selected_row and selected_row['Summary']:
+                        with st.expander("📝 AI Summary", expanded=True):
+                            st.markdown(f"*{selected_row['Summary']}*")
+                    
+                    # Pros and Cons
+                    pros_text = selected_row.get('Pros', '')
+                    cons_text = selected_row.get('Cons', '')
+                    if pros_text or cons_text:
+                        with st.expander("⚖️ Pros & Cons", expanded=False):
+                            pros_col, cons_col = st.columns(2)
+                            
+                            with pros_col:
+                                st.markdown("**✅ Strengths**")
+                                if pros_text and pros_text.strip():
+                                    pros_list = [p.strip() for p in pros_text.split('|') if p.strip()]
+                                    for pro in pros_list:
+                                        st.markdown(f"• {pro}")
+                                else:
+                                    st.markdown("*No specific strengths highlighted*")
+                            
+                            with cons_col:
+                                st.markdown("**❌ Areas for Improvement**")
+                                if cons_text and cons_text.strip():
+                                    cons_list = [c.strip() for c in cons_text.split('|') if c.strip()]
+                                    for con in cons_list:
+                                        st.markdown(f"• {con}")
+                                else:
+                                    st.markdown("*No specific concerns noted*")
+                    
+                    # Strategic Intelligence Section (NEW)
+                    if 'brand_narrative' in selected_row and selected_row['brand_narrative']:
+                        with st.expander("🎭 Brand Narrative & Strategic Signals", expanded=False):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**Brand Story Impact:**")
+                                st.markdown(f"{selected_row['brand_narrative']}")
+                            with col2:
+                                if 'strategic_signal' in selected_row and selected_row['strategic_signal']:
+                                    st.markdown("**Strategic Signal:**")
+                                    st.markdown(f"⚡ {selected_row['strategic_signal']}")
+                    
+                    # Creator/Publication Intelligence (NEW)
+                    creator_data = selected_row.get('creator_analysis', {})
+                    publication_data = selected_row.get('publication_analysis', {})
+                    if isinstance(creator_data, str):
+                        try:
+                            import json
+                            creator_data = json.loads(creator_data) if creator_data else {}
+                        except:
+                            creator_data = {}
+                    if isinstance(publication_data, str):
+                        try:
+                            import json
+                            publication_data = json.loads(publication_data) if publication_data else {}
+                        except:
+                            publication_data = {}
+                    
+                    if creator_data or publication_data:
+                        with st.expander("📊 Media Intelligence", expanded=False):
+                            if creator_data:
+                                st.markdown("**🎬 Creator Analysis:**")
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("Influence", creator_data.get('influence_tier', 'N/A'))
+                                with col2:
+                                    st.metric("Audience", creator_data.get('audience_archetype', 'N/A'))
+                                with col3:
+                                    st.metric("Credibility", f"{creator_data.get('credibility_score', 'N/A')}/10")
+                                with col4:
+                                    st.metric("Viral Potential", creator_data.get('viral_potential', 'N/A'))
+                            
+                            if publication_data:
+                                st.markdown("**📰 Publication Analysis:**")
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("Type", publication_data.get('credibility', 'N/A'))
+                                with col2:
+                                    st.metric("Reach", publication_data.get('audience_reach', 'N/A'))
+                                with col3:
+                                    st.metric("Stance", publication_data.get('editorial_stance', 'N/A'))
+                                with col4:
+                                    st.metric("Influence", f"{publication_data.get('influence_factor', 'N/A')}/10")
+                    
+                    # Competitive Intelligence (NEW)
+                    competitive_data = selected_row.get('competitive_intelligence', {})
+                    if isinstance(competitive_data, str):
+                        try:
+                            import json
+                            competitive_data = json.loads(competitive_data) if competitive_data else {}
+                        except:
+                            competitive_data = {}
+                    
+                    if competitive_data:
+                        with st.expander("🏁 Competitive Intelligence", expanded=False):
+                            st.markdown(f"**Positioning:** {competitive_data.get('positioning_vs_competitors', 'N/A')}")
+                            
+                            advantages = competitive_data.get('advantages_highlighted', [])
+                            vulnerabilities = competitive_data.get('vulnerabilities_exposed', [])
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**✅ Advantages Highlighted:**")
+                                if advantages:
+                                    for adv in advantages:
+                                        st.markdown(f"• {adv}")
+                                else:
+                                    st.markdown("*No specific advantages noted*")
+                            
+                            with col2:
+                                st.markdown("**⚠️ Vulnerabilities Exposed:**")
+                                if vulnerabilities:
+                                    for vuln in vulnerabilities:
+                                        st.markdown(f"• {vuln}")
+                                else:
+                                    st.markdown("*No vulnerabilities identified*")
+                    
+                    # Action Items & Opportunities (NEW)
+                    action_data = selected_row.get('action_items', {})
+                    if isinstance(action_data, str):
+                        try:
+                            import json
+                            action_data = json.loads(action_data) if action_data else {}
+                        except:
+                            action_data = {}
+                    
+                    messaging_opps = selected_row.get('messaging_opportunities', [])
+                    risks = selected_row.get('risks_to_address', [])
+                    influential_statements = selected_row.get('influential_statements', [])
+                    
+                    if action_data or messaging_opps or risks or influential_statements:
+                        with st.expander("🚀 Strategic Actions & Insights", expanded=False):
+                            if action_data:
+                                immediate_response = action_data.get('immediate_response_needed', False)
+                                if immediate_response:
+                                    st.warning("⚡ **IMMEDIATE RESPONSE NEEDED**")
+                                
+                                if 'recommendation' in action_data:
+                                    st.markdown(f"**📋 Recommended Action:** {action_data['recommendation']}")
+                                
+                                if 'creator_relationship' in action_data:
+                                    st.markdown(f"**🤝 Creator Strategy:** {action_data.get('creator_relationship', 'Monitor')}")
+                                elif 'media_strategy' in action_data:
+                                    st.markdown(f"**📰 Media Strategy:** {action_data.get('media_strategy', 'Monitor')}")
+                            
+                            if influential_statements:
+                                st.markdown("**💬 Influential Quotes:**")
+                                for quote in influential_statements[:3]:  # Limit to 3
+                                    st.markdown(f"> *\"{quote}\"*")
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if messaging_opps:
+                                    st.markdown("**🎯 Messaging Opportunities:**")
+                                    for opp in messaging_opps:
+                                        st.markdown(f"• {opp}")
+                            
+                            with col2:
+                                if risks:
+                                    st.markdown("**⚠️ Risks to Address:**")
+                                    for risk in risks:
+                                        st.markdown(f"• {risk}")
+                    
+                    # Add bottom spacing for better visual separation
+                    st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
+                else:
+                    st.warning("Selected work order not found in data.")
+            except Exception as e:
+                st.error(f"Error loading loan details: {e}")
+        else:
+            st.info("👈 Select a loan from the Command Center to view details")
+            
+            # Show helpful instructions
+            st.markdown("""
+            **How to use:**
+            1. 📤 **Upload/Process** loans in the sidebar
+            2. 👥 **Select** a media personality or filter loans  
+            3. 📋 **Choose** a specific work order to review
+            4. ✅ **Approve** or ⚠️ **flag** the clip
+            5. 📤 **Export** approved clips when ready
+            """)
+            
+            # Add extra bottom spacing
+            st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
 
 # ========== EXPORT TAB ==========
 with export_tab:
@@ -6056,8 +6670,12 @@ with export_tab:
     st.markdown('<p style="margin-top: 0; margin-bottom: 1rem; font-size: 0.9rem; color: #6c757d; font-style: italic;">Export clips to Excel with custom filters and date ranges</p>', unsafe_allow_html=True)
     
     try:
-        # Use the global cached database connection
-        db = get_cached_database()
+        # Use cached database connection
+        @st.cache_resource
+        def get_cached_db():
+            return get_database()
+        
+        db = get_cached_db()
         
         # Create filter columns
         col1, col2, col3 = st.columns([1, 1, 1])
@@ -6349,3 +6967,102 @@ with export_tab:
         import traceback
         st.error(f"Full error: {traceback.format_exc()}")
 
+# ========== FILE HISTORY TAB ==========
+with history_tab:
+    st.markdown("## 📚 File History")
+    st.markdown("*Access all your previous approval session files and generate reports*")
+    
+    # Get all JSON files from data directory
+    data_dir = os.path.join(project_root, "data")
+    json_files = []
+    if os.path.exists(data_dir):
+        for file in os.listdir(data_dir):
+            if file.startswith("approved_clips_") and file.endswith(".json"):
+                file_path = os.path.join(data_dir, file)
+                file_stats = os.stat(file_path)
+                # Extract date from filename: approved_clips_20250625_163543.json
+                try:
+                    date_str = file.replace("approved_clips_", "").replace(".json", "")
+                    date_part = date_str.split("_")[0]  # 20250625
+                    time_part = date_str.split("_")[1]  # 163543
+                    formatted_date = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
+                    formatted_time = f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
+                    display_name = f"{formatted_date} at {formatted_time}"
+                except:
+                    display_name = file.replace("approved_clips_", "").replace(".json", "")
+                
+                json_files.append({
+                    'filename': file,
+                    'filepath': file_path,
+                    'display_name': display_name,
+                    'size': file_stats.st_size,
+                    'modified': file_stats.st_mtime
+                })
+    
+    # Sort by modification time (newest first)
+    json_files.sort(key=lambda x: x['modified'], reverse=True)
+    
+    if json_files:
+        st.markdown(f"**Found {len(json_files)} previous approval sessions:**")
+        
+        # Create a more compact display
+        for i, file_info in enumerate(json_files):
+            # Use filename as unique identifier to avoid key conflicts
+            file_key = file_info['filename'].replace('.json', '').replace('approved_clips_', '')
+            
+            with st.expander(f"📅 {file_info['display_name']} ({file_info['size']/1024:.1f} KB)", expanded=(i==0)):
+                col_json_hist, col_excel_hist, col_info = st.columns([1, 1, 1])
+                
+                with col_json_hist:
+                    # Load and provide JSON download
+                    try:
+                        with open(file_info['filepath'], 'r') as f:
+                            json_data = json.load(f)
+                        st.download_button(
+                            label="📋 Download JSON",
+                            data=json.dumps(json_data, indent=2),
+                            file_name=file_info['filename'],
+                            mime="application/json",
+                            key=f"json_download_{file_key}",
+                            help="Download this JSON file"
+                        )
+                    except Exception as e:
+                        st.error(f"Error loading JSON: {e}")
+                
+                with col_excel_hist:
+                    # Excel generation temporarily disabled for historical files
+                    # to avoid compatibility issues
+                    # to avoid compatibility issues
+                    st.info("💡 **Excel Generation**\n\nFor historical sessions, use the JSON download and import into the current session for Excel generation.")
+                    st.caption("This ensures compatibility with the latest Excel format.")
+                
+                with col_info:
+                    # Show file info
+                    try:
+                        with open(file_info['filepath'], 'r') as f:
+                            json_data = json.load(f)
+                        if json_data:
+                            st.metric("Clips", len(json_data))
+                            avg_relevance = sum(clip.get('relevance_score', 0) for clip in json_data) / len(json_data)
+                            st.metric("Avg Score", f"{avg_relevance:.1f}")
+                        else:
+                            st.metric("Clips", 0)
+                    except:
+                        st.metric("Clips", "Error")
+    else:
+        st.info("No previous approval sessions found. Approve some clips to create downloadable files!")
+        
+        # Show helpful instructions
+        st.markdown("""
+        **How File History works:**
+        1. 📋 **Approve clips** in the Bulk Review tab
+        2. 📁 **Files are automatically saved** with timestamps
+        3. 📚 **Access them here** anytime - even after browser restart
+        4. 📊 **Generate fresh Excel reports** from any historical session
+        5. 📋 **Download original JSON** for data integration
+        
+        **File naming:** `approved_clips_YYYYMMDD_HHMMSS.json`
+        **Example:** `approved_clips_20250625_163543.json` = June 25th, 2025 at 4:35 PM
+        """)
+
+ 
