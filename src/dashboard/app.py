@@ -4684,7 +4684,10 @@ with approved_queue_tab:
                 )
             
             # Configure ADVANCED AgGrid for approved queue (same as Bulk Review)
-            gb = GridOptionsBuilder.from_dataframe(clean_df)
+            # Lazy render: limit rows initially to speed first paint, allow full view on demand
+            max_initial_rows = 300
+            initial_df = clean_df.head(max_initial_rows)
+            gb = GridOptionsBuilder.from_dataframe(initial_df)
             
             # *** ADVANCED FEATURES WITH SET FILTERS (CHECKBOXES) ***
             gb.configure_side_bar()  # Enable filtering sidebar
@@ -5320,27 +5323,37 @@ with rejected_tab:
         
         # Cache the current run data to avoid duplicate calls
         @st.cache_data(ttl=300)  # Cache for 5 minutes
-        def get_current_run_data(_db):
+        def get_current_run_data():
             """Get current run data with caching to prevent duplicate DB calls
             
             Args:
-                _db: Database connection (prefixed with _ to exclude from cache key)
+                none
             """
-            latest_id = _db.get_latest_processing_run_id()
-            failed_clips = _db.get_current_run_failed_clips()
+            local_db = get_cached_database()
+            latest_id = local_db.get_latest_processing_run_id()
+            failed_clips = local_db.get_current_run_failed_clips()
             return latest_id, failed_clips
         
         # Choose data source based on mode
         if st.session_state.rejected_view_mode == 'current_run':
             # Current run mode - get only the most recent processing run
-            latest_run_id, current_run_failed_clips = get_current_run_data(db)
+            latest_run_id, current_run_failed_clips = get_current_run_data()
             
             # Also get clips that were skipped in the current run
             current_run_skipped_clips = []
             if latest_run_id:
-                skipped_result = db.supabase.table('clips').select('*').eq('last_skip_run_id', latest_run_id).execute()
-                if skipped_result.data:
-                    current_run_skipped_clips = skipped_result.data
+                @st.cache_data(ttl=300)
+                def get_skipped_clips_by_run(run_id: int):
+                    # Conservative projection (avoid non-existent columns)
+                    projection = 'wo_number, office, make, model, contact, processed_date, original_urls, urls_attempted, failure_reason, last_skip_run_id'
+                    return (
+                        db.supabase
+                        .table('clips')
+                        .select(projection)
+                        .eq('last_skip_run_id', run_id)
+                        .execute()
+                    ).data or []
+                current_run_skipped_clips = get_skipped_clips_by_run(latest_run_id)
             
             # Get run info for display
             if (current_run_failed_clips or current_run_skipped_clips) and latest_run_id:
@@ -5356,6 +5369,7 @@ with rejected_tab:
             for clip in current_run_failed_clips:
                 # Add retry status to rejection reason if in cooldown
                 rejection_reason = 'No Content Found' if clip['status'] == 'no_content_found' else 'Processing Failed'
+                # Some deployments may not have retry_status/ retry_after columns
                 if clip.get('retry_status') == 'in_cooldown':
                     retry_date = clip.get('retry_after', '')
                     if retry_date:
@@ -5382,6 +5396,7 @@ with rejected_tab:
                     'original_urls': clip.get('original_urls', ''),
                     'urls_attempted': clip.get('urls_attempted', 0),
                     'failure_reason': clip.get('failure_reason', ''),
+                    # These fields may not exist in all schemas; keep optional
                     'retry_status': clip.get('retry_status', ''),
                     'attempt_count': clip.get('attempt_count', 1)
                 })
@@ -5420,7 +5435,12 @@ with rejected_tab:
             start_date_str = start_date.strftime('%Y-%m-%d') if start_date else None
             end_date_str = end_date.strftime('%Y-%m-%d') if end_date else None
             
-            all_failed_clips = db.get_all_failed_clips(
+            @st.cache_data(ttl=300)
+            def cached_get_all_failed_clips(start_date: str|None, end_date: str|None):
+                local_db = get_cached_database()
+                return local_db.get_all_failed_clips(start_date=start_date, end_date=end_date)
+
+            all_failed_clips = cached_get_all_failed_clips(
                 start_date=start_date_str,
                 end_date=end_date_str
             )
@@ -5468,12 +5488,12 @@ with rejected_tab:
                 rejected_clips = []
         else:
             # For historical view, get all rejected clips (with optional date filtering)
-            @st.cache_data
-            def cached_get_rejected_clips():
-                db = get_cached_database()
-                return db.get_rejected_clips()
+            @st.cache_data(ttl=300)
+            def cached_get_rejected_clips_hist():
+                local_db = get_cached_database()
+                return local_db.get_rejected_clips()
             
-            rejected_clips = cached_get_rejected_clips()
+            rejected_clips = cached_get_rejected_clips_hist()
         
         for clip in rejected_clips:
             combined_issues.append({
@@ -5761,7 +5781,7 @@ with rejected_tab:
             # Display AgGrid table for rejected records
             st.markdown("**📋 Rejected Records**")
             selected_rejected = AgGrid(
-                clean_df,  # Pass full dataframe so JavaScript can access hidden columns
+                initial_df,
                 gridOptions=grid_options,
                 height=400,
                 width='100%',
@@ -5774,6 +5794,32 @@ with rejected_tab:
                 reload_data=True,
                 columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW'  # Enable auto-sizing
             )
+
+            # Option to load all rows (may be heavy)
+            if len(clean_df) > max_initial_rows:
+                if st.button(f"Load all {len(clean_df)} records", key="load_all_rejected"):
+                    gb_full = GridOptionsBuilder.from_dataframe(clean_df)
+                    # Reuse same column configurations
+                    for hidden_col in hidden_columns:
+                        if hidden_col in clean_df.columns:
+                            gb_full.configure_column(hidden_col, hide=True)
+                    gb_full.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
+                    gb_full.configure_side_bar()
+                    grid_options_full = gb_full.build()
+                    AgGrid(
+                        clean_df,
+                        gridOptions=grid_options_full,
+                        height=500,
+                        width='100%',
+                        data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+                        update_mode=GridUpdateMode.SELECTION_CHANGED,
+                        fit_columns_on_grid_load=True,
+                        theme='streamlit',
+                        enable_enterprise_modules=True,
+                        allow_unsafe_jscode=True,
+                        reload_data=True,
+                        columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW'
+                    )
             
             # Optional: Add functionality to move selected rejected records back to Bulk Review
             if st.button("🔄 Move Selected to Bulk Review", key="move_to_bulk_review"):
