@@ -504,7 +504,7 @@ def analyze_clip(content: str, make: str, model: str, max_retries: int = 3, url:
 #     """
 #     pass
 
-def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str, Any]:
+def analyze_clip_relevance_only(content: str, make: str, model: str, video_title: str = None) -> Dict[str, Any]:
     """
     Analyze content for relevance only (no sentiment analysis) to save costs.
     This function mirrors the OLD system's GPT analysis but skips sentiment scoring.
@@ -513,6 +513,7 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
         content: Article or video transcript content
         make: Vehicle make
         model: Vehicle model
+        video_title: Optional video title for additional context
         
     Returns:
         Dictionary with relevance_score only, or None if analysis fails
@@ -527,6 +528,30 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
     if not content or len(content.strip()) < 100:
         logger.warning("Content too short for relevance analysis")
         return {'relevance_score': 0}
+    
+    # SHORTCUT: If title (video or article) clearly indicates it's about the target vehicle, bypass GPT
+    if video_title:
+        title_lower = video_title.lower()
+        model_lower = model.lower() if model else ""
+        make_lower = make.lower() if make else ""
+        
+        # Check for model variations in title
+        model_variations = [
+            model_lower,  # Original
+            model_lower.replace('-', ''),  # "cx-90" -> "cx90"
+            model_lower.replace(' ', ''),  # Remove spaces
+            model_lower.replace('-', ' ')  # "cx-90" -> "cx 90"
+        ]
+        
+        # If title contains the model (or variations), it's highly relevant
+        for variant in model_variations:
+            if variant and variant in title_lower:
+                logger.info(f"🎯 SHORTCUT: Title '{video_title}' contains '{variant}' - highly relevant!")
+                # Still check content to make sure it's substantial
+                if len(content) >= 1000:  # Substantial content
+                    logger.info(f"✅ Returning high relevance (8) based on title match and substantial content")
+                    return {'relevance_score': 8}
+                break
     
     # Extract a more representative sample of the content
     # Try to find sections that mention the vehicle
@@ -567,14 +592,20 @@ def analyze_clip_relevance_only(content: str, make: str, model: str) -> Dict[str
     
     Content: {content_excerpt}
     
+    IMPORTANT CONTEXT:
+    - Reviewers sometimes misspeak or make errors when referring to vehicle names
+    - If the content mentions "{model}" or variations like "{model_lower}", it's likely about that vehicle
+    - Look for context clues - if they're discussing features/aspects of a "{model}", score it as relevant
+    - Example: If someone says "CX-5" but then refers to it as "CX-90", they likely mean CX-90
+    
     Rate relevance on a scale of 0-10 where:
-    - 0: No mention of the vehicle
+    - 0: No mention of the vehicle at all
     - 1-3: Brief mention only
     - 4-6: Some discussion of the vehicle
-    - 7-8: Substantial coverage of the vehicle
+    - 7-8: Substantial coverage of the vehicle (THIS IS THE MINIMUM if the content is a review of the {make} {model})
     - 9-10: Comprehensive review or detailed analysis
     
-    IMPORTANT: If this content is specifically about the {make} {model}, the score should be at least 7.
+    CRITICAL: If this appears to be a review or detailed discussion of the {make} {model} (even if the reviewer misspoke initially), the score MUST be at least 7.
     
     Respond with ONLY a JSON object: {{"relevance_score": <number>}}
     """

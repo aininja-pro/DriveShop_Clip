@@ -366,8 +366,23 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
                         logger.warning("⚠️ Article extraction failed or returned minimal content. Using raw HTML.")
                         # Don't reject entirely - let GPT try with raw HTML as fallback
             
+            # Extract title for both YouTube and web content
+            content_title = None
+            if 'youtube.com' in url or 'youtu.be' in url:
+                # Extract title from the formatted YouTube content
+                import re
+                title_match = re.search(r'Video Title:\s*(.+?)(?:\n|$)', content)
+                if title_match:
+                    content_title = title_match.group(1).strip()
+                    logger.info(f"📹 Extracted video title: '{content_title}'")
+            else:
+                # For web articles, use the title from the result
+                content_title = result.get('title', '')
+                if content_title and content_title != result_url:  # Don't use URL as title
+                    logger.info(f"📰 Using article title: '{content_title}'")
+            
             try:
-                gpt_result = analyze_clip_relevance_only(content, make, model)
+                gpt_result = analyze_clip_relevance_only(content, make, model, video_title=content_title)
                 relevance_score = gpt_result.get('relevance_score', 0) if gpt_result else 0
                 
                 # Only store if relevance score is reasonable (same threshold as OLD system)
@@ -486,8 +501,8 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                     'processing_run_id': run_id,
                     'office': clip_result.get('office'),
                     'make': loan.get('make'),
-                    'model': loan.get('model'),
-                    'trim': loan.get('trim'),  # Add trim from loan data
+                    'model': loan.get('model'),  # This is already the base model from ingest.py
+                    'trim': loan.get('trim'),  # This already has the extracted trim from ingest.py
                     'contact': loan.get('to'),  # FIX: Get contact name from loan data, not clip_result
                     'person_id': clip_result.get('person_id'),
                     'activity_id': loan.get('activity_id'),  # FIX: Get Activity_ID from loan data, not clip_result

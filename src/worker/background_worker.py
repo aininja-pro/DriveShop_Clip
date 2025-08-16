@@ -413,6 +413,18 @@ class BackgroundWorker:
                 filtered_loans = filtered_loans[:limit]
                 self.log_job_message('INFO', f'Applied limit: processing {len(filtered_loans)} loans')
             
+            # NOW extract trim only for the filtered loans (much more efficient!)
+            from src.utils.trim_extractor import extract_trim_from_model
+            for loan in filtered_loans:
+                if loan.get('model_full') and not loan.get('trim'):
+                    make = loan.get('make', '')
+                    full_model = loan.get('model_full', '')
+                    base_model, trim = extract_trim_from_model(full_model, make)
+                    loan['model'] = base_model  # Update to base model
+                    loan['trim'] = trim  # Add extracted trim
+                    if trim:
+                        logger.info(f"Extracted trim '{trim}' from '{full_model}' for WO# {loan.get('work_order')}")
+            
             # Update job with correct total for progress tracking
             self.db.supabase.table('processing_runs').update({
                 'progress_total': len(filtered_loans),  # Set the actual filtered count
@@ -431,7 +443,7 @@ class BackgroundWorker:
                         self.job_cancelled = True
                         logger.info(f"Cancellation detected for job {self.current_job_id} - flagged for stop")
                         break
-                    time.sleep(1)  # Check every second
+                    time.sleep(30)  # Check every 30 seconds - plenty for cancellation detection
             
             cancel_thread = threading.Thread(target=check_cancellation_thread, daemon=True)
             cancel_thread.start()

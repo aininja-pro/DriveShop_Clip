@@ -12,6 +12,19 @@ services:
       - .env
     restart: unless-stopped
   
+  # Worker service for processing jobs
+  worker:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./src:/app/src
+      - ./migrations:/app/migrations
+    env_file:
+      - .env
+    command: python src/worker/background_worker.py
+    restart: unless-stopped
+  
   # Cron service is now optional and won't start by default
   cron:
     profiles:

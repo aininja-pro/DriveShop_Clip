@@ -326,20 +326,18 @@ def load_loans_data_from_url(url: str, limit: Optional[int] = None) -> List[Dict
         # Log URL parsing for debugging
         logger.info(f"Loan {loan_dict.get('WO #')}: Parsed {len(urls)} URLs from '{links_text[:100]}...'")
         
-        # Extract trim from the Model field
+        # Get make and model - but DON'T extract trim yet for efficiency
         make = loan_dict.get('Make', '')
         full_model = loan_dict.get('Model', '')
-        base_model, trim = extract_trim_from_model(full_model, make)
         
-        # Log trim extraction
-        if trim:
-            logger.info(f"Extracted trim '{trim}' from model '{full_model}' -> base: '{base_model}'")
+        # For efficiency, we'll extract trim later only for filtered loans
+        # This avoids extracting trim for all 2090 loans when we only need 1
         
         processed_loan = {
             'work_order': loan_dict.get('WO #'),
-            'model': base_model,  # Store the base model without trim
+            'model': full_model,  # Keep full model for now - will extract trim later if needed
             'model_full': full_model,  # Keep the full model string
-            'trim': trim,  # Store trim separately
+            'trim': None,  # Will be extracted later for filtered loans only
             'to': loan_dict.get('To'),
             'affiliation': loan_dict.get('Affiliation'),
             'urls': urls,  # Use the properly parsed URLs
@@ -636,33 +634,69 @@ def process_youtube_url(url: str, loan: Dict[str, Any], cancel_check: Optional[c
                     logger.warning(f"❌ Video too far in future: uploaded {days_diff} days after start date (max: 180 days)")
                     return None
             
-            # If date is acceptable, proceed with content extraction
+            # OPTIMIZATION: Check title relevance BEFORE extracting expensive transcript
+            title = metadata.get('title', '') if metadata else ''
+            make = loan.get('make', '')
+            model = loan.get('model', '')
+            
+            if title and model:
+                title_lower = title.lower()
+                model_lower = model.lower()
+                
+                # Check for model variations in title
+                model_variations = [
+                    model_lower,
+                    model_lower.replace('-', ''),  # "cx-90" -> "cx90"  
+                    model_lower.replace(' ', ''),  # Remove spaces
+                    model_lower.replace('-', ' ')  # "cx-90" -> "cx 90"
+                ]
+                
+                # Check if title contains the target model
+                title_is_relevant = False
+                for variant in model_variations:
+                    if variant and variant in title_lower:
+                        logger.info(f"✅ Video title '{title}' contains target model '{variant}' - proceeding with transcript extraction")
+                        title_is_relevant = True
+                        break
+                
+                if not title_is_relevant:
+                    logger.warning(f"⚠️ SKIPPING TRANSCRIPT: Video title '{title}' doesn't mention {make} {model}")
+                    logger.info(f"💰 Saved transcript extraction cost for irrelevant video")
+                    return None
+            
+            # PHASE 1: For initial discovery, use metadata (title + description) only
+            # This is MUCH faster and more reliable than transcript extraction
             if cancel_check and cancel_check():
                 raise Exception("Job cancelled by user")
-            transcript = get_transcript(video_id, video_url=url)
             
-            if transcript:
-                title = metadata.get('title', f"YouTube Video {video_id}") if metadata else f"YouTube Video {video_id}"
+            # Always use metadata for initial discovery (Bulk Review phase)
+            if metadata and metadata.get('content_text'):
+                logger.info(f"📊 PHASE 1 - Using metadata for initial discovery (no transcript extraction)")
+                logger.info(f"✅ Video: {metadata.get('title', 'No title')}")
+                logger.info(f"💰 Skipping expensive transcript extraction - will extract if approved")
                 
                 return {
                     'url': url,
-                    'content': transcript,
-                    'content_type': 'video',
-                    'title': title,
-                    'published_date': video_date
+                    'content': metadata['content_text'],  # Title + description is enough for relevance
+                    'content_type': 'video_metadata',  # Mark as metadata-only
+                    'title': metadata.get('title', f"YouTube Video {video_id}"),
+                    'channel_name': metadata.get('channel_name', ''),
+                    'view_count': metadata.get('view_count', '0'),
+                    'published_date': video_date,
+                    'needs_transcript': True  # Flag for later extraction if approved
                 }
             else:
-                logger.info(f"No transcript available for video {video_id}, trying metadata fallback")
-                # Fallback to video metadata (title + description)
-                if metadata and metadata.get('content_text'):
-                    logger.info(f"Using video metadata fallback for {video_id}: {metadata.get('title', 'No title')}")
+                # Only if metadata fails completely (rare), try transcript as last resort
+                logger.warning(f"⚠️ No metadata available, attempting transcript extraction as fallback")
+                transcript = get_transcript(video_id, video_url=url)
+                
+                if transcript:
+                    title = metadata.get('title', f"YouTube Video {video_id}") if metadata else f"YouTube Video {video_id}"
                     return {
                         'url': url,
-                        'content': metadata['content_text'],
-                        'content_type': 'video_metadata',
-                        'title': metadata.get('title', f"YouTube Video {video_id}"),
-                        'channel_name': metadata.get('channel_name', ''),
-                        'view_count': metadata.get('view_count', '0'),
+                        'content': transcript,
+                        'content_type': 'video',
+                        'title': title,
                         'published_date': video_date
                     }
                 else:
@@ -812,36 +846,43 @@ def process_youtube_url(url: str, loan: Dict[str, Any], cancel_check: Optional[c
                                 if video_date:
                                     logger.info(f"📅 Extracted date from video metadata: {video_date}")
                             
+                            # PHASE 1: Use metadata for initial discovery instead of transcript
                             if cancel_check and cancel_check():
                                 raise Exception("Job cancelled by user")
-                            transcript = get_transcript(video_id, video_url=video['url'])
                             
-                            if transcript:
-                                result_dict = {
+                            # Re-fetch metadata if we don't have it
+                            if not metadata:
+                                metadata = get_video_metadata_fallback(video_id, known_title=video['title'])
+                            
+                            if metadata and metadata.get('content_text'):
+                                logger.info(f"📊 PHASE 1 - Using metadata for channel video (no transcript)")
+                                logger.info(f"💰 Saving transcript extraction for later if approved")
+                                return {
                                     'url': video['url'],
-                                    'content': transcript,
-                                    'content_type': 'video',
-                                    'title': video['title'],
-                                    'published_date': video_date
+                                    'content': metadata['content_text'],  # Title + description
+                                    'content_type': 'video_metadata',
+                                    'title': metadata.get('title', video['title']),
+                                    'channel_name': metadata.get('channel_name', ''),
+                                    'view_count': metadata.get('view_count', '0'),
+                                    'published_date': video_date,
+                                    'needs_transcript': True  # Flag for later extraction
                                 }
-                                logger.info(f"📅 Returning YouTube result with published_date: {video_date}")
-                                return result_dict
                             else:
-                                # Fallback to metadata if no transcript
-                                logger.info(f"No transcript for {video_id}, trying metadata fallback")
-                                # Re-fetch metadata only if we didn't already get it
-                                if not metadata:
-                                    metadata = get_video_metadata_fallback(video_id)
-                                if metadata and metadata.get('content_text'):
+                                # Only try transcript if metadata completely fails (rare)
+                                logger.warning(f"⚠️ No metadata for {video_id}, attempting transcript as fallback")
+                                transcript = get_transcript(video_id, video_url=video['url'])
+                                
+                                if transcript:
                                     return {
                                         'url': video['url'],
-                                        'content': metadata['content_text'],
-                                        'content_type': 'video_metadata',
-                                        'title': metadata.get('title', video['title']),
-                                        'channel_name': metadata.get('channel_name', ''),
-                                        'view_count': metadata.get('view_count', '0'),
+                                        'content': transcript,
+                                        'content_type': 'video',
+                                        'title': video['title'],
                                         'published_date': video_date
                                     }
+                                else:
+                                    logger.warning(f"No content available for video {video_id}")
+                                    continue  # Try next video
             
             # If we found something in this time window, stop looking
             if days_forward == 90:

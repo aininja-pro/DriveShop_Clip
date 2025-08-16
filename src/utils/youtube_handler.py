@@ -1,7 +1,9 @@
 import re
+import os
 import requests
 import xml.etree.ElementTree as ET
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
+from youtube_transcript_api.proxies import GenericProxyConfig
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -14,6 +16,21 @@ from src.utils.config import YOUTUBE_SCRAPFLY_CONFIG
 from src.utils.youtube_relative_date_parser import extract_youtube_date_from_html, parse_youtube_relative_date, extract_video_upload_date
 
 logger = setup_logger(__name__)
+
+# Get IPRoyal proxy configuration from environment
+YOUTUBE_PROXY_URL = os.getenv('YOUTUBE_PROXY_URL')
+if YOUTUBE_PROXY_URL:
+    logger.info(f"✅ IPRoyal proxy configured for YouTube transcript extraction")
+    # Create proxy config for youtube-transcript-api
+    proxy_config = GenericProxyConfig(
+        http_url=YOUTUBE_PROXY_URL,
+        https_url=YOUTUBE_PROXY_URL
+    )
+    # Create a proxied API instance
+    proxied_transcript_api = YouTubeTranscriptApi(proxy_config=proxy_config)
+else:
+    logger.warning("⚠️ No YOUTUBE_PROXY_URL found - transcript extraction may be rate-limited")
+    proxied_transcript_api = None
 
 def flexible_model_match(video_title: str, model_variation: str) -> bool:
     """
@@ -442,16 +459,39 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
         # Apply rate limiting
         rate_limiter.wait_if_needed('youtube.com')
         
-        # Try to get English transcript directly
+        # Use proxied API if available, otherwise use regular API
+        if proxied_transcript_api:
+            logger.info(f"🔄 Using IPRoyal proxy for transcript extraction of video {video_id}")
+            api = proxied_transcript_api
+        else:
+            logger.info(f"📝 Using direct connection for transcript extraction (no proxy)")
+            api = YouTubeTranscriptApi
+        
+        # Try to get transcript with better fallback handling
+        transcript_data = None
         try:
             # First try manual transcripts in English
-            transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
+            transcript_data = api.get_transcript(video_id, languages=['en', 'en-US', 'en-GB'])
+            logger.info(f"Got manual English transcript for {video_id}")
         except:
             try:
-                # Try any available transcript
-                transcript_data = YouTubeTranscriptApi.get_transcript(video_id)
-            except:
-                raise Exception(f"No transcript found for video {video_id}")
+                # Try to get auto-generated English transcript
+                transcript_list = api.list_transcripts(video_id)
+                
+                # Try to find any English transcript (including auto-generated)
+                for transcript in transcript_list:
+                    if transcript.language_code.startswith('en'):
+                        transcript_data = transcript.fetch()
+                        logger.info(f"Got {transcript.language} transcript for {video_id} (auto-generated: {transcript.is_generated})")
+                        break
+                
+                # If no English found, take the first available
+                if not transcript_data:
+                    transcript_data = transcript_list.find_transcript(['en']).fetch()
+                    logger.info(f"Got first available transcript for {video_id}")
+            except Exception as e:
+                logger.warning(f"Failed to get any transcript: {e}")
+                raise Exception(f"No transcript found for video {video_id}: {e}")
         
         # Combine all text parts
         full_text = ' '.join([part['text'] for part in transcript_data])
@@ -462,28 +502,21 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
     except Exception as e:
         logger.warning(f"No YouTube transcript available for video {video_id}: {e}")
         
-        # Try Whisper fallback if enabled and URL provided
-        if use_whisper_fallback and video_url:
-            logger.info(f"🎤 Attempting Whisper transcription for {video_id}...")
-            try:
-                # Import the appropriate version based on OpenAI library
-                try:
-                    import openai
-                    if hasattr(openai, '__version__') and openai.__version__.startswith('1.'):
-                        from src.utils.whisper_transcriber import transcribe_youtube_video
-                    else:
-                        from src.utils.whisper_transcriber_v0 import transcribe_youtube_video
-                except:
-                    from src.utils.whisper_transcriber_v0 import transcribe_youtube_video
-                
-                whisper_transcript = transcribe_youtube_video(video_url, video_id)
-                if whisper_transcript:
-                    logger.info(f"✅ Whisper transcription successful for {video_id}: {len(whisper_transcript)} characters")
-                    return whisper_transcript
-                else:
-                    logger.warning(f"❌ Whisper transcription failed for {video_id}")
-            except Exception as whisper_error:
-                logger.error(f"Error using Whisper fallback: {whisper_error}")
+        # IMPORTANT: Whisper fallback is DISABLED for approval workflow - too slow!
+        # For approved clips, we recommend using Apify or manual extraction
+        if use_whisper_fallback and video_url and False:  # Disabled 
+            logger.info(f"⚠️ Whisper fallback disabled for approval workflow - too slow (5+ minutes)")
+            logger.info(f"💡 Consider using Apify actor or browser-based extraction instead")
+        
+        # Try browser-based extraction as a faster alternative
+        logger.info(f"🌐 Attempting browser-based transcript extraction for {video_id}...")
+        try:
+            browser_transcript = extract_transcript_with_browser(video_id)
+            if browser_transcript:
+                logger.info(f"✅ Browser extraction successful: {len(browser_transcript)} chars")
+                return browser_transcript
+        except Exception as browser_error:
+            logger.debug(f"Browser extraction failed: {browser_error}")
         
         return None
 
@@ -683,6 +716,80 @@ def get_video_metadata_fallback(video_id, known_title=None):
         if known_title:
             return _create_fallback_metadata_with_title(video_id, known_title, f"https://www.youtube.com/watch?v={video_id}")
         return None
+
+def extract_transcript_with_browser(video_id):
+    """
+    Extract transcript using browser automation - MUCH faster than Whisper.
+    Uses Playwright to get transcript directly from YouTube page.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+        import time
+        
+        logger.info(f"🌐 Starting browser-based transcript extraction for {video_id}")
+        
+        with sync_playwright() as p:
+            # Launch browser
+            browser = p.chromium.launch(headless=True, args=['--disable-blink-features=AutomationControlled'])
+            context = browser.new_context(
+                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                viewport={'width': 1920, 'height': 1080}
+            )
+            page = context.new_page()
+            
+            try:
+                # Navigate to video
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                page.goto(url, wait_until='domcontentloaded', timeout=20000)
+                
+                # Wait for video player to load
+                page.wait_for_selector('video', timeout=10000)
+                time.sleep(2)  # Let page settle
+                
+                # Try to open transcript panel
+                # Click the three dots menu
+                more_button = page.query_selector('button[aria-label*="More"]')
+                if more_button:
+                    more_button.click()
+                    time.sleep(1)
+                    
+                    # Look for "Show transcript" option
+                    transcript_button = page.query_selector('text="Show transcript"')
+                    if not transcript_button:
+                        transcript_button = page.query_selector('text="Transcript"')
+                    
+                    if transcript_button:
+                        transcript_button.click()
+                        time.sleep(2)
+                        
+                        # Extract transcript text
+                        transcript_segments = page.query_selector_all('[class*="segment-text"]')
+                        if not transcript_segments:
+                            # Try alternative selector
+                            transcript_segments = page.query_selector_all('[class*="transcript"] [class*="cue"]')
+                        
+                        if transcript_segments:
+                            transcript_text = ' '.join([seg.inner_text() for seg in transcript_segments])
+                            browser.close()
+                            
+                            if transcript_text and len(transcript_text) > 100:
+                                logger.info(f"✅ Browser transcript extraction successful: {len(transcript_text)} chars")
+                                return transcript_text
+                
+                browser.close()
+                logger.warning(f"Could not extract transcript via browser for {video_id}")
+                
+            except Exception as e:
+                browser.close()
+                logger.error(f"Browser extraction error: {e}")
+                
+    except ImportError:
+        logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
+    except Exception as e:
+        logger.error(f"Browser transcript extraction failed: {e}")
+    
+    return None
+
 
 def _create_fallback_metadata_with_title(video_id, title, url):
     """

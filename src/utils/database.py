@@ -211,6 +211,7 @@ class DatabaseManager:
                 "office": clip_data.get('office'),
                 "make": clip_data.get('make'),
                 "model": clip_data.get('model'),
+                "trim": clip_data.get('trim'),  # ADD TRIM FIELD
                 "contact": clip_data.get('contact'),
                 "person_id": clip_data.get('person_id'),
                 "activity_id": clip_data.get('activity_id'),
