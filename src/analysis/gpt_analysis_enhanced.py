@@ -278,13 +278,16 @@ def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None,
                 features_count = len(analysis_result.get('key_features_mentioned', []))
                 attributes_count = len(analysis_result.get('brand_attributes_captured', []))
                 drivers_count = len(analysis_result.get('purchase_drivers', []))
+                trim_mentioned = analysis_result.get('trim_level_mentioned', False)
+                trim_impact = analysis_result.get('trim_impact_score', 0.0)
                 
                 # Relevance scoring: more extracted elements = higher relevance
                 relevance_score = min(10, max(1, 
                     3 + # Base score for mentioning the vehicle
                     min(4, features_count) + # Up to 4 points for features
                     min(2, attributes_count) + # Up to 2 points for brand attributes
-                    min(1, drivers_count) # Up to 1 point for purchase drivers
+                    min(1, drivers_count) + # Up to 1 point for purchase drivers
+                    (1 if trim_mentioned and trim_impact > 0.5 else 0) # Bonus point for significant trim discussion
                 ))
                 
                 analysis_result['relevance_score'] = relevance_score
@@ -298,6 +301,14 @@ def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None,
                 positive_brand = sum(1 for s in brand_sentiments if s == 'reinforced')
                 negative_brand = sum(1 for s in brand_sentiments if s == 'challenged')
                 analysis_result['brand_alignment'] = positive_brand > negative_brand
+                
+                # Ensure trim fields are present even if not in response
+                if 'trim_level_mentioned' not in analysis_result:
+                    analysis_result['trim_level_mentioned'] = False
+                if 'trim_impact_score' not in analysis_result:
+                    analysis_result['trim_impact_score'] = 0.0
+                if 'trim_highlights' not in analysis_result:
+                    analysis_result['trim_highlights'] = None
                 
                 return analysis_result
             else:
@@ -347,18 +358,42 @@ def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None,
                         features_count = len(analysis_result.get('key_features_mentioned', []))
                         attributes_count = len(analysis_result.get('brand_attributes_captured', []))
                         drivers_count = len(analysis_result.get('purchase_drivers', []))
+                        trim_mentioned = analysis_result.get('trim_level_mentioned', False)
+                        trim_impact = analysis_result.get('trim_impact_score', 0.0)
                         
                         relevance_score = min(10, max(1, 
-                            3 + min(4, features_count) + min(2, attributes_count) + min(1, drivers_count)
+                            3 + min(4, features_count) + min(2, attributes_count) + min(1, drivers_count) +
+                            (1 if trim_mentioned and trim_impact > 0.5 else 0)
                         ))
                         
                         analysis_result['relevance_score'] = relevance_score
                         analysis_result['summary'] = analysis_result.get('sentiment_classification', {}).get('rationale', '')
+                        analysis_result['vehicle_identifier'] = vehicle_identifier
+                        analysis_result['content_type'] = content_type
+                        
+                        # Map new sentiment to old format for compatibility
+                        sentiment_map = {
+                            'very_positive': 'positive',
+                            'positive': 'positive',
+                            'neutral': 'neutral',
+                            'negative': 'negative',
+                            'very_negative': 'negative'
+                        }
+                        overall_sentiment = analysis_result.get('sentiment_classification', {}).get('overall', 'neutral')
+                        analysis_result['overall_sentiment'] = sentiment_map.get(overall_sentiment, 'neutral')
                         
                         brand_sentiments = [attr.get('sentiment', 'neutral') for attr in analysis_result.get('brand_attributes_captured', [])]
                         positive_brand = sum(1 for s in brand_sentiments if s == 'reinforced')
                         negative_brand = sum(1 for s in brand_sentiments if s == 'challenged')
                         analysis_result['brand_alignment'] = positive_brand > negative_brand
+                        
+                        # Ensure trim fields are present even if not in response
+                        if 'trim_level_mentioned' not in analysis_result:
+                            analysis_result['trim_level_mentioned'] = False
+                        if 'trim_impact_score' not in analysis_result:
+                            analysis_result['trim_impact_score'] = 0.0
+                        if 'trim_highlights' not in analysis_result:
+                            analysis_result['trim_highlights'] = None
                         
                         return analysis_result
                 except Exception as fallback_error:
@@ -380,13 +415,15 @@ ENHANCED_SENTIMENT_PROMPT = """# Automotive Review Sentiment Analysis
 
 You are an automotive marketing intelligence analyst extracting standardized insights from vehicle reviews. Your analysis will be compared against manufacturer (OEM) marketing messages to identify alignment and gaps.
 
-**Context:** OEMs promote specific features, brand attributes, and purchase reasons. Your job is to identify what reviewers ACTUALLY discuss and how they frame it.
+**Primary Intent:** Advocate for the great job media is doing in covering vehicles. Focus on what reviewers ARE discussing and highlighting rather than what might be missing. Our goal is to showcase media value and identify successful messaging alignment.
+
+**Context:** OEMs promote specific features, brand attributes, and purchase reasons. Your job is to identify what reviewers ACTUALLY discuss and how they frame it, emphasizing the positive coverage and valuable insights they provide.
 
 **Input:**
 - Vehicle: {make} {model} {year} {trim}
 - Content: {content}
 
-**Your Task:** Extract structured data focusing on three core areas that enable comparison with OEM messaging.
+**Your Task:** Extract structured data focusing on core areas that enable comparison with OEM messaging. Be generous in recognizing when reviewers touch on key topics, even if briefly.
 
 **Output Format (JSON):**
 ```json
@@ -430,6 +467,15 @@ You are an automotive marketing intelligence analyst extracting standardized ins
   "competitive_context": {{
     "direct_comparisons": ["<vehicle>: <brief context>"],
     "market_positioning": "<how reviewer positions this vs. segment>"
+  }},
+  
+  "trim_level_mentioned": true|false,
+  "trim_impact_score": 0.0-1.0,
+  "trim_highlights": {{
+    "trim_name": "<actual trim name>",
+    "sentiment": "positive|neutral|negative",
+    "summary": "<2-3 sentences about what was said regarding this trim>",
+    "features_mentioned": ["<specific trim features discussed>"]
   }}
 }}
 ```
@@ -462,11 +508,36 @@ PURCHASE DRIVERS:
 1. Only extract what's explicitly stated in the review - no inference
 2. Use exact quotes from the review, not paraphrased
 3. AIM FOR MAXIMUM EXTRACTION: Try to find 10 features, 3-5 attributes, 3+ drivers
-4. Include even briefly mentioned features (e.g., "comfortable seats" counts as a feature)
-5. Features = tangible (what the car HAS) - be granular (e.g., "leather seats" and "heated seats" are separate)
-6. Attributes = intangible (what the brand IS) - can be implied from context
-7. Drivers = decision factors (why to BUY or NOT BUY) - include all mentioned reasons
-8. If the review is brief, extract everything possible rather than leaving arrays empty
+4. **Be inclusive rather than exclusive** - if something is close to a key feature/attribute, include it
+5. **Credit partial mentions** - even brief or tangential coverage counts as addressing the topic
+6. Include even briefly mentioned features (e.g., "comfortable seats" counts as a feature)
+7. Features = tangible (what the car HAS) - be granular (e.g., "leather seats" and "heated seats" are separate)
+8. Attributes = intangible (what the brand IS) - can be implied from context
+9. Drivers = decision factors (why to BUY or NOT BUY) - include all mentioned reasons
+10. If the review is brief, extract everything possible rather than leaving arrays empty
+11. **Recognize related terminology** - if reviewer says "cargo area" and OEM says "cargo space", treat as matched
+
+**TRIM LEVEL ANALYSIS:** When trim level ({{trim}}) is provided:
+1. Check if the specific trim is mentioned in the review (set trim_level_mentioned)
+2. Assess how much the trim discussion influenced the overall review sentiment (0.0 = no influence, 1.0 = major influence)
+3. If mentioned, capture:
+   - The exact trim name as stated in the review
+   - Whether discussion of the trim was positive, neutral, or negative
+   - A brief summary of trim-specific comments
+   - Any trim-exclusive features mentioned (e.g., "Carbon Edition's blacked-out wheels", "Hybrid's efficiency gains")
+
+**Trim Impact Scoring Guide:**
+- 0.0-0.2: Trim mentioned in passing, no real impact on review
+- 0.3-0.5: Trim discussed with some detail, moderate influence on sentiment
+- 0.6-0.8: Trim features/benefits are significant part of review
+- 0.9-1.0: Trim level is central to the review's recommendation
+
+**If trim is NOT mentioned:**
+- Set trim_level_mentioned to false
+- Set trim_impact_score to 0.0
+- Set trim_highlights to null
+
+Remember: The goal is to understand if reviewers are highlighting trim-specific value propositions that enhance (or detract from) the base model's appeal, showcasing the comprehensive coverage media provides.
 
 Return ONLY valid JSON matching the specified format."""
 

@@ -4238,6 +4238,30 @@ with bulk_review_tab:
                                     
                                     logger.info(f"✅ Approved {len(approved_clips)} clips")
                                     
+                                    # Extract trim for clips that don't have it
+                                    from src.utils.trim_extractor import extract_trim_from_model
+                                    
+                                    for clip in approved_clips:
+                                        if not clip.get('trim'):
+                                            make = clip.get('make', '')
+                                            model = clip.get('model', '')
+                                            if model:
+                                                base_model, extracted_trim = extract_trim_from_model(model, make)
+                                                if extracted_trim:
+                                                    # Update the clip with extracted trim
+                                                    try:
+                                                        db.supabase.table('clips').update({
+                                                            'trim': extracted_trim,
+                                                            'model': base_model  # Update to base model without trim
+                                                        }).eq('wo_number', clip['wo_number']).execute()
+                                                        
+                                                        # Update the clip object for sentiment analysis
+                                                        clip['trim'] = extracted_trim
+                                                        clip['model'] = base_model
+                                                        logger.info(f"Extracted trim '{extracted_trim}' for WO# {clip['wo_number']}")
+                                                    except Exception as e:
+                                                        logger.error(f"Failed to update trim for WO# {clip['wo_number']}: {e}")
+                                    
                                     # Show progress bar for sentiment analysis
                                     st.info("🧠 Running sentiment analysis on approved clips...")
                                     progress_bar = st.progress(0)

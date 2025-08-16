@@ -50,6 +50,7 @@ from src.utils.date_extractor import extract_date_from_html, extract_youtube_upl
 from src.utils.tiktok_handler import process_tiktok_video, search_channel_for_vehicle as search_tiktok_channel
 from src.utils.instagram_handler import process_instagram_post, search_profile_for_vehicle as search_instagram_profile
 from src.utils.enhanced_date_filter import is_content_acceptable
+from src.utils.trim_extractor import extract_trim_from_model
 
 logger = setup_logger(__name__)
 
@@ -325,14 +326,25 @@ def load_loans_data_from_url(url: str, limit: Optional[int] = None) -> List[Dict
         # Log URL parsing for debugging
         logger.info(f"Loan {loan_dict.get('WO #')}: Parsed {len(urls)} URLs from '{links_text[:100]}...'")
         
+        # Extract trim from the Model field
+        make = loan_dict.get('Make', '')
+        full_model = loan_dict.get('Model', '')
+        base_model, trim = extract_trim_from_model(full_model, make)
+        
+        # Log trim extraction
+        if trim:
+            logger.info(f"Extracted trim '{trim}' from model '{full_model}' -> base: '{base_model}'")
+        
         processed_loan = {
             'work_order': loan_dict.get('WO #'),
-            'model': loan_dict.get('Model'),
+            'model': base_model,  # Store the base model without trim
+            'model_full': full_model,  # Keep the full model string
+            'trim': trim,  # Store trim separately
             'to': loan_dict.get('To'),
             'affiliation': loan_dict.get('Affiliation'),
             'urls': urls,  # Use the properly parsed URLs
             'start_date': None,  # Initialize as None, then parse below
-            'make': loan_dict.get('Make'),
+            'make': make,
             # Add the new fields
             'activity_id': loan_dict.get('ActivityID'),
             'person_id': loan_dict.get('Person_ID'),
@@ -1256,6 +1268,7 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     make = loan.get('make', '')
     model = loan.get('model', '')
+    trim = loan.get('trim', '')  # Get trim if available
     work_order = loan.get('work_order', '')
     
     if not model or not work_order:
@@ -1344,6 +1357,7 @@ def process_loan(loan: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 'Person_ID': loan.get('person_id', ''),  # Add Person_ID for smart outlet matching
                 'Make': make,
                 'Model': model,
+                'Trim': trim,  # Add trim to the result
                 'Clip URL': actual_url,  # Use the actual URL where content was found (could be from RSS feed)
                 # Add attribution information for transparency
                 'Attribution_Strength': clip_data.get('attribution_strength', 'unknown'),

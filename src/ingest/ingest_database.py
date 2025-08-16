@@ -487,6 +487,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                     'office': clip_result.get('office'),
                     'make': loan.get('make'),
                     'model': loan.get('model'),
+                    'trim': loan.get('trim'),  # Add trim from loan data
                     'contact': loan.get('to'),  # FIX: Get contact name from loan data, not clip_result
                     'person_id': clip_result.get('person_id'),
                     'activity_id': loan.get('activity_id'),  # FIX: Get Activity_ID from loan data, not clip_result

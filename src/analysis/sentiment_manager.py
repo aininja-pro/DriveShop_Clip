@@ -55,24 +55,27 @@ class SentimentManager:
             model = clip_data.get('model', '')
             url = clip_data.get('clip_url', '')
             
-            # Extract year and trim if available (from model field or separate)
-            year = None
-            trim = None
+            # Extract year and trim if available
+            year = clip_data.get('year')  # Check if year is provided separately
+            trim = clip_data.get('trim')  # Check if trim is provided separately
             
-            # Try to parse year from model (e.g., "2024 Camry XLE")
-            model_parts = model.split()
-            if model_parts and model_parts[0].isdigit() and len(model_parts[0]) == 4:
-                year = model_parts[0]
-                # Reconstruct model without year
-                model = ' '.join(model_parts[1:])
-                
-                # Check if last part might be trim
-                if len(model_parts) > 2:
-                    potential_trim = model_parts[-1]
-                    # Common trim indicators
-                    if any(indicator in potential_trim.upper() for indicator in ['XLE', 'XSE', 'SR', 'LIMITED', 'SPORT', 'BASE', 'LX', 'EX', 'SI']):
-                        trim = potential_trim
-                        model = ' '.join(model_parts[1:-1])
+            # If trim not provided separately, try to parse from model field
+            if not trim:
+                # Try to parse year from model (e.g., "2024 Camry XLE")
+                model_parts = model.split()
+                if model_parts and model_parts[0].isdigit() and len(model_parts[0]) == 4:
+                    if not year:
+                        year = model_parts[0]
+                    # Reconstruct model without year
+                    model = ' '.join(model_parts[1:])
+                    
+                    # Check if last part might be trim
+                    if len(model_parts) > 2:
+                        potential_trim = model_parts[-1]
+                        # Common trim indicators
+                        if any(indicator in potential_trim.upper() for indicator in ['XLE', 'XSE', 'SR', 'LIMITED', 'SPORT', 'BASE', 'LX', 'EX', 'SI']):
+                            trim = potential_trim
+                            model = ' '.join(model_parts[1:-1])
             
             logger.info(f"Analyzing clip: {make} {model} {year} {trim} - Using {'enhanced' if use_enhanced_analysis else 'original'} analyzer")
             
