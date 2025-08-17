@@ -30,7 +30,7 @@ def is_content_acceptable(
     """
     # Configuration
     MAX_AGE_MONTHS = 18  # Absolute limit for content WITH dates
-    DAYS_BEFORE_LOAN = 60  # Allow content up to 60 days before loan
+    DAYS_BEFORE_LOAN = 30  # Allow content up to 30 days before loan (for reissued loans)
     DAYS_AFTER_LOAN = 180  # Look up to 180 days after loan
     
     today = datetime.now()

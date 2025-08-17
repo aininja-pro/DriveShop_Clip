@@ -965,42 +965,71 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                         published_date = None
                         date_text = None
                         
-                        # Look for metadata in the parent container
+                        # Look for metadata in the parent container and broader areas
                         parent = title_elem.parent if title_elem else None
                         if parent:
-                            # Method 1: Look for metadata spans
-                            metadata_spans = parent.find_all('span', class_=re.compile('inline-metadata-item|metadata'))
-                            if i < 3:  # Debug first few videos
-                                logger.debug(f"   Found {len(metadata_spans)} metadata spans for video {i+1}")
-                            for span in metadata_spans:
-                                span_text = span.get_text(strip=True)
-                                if re.search(r'\d+\s*(second|minute|hour|day|week|month|year)s?\s*ago', span_text, re.I):
-                                    date_text = span_text
-                                    published_date = parse_youtube_relative_date(date_text)
-                                    if published_date:
-                                        logger.info(f"   📅 Found date for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
-                                        break
+                            # Method 1: Look for ANY text containing relative dates in a much broader scope
+                            # Search up to 3 levels of parents for date strings
+                            search_elements = [parent]
+                            if parent.parent:
+                                search_elements.append(parent.parent)
+                                if parent.parent.parent:
+                                    search_elements.append(parent.parent.parent)
                             
-                            # Method 2: If not found, look in parent's parent for aria-label
-                            if not published_date and parent.parent:
-                                grandparent = parent.parent
-                                aria_label = grandparent.get('aria-label', '')
-                                date_match = re.search(r'(\d+\s*(?:second|minute|hour|day|week|month|year)s?\s*ago)', aria_label, re.I)
-                                if date_match:
-                                    date_text = date_match.group(1)
-                                    published_date = parse_youtube_relative_date(date_text)
-                                    if published_date:
-                                        logger.debug(f"   📅 Found date in aria-label for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
-                            
-                            # Method 3: Search broader in the parent for any text containing date
-                            if not published_date:
-                                # Use string instead of text (deprecated)
-                                date_strings = parent.find_all(string=re.compile(r'\d+\s*(second|minute|hour|day|week|month|year)s?\s*ago', re.I))
-                                if date_strings:
-                                    date_text = date_strings[0].strip()
-                                    published_date = parse_youtube_relative_date(date_text)
-                                    if published_date:
-                                        logger.debug(f"   📅 Found date in text for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
+                            for search_elem in search_elements:
+                                if published_date:
+                                    break
+                                    
+                                # Look for ALL text that contains relative dates
+                                all_text = search_elem.get_text()
+                                date_matches = re.findall(r'(\d+\s*(?:second|minute|hour|day|week|month|year)s?\s*ago)', all_text, re.I)
+                                
+                                if date_matches:
+                                    # Try each date match
+                                    for date_match in date_matches:
+                                        date_text = date_match.strip()
+                                        published_date = parse_youtube_relative_date(date_text)
+                                        if published_date:
+                                            logger.info(f"   📅 Found date in broader text for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
+                                            break
+                                
+                                # Also check aria-labels in this element and children
+                                if not published_date:
+                                    for elem_with_aria in search_elem.find_all(attrs={'aria-label': True}):
+                                        aria_label = elem_with_aria.get('aria-label', '')
+                                        date_match = re.search(r'(\d+\s*(?:second|minute|hour|day|week|month|year)s?\s*ago)', aria_label, re.I)
+                                        if date_match:
+                                            date_text = date_match.group(1)
+                                            published_date = parse_youtube_relative_date(date_text)
+                                            if published_date:
+                                                logger.info(f"   📅 Found date in aria-label for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
+                                                break
+                        
+                        # Method 2: As last resort, search for dates in the raw HTML around this video
+                        if not published_date and title:
+                            try:
+                                # Find this video's title in the raw HTML and extract surrounding context
+                                title_escaped = re.escape(title[:50])  # Use first 50 chars to find it
+                                html_str = str(soup)
+                                title_pos = html_str.find(title[:50])
+                                if title_pos > 0:
+                                    # Get 2000 characters around the title
+                                    start = max(0, title_pos - 1000)
+                                    end = min(len(html_str), title_pos + 1000)
+                                    video_context = html_str[start:end]
+                                    
+                                    # Look for date patterns in this context
+                                    date_matches = re.findall(r'(\d+\s*(?:second|minute|hour|day|week|month|year)s?\s*ago)', video_context, re.I)
+                                    if date_matches:
+                                        # Use the first valid date found
+                                        for date_match in date_matches:
+                                            date_text = date_match.strip()
+                                            published_date = parse_youtube_relative_date(date_text)
+                                            if published_date:
+                                                logger.info(f"   📅 Found date in HTML context for video {i+1}: '{date_text}' -> {published_date.strftime('%Y-%m-%d')}")
+                                                break
+                            except Exception as e:
+                                logger.debug(f"   Could not search HTML context: {e}")
                         
                         logger.info(f"🔍 Video {i+1}: Title='{title}', Href='{href}', Date='{date_text or 'Not found'}'")
                         
@@ -1076,8 +1105,24 @@ def scrape_channel_videos_with_scrapfly(channel_url: str, make: str, model: str,
                             for model_var in model_variations:
                                 logger.info(f"   🔍 Checking for model variation: '{model_var}'")
                                 if flexible_model_match(title_lower, model_var):
-                                    logger.info(f"🎯 ScrapFly found relevant video: {video['title']}")
-                                    relevant_videos.append(video)
+                                    # Check date filtering before adding video
+                                    video_date = None
+                                    if video.get('published'):
+                                        try:
+                                            video_date = datetime.fromisoformat(video['published'].replace('Z', '+00:00')).replace(tzinfo=None)
+                                        except:
+                                            video_date = None
+                                    
+                                    # Import and use enhanced date filter
+                                    from src.utils.enhanced_date_filter import is_content_acceptable
+                                    if is_content_acceptable(video_date, start_date, "youtube", video.get('url')):
+                                        logger.info(f"🎯 ScrapFly found relevant video: {video['title']}")
+                                        relevant_videos.append(video)
+                                    else:
+                                        if video_date:
+                                            logger.info(f"📅 Skipping video '{video['title']}' - published {video_date.strftime('%Y-%m-%d')} outside acceptable date range")
+                                        else:
+                                            logger.info(f"📅 Skipping video '{video['title']}' - no date available and failed enhanced date filter")
                                     break
                                 else:
                                     logger.info(f"   ❌ Model variation '{model_var}' not found")

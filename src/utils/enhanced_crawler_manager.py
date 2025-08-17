@@ -219,7 +219,7 @@ class EnhancedCrawlerManager:
         logger.info(f"SPECIFIC CONTENT confirmed: {make} {model} found with sufficient confidence")
         return False
 
-    def crawl_url(self, url: str, make: str, model: str, person_name: str = "") -> Dict[str, Any]:
+    def crawl_url(self, url: str, make: str, model: str, person_name: str = "", loan_start_date=None) -> Dict[str, Any]:
         """
         6-tier escalation system with CONTENT QUALITY DETECTION
         
@@ -239,6 +239,9 @@ class EnhancedCrawlerManager:
             'error': str (if success=False)
         }
         """
+        
+        # Store loan start date for date filtering
+        self.loan_start_date = loan_start_date
         
         # BLOCK SOCIAL MEDIA AND NON-CONTENT DOMAINS
         blocked_domains = [
@@ -616,24 +619,69 @@ class EnhancedCrawlerManager:
             article_result = self._crawl_specific_url(specific_url, make, model)
             
             if article_result['success']:
-                result = article_result.copy()
-                result.update({
-                    'tier_used': 'Tier 6: Google Search + ' + article_result.get('tier_used', 'Unknown'),
-                    'cached': False,
-                    # Add attribution information for UI display
-                    'attribution_strength': attribution_info.get('attribution_strength', 'unknown'),
-                    'actual_byline': attribution_info.get('actual_byline')
-                })
-                # Cache the result
-                self.cache_manager.store_result(
-                    person_id=person_name or "unknown",
-                    domain=domain,
-                    make=make,
-                    model=model,
-                    url=specific_url,
-                    content=article_result['content']
-                )
-                return self._add_byline_to_result(result, person_name)
+                # Apply date filtering to Google Search results
+                from src.utils.date_extractor import extract_publication_date
+                from src.utils.enhanced_date_filter import is_content_acceptable
+                
+                # Extract publication date from the article content
+                article_date = None
+                try:
+                    article_date = extract_publication_date(article_result['content'], specific_url)
+                    if article_date:
+                        logger.info(f"📅 Extracted publication date: {article_date.strftime('%Y-%m-%d')} for {specific_url}")
+                    else:
+                        logger.warning(f"📅 Could not extract publication date for {specific_url}")
+                except Exception as e:
+                    logger.warning(f"📅 Error extracting date from {specific_url}: {e}")
+                
+                # Check date filtering if we have a loan start date
+                if self.loan_start_date:
+                    if not is_content_acceptable(article_date, self.loan_start_date, "web", specific_url):
+                        logger.warning(f"📅 REJECTING Google Search result - article from {article_date.strftime('%Y-%m-%d') if article_date else 'unknown date'} is outside acceptable range for loan starting {self.loan_start_date.strftime('%Y-%m-%d')}")
+                        # Don't return this result, fall through to next tier
+                        pass
+                    else:
+                        logger.info(f"📅 Google Search result date approved: {article_date.strftime('%Y-%m-%d') if article_date else 'no date'}")
+                        
+                        result = article_result.copy()
+                        result.update({
+                            'tier_used': 'Tier 6: Google Search + ' + article_result.get('tier_used', 'Unknown'),
+                            'cached': False,
+                            # Add attribution information for UI display
+                            'attribution_strength': attribution_info.get('attribution_strength', 'unknown'),
+                            'actual_byline': attribution_info.get('actual_byline')
+                        })
+                        # Cache the result
+                        self.cache_manager.store_result(
+                            person_id=person_name or "unknown",
+                            domain=domain,
+                            make=make,
+                            model=model,
+                            url=specific_url,
+                            content=article_result['content']
+                        )
+                        return self._add_byline_to_result(result, person_name)
+                else:
+                    # No loan start date available, proceed without date filtering
+                    logger.info("📅 No loan start date available - proceeding without date filtering")
+                    result = article_result.copy()
+                    result.update({
+                        'tier_used': 'Tier 6: Google Search + ' + article_result.get('tier_used', 'Unknown'),
+                        'cached': False,
+                        # Add attribution information for UI display
+                        'attribution_strength': attribution_info.get('attribution_strength', 'unknown'),
+                        'actual_byline': attribution_info.get('actual_byline')
+                    })
+                    # Cache the result
+                    self.cache_manager.store_result(
+                        person_id=person_name or "unknown",
+                        domain=domain,
+                        make=make,
+                        model=model,
+                        url=specific_url,
+                        content=article_result['content']
+                    )
+                    return self._add_byline_to_result(result, person_name)
                 
         # Tier 7: Original crawler (Playwright as last resort)
         logger.info(f"Tier 7: All direct scraping and Google Search failed, using original crawler for {url}")

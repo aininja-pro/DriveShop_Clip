@@ -1051,7 +1051,8 @@ def process_web_url(url: str, loan: Dict[str, Any], cancel_check: Optional[calla
             url=url,
             make=make,
             model=search_model,  # Use the hierarchical search model
-            person_name=person_name
+            person_name=person_name,
+            loan_start_date=start_date
         )
         
         if not result['success']:
