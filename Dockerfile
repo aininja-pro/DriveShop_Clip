@@ -2,8 +2,10 @@ FROM python:3.11
 
 WORKDIR /app
 
-# Install system dependencies for OCR and PDF processing
-RUN apt-get update && apt-get install -y \
+# Fix GPG keyring issues and install system dependencies 
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false && \
+    apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
     poppler-utils \

@@ -91,3 +91,6 @@ yarl==1.20.0
 youtube-transcript-api==1.0.3
 yt-dlp>=2024.0.0
 zope.interface==7.2
+webvtt-py>=0.4.6
+faster-whisper>=0.10.0
+httpx>=0.24.0

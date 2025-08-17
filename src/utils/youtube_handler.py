@@ -455,16 +455,36 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
     if not video_id:
         return None
     
+    # Try the new yt-dlp-based transcript fetcher first
+    try:
+        from src.utils.transcript_fetcher import get_transcript_fetcher
+        
+        logger.info(f"🚀 Using new yt-dlp transcript fetcher for {video_id}")
+        
+        fetcher = get_transcript_fetcher()
+        transcript_text = fetcher.get_transcript(video_id, timeout_s=25)
+        
+        if transcript_text and len(transcript_text) > 100:
+            logger.info(f"✅ New transcript fetcher successful: {len(transcript_text)} characters")
+            return transcript_text
+        else:
+            logger.warning(f"⚠️ New transcript fetcher returned insufficient content, falling back to legacy method")
+    
+    except Exception as e:
+        logger.warning(f"❌ New transcript fetcher failed for {video_id}: {e}")
+        logger.info("🔄 Falling back to legacy youtube-transcript-api method")
+    
+    # Fallback to legacy youtube-transcript-api method
     try:
         # Apply rate limiting
         rate_limiter.wait_if_needed('youtube.com')
         
         # Use proxied API if available, otherwise use regular API
         if proxied_transcript_api:
-            logger.info(f"🔄 Using IPRoyal proxy for transcript extraction of video {video_id}")
+            logger.info(f"🔄 Using IPRoyal proxy for legacy transcript extraction of video {video_id}")
             api = proxied_transcript_api
         else:
-            logger.info(f"📝 Using direct connection for transcript extraction (no proxy)")
+            logger.info(f"📝 Using direct connection for legacy transcript extraction (no proxy)")
             api = YouTubeTranscriptApi
         
         # Try to get transcript with better fallback handling
@@ -496,11 +516,11 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
         # Combine all text parts
         full_text = ' '.join([part['text'] for part in transcript_data])
         
-        logger.info(f"✅ Got YouTube transcript for {video_id}: {len(full_text)} characters")
+        logger.info(f"✅ Got legacy YouTube transcript for {video_id}: {len(full_text)} characters")
         return full_text
     
     except Exception as e:
-        logger.warning(f"No YouTube transcript available for video {video_id}: {e}")
+        logger.warning(f"No YouTube transcript available via legacy method for video {video_id}: {e}")
         
         # IMPORTANT: Whisper fallback is DISABLED for approval workflow - too slow!
         # For approved clips, we recommend using Apify or manual extraction
@@ -508,7 +528,7 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
             logger.info(f"⚠️ Whisper fallback disabled for approval workflow - too slow (5+ minutes)")
             logger.info(f"💡 Consider using Apify actor or browser-based extraction instead")
         
-        # Try browser-based extraction as a faster alternative
+        # Try browser-based extraction as final fallback
         logger.info(f"🌐 Attempting browser-based transcript extraction for {video_id}...")
         try:
             browser_transcript = extract_transcript_with_browser(video_id)
@@ -518,6 +538,7 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
         except Exception as browser_error:
             logger.debug(f"Browser extraction failed: {browser_error}")
         
+        logger.error(f"❌ All transcript extraction methods failed for video {video_id}")
         return None
 
 def get_video_metadata_fallback(video_id, known_title=None):
@@ -720,75 +741,95 @@ def get_video_metadata_fallback(video_id, known_title=None):
 def extract_transcript_with_browser(video_id):
     """
     Extract transcript using browser automation - MUCH faster than Whisper.
-    Uses Playwright to get transcript directly from YouTube page.
+    Uses Playwright in ThreadPoolExecutor to avoid asyncio loop conflicts.
     """
-    try:
-        from playwright.sync_api import sync_playwright
-        import time
-        
-        logger.info(f"🌐 Starting browser-based transcript extraction for {video_id}")
-        
-        with sync_playwright() as p:
-            # Launch browser
-            browser = p.chromium.launch(headless=True, args=['--disable-blink-features=AutomationControlled'])
-            context = browser.new_context(
-                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                viewport={'width': 1920, 'height': 1080}
-            )
-            page = context.new_page()
-            
-            try:
-                # Navigate to video
-                url = f"https://www.youtube.com/watch?v={video_id}"
-                page.goto(url, wait_until='domcontentloaded', timeout=20000)
-                
-                # Wait for video player to load
-                page.wait_for_selector('video', timeout=10000)
-                time.sleep(2)  # Let page settle
-                
-                # Try to open transcript panel
-                # Click the three dots menu
-                more_button = page.query_selector('button[aria-label*="More"]')
-                if more_button:
-                    more_button.click()
-                    time.sleep(1)
-                    
-                    # Look for "Show transcript" option
-                    transcript_button = page.query_selector('text="Show transcript"')
-                    if not transcript_button:
-                        transcript_button = page.query_selector('text="Transcript"')
-                    
-                    if transcript_button:
-                        transcript_button.click()
-                        time.sleep(2)
-                        
-                        # Extract transcript text
-                        transcript_segments = page.query_selector_all('[class*="segment-text"]')
-                        if not transcript_segments:
-                            # Try alternative selector
-                            transcript_segments = page.query_selector_all('[class*="transcript"] [class*="cue"]')
-                        
-                        if transcript_segments:
-                            transcript_text = ' '.join([seg.inner_text() for seg in transcript_segments])
-                            browser.close()
-                            
-                            if transcript_text and len(transcript_text) > 100:
-                                logger.info(f"✅ Browser transcript extraction successful: {len(transcript_text)} chars")
-                                return transcript_text
-                
-                browser.close()
-                logger.warning(f"Could not extract transcript via browser for {video_id}")
-                
-            except Exception as e:
-                browser.close()
-                logger.error(f"Browser extraction error: {e}")
-                
-    except ImportError:
-        logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
-    except Exception as e:
-        logger.error(f"Browser transcript extraction failed: {e}")
+    import concurrent.futures
     
-    return None
+    def _sync_browser_extract(video_id):
+        """Internal sync function to run in thread pool"""
+        try:
+            from playwright.sync_api import sync_playwright
+            import time
+            
+            logger.info(f"🌐 Starting browser-based transcript extraction for {video_id}")
+            
+            with sync_playwright() as p:
+                # Launch browser
+                browser = p.chromium.launch(headless=True, args=['--disable-blink-features=AutomationControlled'])
+                context = browser.new_context(
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    viewport={'width': 1920, 'height': 1080}
+                )
+                page = context.new_page()
+                
+                try:
+                    # Navigate to video
+                    url = f"https://www.youtube.com/watch?v={video_id}"
+                    page.goto(url, wait_until='domcontentloaded', timeout=20000)
+                    
+                    # Wait for video player to load
+                    page.wait_for_selector('video', timeout=10000)
+                    time.sleep(2)  # Let page settle
+                    
+                    # Try to open transcript panel
+                    # Click the three dots menu
+                    more_button = page.query_selector('button[aria-label*="More"]')
+                    if more_button:
+                        more_button.click()
+                        time.sleep(1)
+                        
+                        # Look for "Show transcript" option
+                        transcript_button = page.query_selector('text="Show transcript"')
+                        if not transcript_button:
+                            transcript_button = page.query_selector('text="Transcript"')
+                        
+                        if transcript_button:
+                            transcript_button.click()
+                            time.sleep(2)
+                            
+                            # Extract transcript text
+                            transcript_segments = page.query_selector_all('[class*="segment-text"]')
+                            if not transcript_segments:
+                                # Try alternative selector
+                                transcript_segments = page.query_selector_all('[class*="transcript"] [class*="cue"]')
+                            
+                            if transcript_segments:
+                                transcript_text = ' '.join([seg.inner_text() for seg in transcript_segments])
+                                browser.close()
+                                
+                                if transcript_text and len(transcript_text) > 100:
+                                    logger.info(f"✅ Browser transcript extraction successful: {len(transcript_text)} chars")
+                                    return transcript_text
+                    
+                    browser.close()
+                    logger.warning(f"Could not extract transcript via browser for {video_id}")
+                    return None
+                    
+                except Exception as e:
+                    browser.close()
+                    logger.error(f"Browser extraction error: {e}")
+                    return None
+                    
+        except ImportError:
+            logger.error("Playwright not installed. Run: pip install playwright && playwright install chromium")
+            return None
+        except Exception as e:
+            logger.error(f"Browser transcript extraction failed: {e}")
+            return None
+    
+    # Run the sync Playwright code in a thread pool to avoid asyncio conflicts
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_sync_browser_extract, video_id)
+            # 30-second timeout for browser extraction
+            result = future.result(timeout=30)
+            return result
+    except concurrent.futures.TimeoutError:
+        logger.error(f"Browser transcript extraction timed out for {video_id}")
+        return None
+    except Exception as e:
+        logger.error(f"ThreadPoolExecutor error for browser extraction: {e}")
+        return None
 
 
 def _create_fallback_metadata_with_title(video_id, title, url):
