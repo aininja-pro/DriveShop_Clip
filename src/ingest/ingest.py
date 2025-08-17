@@ -706,26 +706,126 @@ def process_youtube_url(url: str, loan: Dict[str, Any], cancel_check: Optional[c
         # If not a direct video, try as a channel
         if cancel_check and cancel_check():
             raise Exception("Job cancelled by user")
+        
+        # TIER 1: Try ScrapFly first (comprehensive, fast, 100+ videos)
+        logger.info(f"🚀 TIER 1: Trying ScrapFly channel search for {loan.get('make', '')} {loan.get('model', '')}")
+        
+        try:
+            # Use ScrapFly to search the full channel content with date filtering
+            start_date = loan.get('start_date')
+            make = loan.get('make', '').lower()
+            model = loan.get('model', '').lower()
+            
+            channel_videos = scrape_channel_videos_with_scrapfly(url, loan.get('make', ''), loan.get('model', ''), start_date, 90)
+            
+            if channel_videos:
+                logger.info(f"✅ ScrapFly found {len(channel_videos)} relevant videos in channel")
+                
+                # Process ALL relevant videos and score them - DON'T return first match!
+                successful_videos = []
+                
+                for i, video_info in enumerate(channel_videos):
+                    video_id = video_info.get('video_id')
+                    if not video_id:
+                        continue
+                        
+                    logger.info(f"Processing ScrapFly video {i+1}/{len(channel_videos)}: {video_info['title']}")
+                    
+                    # Try metadata fallback first - same 2-phase processing as RSS
+                    if cancel_check and cancel_check():
+                        raise Exception("Job cancelled by user")
+                    metadata = get_video_metadata_fallback(video_id, known_title=video_info['title'])
+                    if metadata and metadata.get('content_text'):
+                        logger.info(f"✅ ScrapFly + metadata success: {video_info['title']}")
+                        
+                        # Get published date from various possible sources
+                        published_date = video_info.get('published') or video_info.get('published_date') or metadata.get('upload_date')
+                        
+                        # If we have a date from ScrapFly, parse it if needed
+                        if published_date and isinstance(published_date, str):
+                            parsed_date = parse_date_string(published_date)
+                            if parsed_date:
+                                published_date = parsed_date
+                        
+                        # Collect this video for scoring - DON'T return immediately
+                        video_result = {
+                            'url': video_info['url'],
+                            'content': metadata['content_text'],  # Title + description
+                            'content_type': 'video_metadata',
+                            'title': metadata.get('title', video_info['title']),
+                            'channel_name': metadata.get('channel_name', ''),
+                            'view_count': metadata.get('view_count', '0'),
+                            'published_date': published_date,
+                            'needs_transcript': True,  # Flag for later extraction
+                            'source': 'scrapfly_tier1'
+                        }
+                        successful_videos.append(video_result)
+                
+                # NOW score all successful videos and return the best match
+                if successful_videos:
+                    logger.info(f"ScrapFly collected {len(successful_videos)} videos with metadata - now scoring for best match")
+                    
+                    # Score each video based on title relevance (same logic as RSS)
+                    make = loan.get('make', '').lower()
+                    model = loan.get('model', '').lower()
+                    
+                    best_video = None
+                    best_score = -1
+                    
+                    for video in successful_videos:
+                        title_lower = video['title'].lower()
+                        score = 0
+                        
+                        # High score for exact model match in title
+                        if model in title_lower and make in title_lower:
+                            score = 100  # Perfect match
+                            logger.info(f"🎯 PERFECT MATCH: '{video['title']}' contains both '{make}' and '{model}' - score: {score}")
+                        elif model in title_lower:
+                            score = 50   # Good match
+                            logger.info(f"✅ GOOD MATCH: '{video['title']}' contains '{model}' - score: {score}")
+                        else:
+                            score = 10   # Weak match
+                            logger.info(f"⚠️ WEAK MATCH: '{video['title']}' doesn't contain '{model}' - score: {score}")
+                        
+                        if score > best_score:
+                            best_score = score
+                            best_video = video
+                            logger.info(f"🏆 NEW BEST: '{video['title']}' with score {score}")
+                    
+                    if best_video:
+                        logger.info(f"🎯 ScrapFly selected BEST video with score {best_score}: {best_video['title']}")
+                        return best_video
+                    else:
+                        logger.warning(f"No scored videos found, returning first: {successful_videos[0]['title']}")
+                        return successful_videos[0]
+                
+                logger.info(f"ScrapFly found videos but none had usable metadata for {make} {model}")
+            else:
+                logger.info(f"ScrapFly found no relevant videos for {make} {model}")
+                
+        except Exception as e:
+            logger.warning(f"ScrapFly channel search failed: {e}")
+        
+        # TIER 2: Fallback to RSS feed if ScrapFly didn't find anything
+        logger.info(f"🔄 TIER 2: Falling back to RSS feed for {loan.get('make', '')} {loan.get('model', '')}")
+        
         channel_id = get_channel_id(url)
         
         if not channel_id:
             logger.warning(f"Could not resolve YouTube channel ID from: {url}")
-            # Don't return None here - let it fall through to try ScrapFly
-            # The ScrapFly fallback below will handle channel URLs without channel IDs
+            # If no channel ID and ScrapFly failed, we're done
+            return None
         
-        # Get latest videos from channel (only if we have a channel_id)
+        # Get latest videos from channel using RSS
         videos = []
-        if channel_id:
-            logger.info(f"Fetching latest videos for channel: {channel_id}")
-            if cancel_check and cancel_check():
-                raise Exception("Job cancelled by user")
-            videos = get_latest_videos(channel_id, max_videos=25)
-            
-            if not videos:
-                logger.warning(f"No videos found for channel: {channel_id}")
-                # Don't return None - let it fall through to ScrapFly
-        else:
-            logger.info("No channel ID available - will try ScrapFly directly")
+        logger.info(f"Fetching latest videos for channel: {channel_id}")
+        if cancel_check and cancel_check():
+            raise Exception("Job cancelled by user")
+        videos = get_latest_videos(channel_id, max_videos=25)
+        
+        if not videos:
+            logger.warning(f"No videos found for channel: {channel_id}")
+            return None
         
         if videos:
             logger.info(f"Found {len(videos)} videos in channel {channel_id}")
@@ -889,126 +989,6 @@ def process_youtube_url(url: str, loan: Dict[str, Any], cancel_check: Optional[c
                 logger.info(f"No relevant videos found in {days_forward} days forward, trying {days_attempted[1]} days...")
             else:
                 logger.info(f"No relevant videos found in {days_forward} days forward either")
-        
-        if channel_id:
-            logger.info(f"No relevant videos found for {make} {model} in channel {channel_id}")
-        else:
-            logger.info(f"No channel ID available for URL: {url}")
-        
-        # Try ScrapFly channel search as fallback when RSS feed fails OR when we don't have a channel ID
-        logger.info(f"🔄 Falling back to ScrapFly channel search for {make} {model}")
-        
-        try:
-            # Use ScrapFly to search the full channel content with date filtering
-            start_date = loan.get('start_date')
-            channel_videos = scrape_channel_videos_with_scrapfly(url, make, model, start_date, 90)
-            
-            if channel_videos:
-                logger.info(f"✅ ScrapFly found {len(channel_videos)} relevant videos in channel")
-                
-                # Process ALL relevant videos and collect successful extractions
-                successful_videos = []
-                
-                for i, video_info in enumerate(channel_videos):
-                    video_id = video_info.get('video_id')
-                    if not video_id:
-                        continue
-                        
-                    logger.info(f"Processing video {i+1}/{len(channel_videos)}: {video_info['title']}")
-                    
-                    # Try metadata fallback first since transcript fetching is consistently failing
-                    metadata = get_video_metadata_fallback(video_id, known_title=video_info['title'])
-                    if metadata and metadata.get('content_text'):
-                        logger.info(f"✅ ScrapFly + metadata success: {video_info['title']}")
-                        # Get published date from various possible sources
-                        # Priority: 1) RSS feed date, 2) metadata extracted date, 3) other sources
-                        published_date = video_info.get('published') or video_info.get('published_date') or metadata.get('upload_date')
-                        
-                        # If we have a date from RSS/ScrapFly, parse it if needed
-                        if published_date and isinstance(published_date, str):
-                            parsed_date = parse_date_string(published_date)
-                            if parsed_date:
-                                published_date = parsed_date
-                        
-                        if published_date:
-                            logger.info(f"📅 Using published date for clip: {published_date}")
-                        else:
-                            logger.warning(f"⚠️ No published date found for video: {video_info['title']}")
-                        
-                        video_result = {
-                            'url': video_info['url'],
-                            'content': metadata['content_text'],
-                            'content_type': 'video_metadata',
-                            'title': metadata.get('title', video_info['title']),
-                            'channel_name': metadata.get('channel_name', ''),
-                            'view_count': metadata.get('view_count', '0'),
-                            'published_date': published_date
-                        }
-                        successful_videos.append(video_result)
-                        continue
-                    
-                    # Only try transcript as fallback if metadata failed
-                    if cancel_check and cancel_check():
-                        raise Exception("Job cancelled by user")
-                    transcript = get_transcript(video_id, video_url=video_info['url'])
-                    if transcript:
-                        logger.info(f"✅ ScrapFly + transcript success: {video_info['title']}")
-                        video_result = {
-                            'url': video_info['url'],
-                            'content': transcript,
-                            'content_type': 'video',
-                            'title': video_info['title'],
-                            'published_date': video_info.get('published') or video_info.get('published_date')
-                        }
-                        successful_videos.append(video_result)
-                
-                # Return the best match based on title relevance
-                if successful_videos:
-                    logger.info(f"Successfully processed {len(successful_videos)} out of {len(channel_videos)} videos")
-                    
-                    # Score each video based on model match in title
-                    from src.utils.model_variations import generate_model_variations
-                    model_variations = generate_model_variations(make, model)
-                    
-                    best_video = None
-                    best_score = -1
-                    
-                    for video in successful_videos:
-                        title_lower = video['title'].lower()
-                        score = 0
-                        
-                        # Check for exact model match first (highest priority)
-                        if model.lower() in title_lower:
-                            score = 100
-                        else:
-                            # Check model variations
-                            for variation in model_variations:
-                                if variation in title_lower:
-                                    # Longer variations get higher scores (more specific)
-                                    score = max(score, len(variation))
-                        
-                        logger.info(f"Video '{video['title']}' scored: {score}")
-                        
-                        if score > best_score:
-                            best_score = score
-                            best_video = video
-                    
-                    if best_video:
-                        logger.info(f"🎯 Selected best matching video with score {best_score}: {best_video['title']}")
-                        return best_video
-                    else:
-                        # If no good match found, return the first one
-                        logger.info(f"No high-scoring match found, returning first video: {successful_videos[0]['title']}")
-                        return successful_videos[0]
-            else:
-                logger.info(f"ScrapFly found no relevant videos for {make} {model} in channel")
-                
-        except Exception as e:
-            logger.warning(f"ScrapFly channel search failed: {e}")
-        
-        # Only return None if both RSS and ScrapFly failed
-        logger.info(f"❌ No relevant videos found for {make} {model} in the specified channel {channel_id}")
-        logger.info(f"🔒 Staying within specified channel - not searching other YouTube channels")
         
         return None
         
