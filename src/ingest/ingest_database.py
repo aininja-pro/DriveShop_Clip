@@ -29,6 +29,36 @@ import json
 
 logger = setup_logger(__name__)
 
+def _normalize_date_for_storage(date_value):
+    """
+    Normalize various date formats for database storage.
+    Database expects DATE format (YYYY-MM-DD), not full datetime.
+    """
+    if not date_value:
+        return None
+        
+    # If it's already a string, try to parse and extract date part
+    if isinstance(date_value, str):
+        try:
+            from datetime import datetime
+            # Handle ISO format strings
+            if 'T' in date_value:
+                parsed = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                return parsed.date().isoformat()
+            else:
+                # Already a date string, return as-is
+                return date_value
+        except:
+            return date_value
+    
+    # If it's a datetime object, extract date part
+    elif hasattr(date_value, 'date'):
+        return date_value.date().isoformat()
+    elif hasattr(date_value, 'isoformat'):
+        return date_value.isoformat()
+    
+    return str(date_value) if date_value else None
+
 def load_person_outlets_mapping():
     """Load Person_ID to Media Outlets mapping from JSON file"""
     try:
@@ -414,6 +444,9 @@ def process_loan_for_database(loan: Dict[str, Any], run_id: str, outlets_mapping
                 result['clip_url'] = result['url']
             if not result.get('extracted_content') and result.get('content'):
                 result['extracted_content'] = result['content']
+            # YouTube ScrapFly returns 'published', but database expects 'published_date'
+            if not result.get('published_date') and result.get('published'):
+                result['published_date'] = result['published']
             
             # Debug logging for date tracking
             if result.get('published_date'):
@@ -508,7 +541,7 @@ async def process_loan_database_async(semaphore: asyncio.Semaphore, loan: Dict[s
                     'activity_id': loan.get('activity_id'),  # FIX: Get Activity_ID from loan data, not clip_result
                     'clip_url': clip_result.get('clip_url'),
                     'extracted_content': clip_result.get('extracted_content'),
-                    'published_date': clip_result.get('published_date').isoformat() if clip_result.get('published_date') and hasattr(clip_result.get('published_date'), 'isoformat') else clip_result.get('published_date'),
+                    'published_date': _normalize_date_for_storage(clip_result.get('published_date')),
                     'attribution_strength': clip_result.get('attribution_strength'),
                     'byline_author': clip_result.get('byline_author'),
                     'tier_used': clip_result.get('processing_method', 'Unknown'),
