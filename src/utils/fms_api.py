@@ -9,7 +9,15 @@ from typing import List, Dict, Any, Optional
 import requests
 from datetime import datetime
 
+# Set up more visible logging for FMS API
 logger = logging.getLogger(__name__)
+# Ensure FMS API logs are visible
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('FMS_API: %(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 
 class FMSAPIClient:
@@ -17,18 +25,29 @@ class FMSAPIClient:
     
     def __init__(self):
         """Initialize the FMS API client with environment variables."""
+        print("🔥 FMS_INIT: Starting FMS API client initialization...")
+        
         self.token = os.getenv("FMS_API_TOKEN")
         self.environment = os.getenv("FMS_API_ENVIRONMENT", "staging")
+        
+        print(f"🔥 FMS_INIT: Environment: {self.environment}")
+        print(f"🔥 FMS_INIT: Token present: {bool(self.token)}")
         
         if self.environment == "production":
             self.api_url = os.getenv("FMS_API_PRODUCTION_URL")
         else:
             self.api_url = os.getenv("FMS_API_STAGING_URL")
             
+        print(f"🔥 FMS_INIT: API URL: {self.api_url}")
+            
         if not self.token:
+            print("🔥 FMS_INIT: ERROR - No token found!")
             raise ValueError("FMS_API_TOKEN environment variable not set")
         if not self.api_url:
+            print(f"🔥 FMS_INIT: ERROR - No API URL for {self.environment}!")
             raise ValueError(f"FMS API URL not configured for {self.environment} environment")
+            
+        print("🔥 FMS_INIT: Initialization complete!")
             
         self.headers = {
             "Authorization": f"Token {self.token}",
@@ -75,8 +94,13 @@ class FMSAPIClient:
             
         # Prepare the payload
         payload = {"clips": clips}
+        print(f"🔥 FMS_PAYLOAD: Prepared payload with {len(clips)} clips")
         
         try:
+            print(f"🚀 FMS_API: Sending {len(clips)} clips to FMS API ({self.environment})")
+            print(f"🚀 FMS_API: API URL: {self.api_url}")
+            print(f"🚀 FMS_API: Sample clip data: {json.dumps(clips[0] if clips else {}, indent=2)}")
+            
             logger.info(f"Sending {len(clips)} clips to FMS API ({self.environment})")
             logger.info(f"API URL: {self.api_url}")
             logger.info(f"Sample clip data: {json.dumps(clips[0] if clips else {}, indent=2)}")
@@ -89,22 +113,58 @@ class FMSAPIClient:
                 timeout=30
             )
             
-            # Log response details
+            # Log response details (both print and logger for visibility)
+            print(f"🔄 FMS_API: Response Status: {response.status_code}")
+            print(f"🔄 FMS_API: Response Text: {response.text[:500]}...")  # First 500 chars
+            
             logger.info(f"FMS API Response Status: {response.status_code}")
+            logger.info(f"FMS API Response: {response.text}")
             
             if response.status_code == 200 or response.status_code == 201:
-                logger.info(f"Successfully sent {len(clips)} clips to FMS")
+                print(f"✅ FMS_API: SUCCESS - Status {response.status_code}")
+                # Parse the actual response to get accurate counts
+                response_data = {}
+                actual_sent_count = len(clips)  # Default assumption
+                
+                try:
+                    if response.text:
+                        response_data = response.json()
+                        # Check if FMS API returns specific success info
+                        if isinstance(response_data, dict):
+                            # Look for various possible response formats
+                            if 'successful_count' in response_data:
+                                actual_sent_count = response_data['successful_count']
+                            elif 'processed' in response_data:
+                                actual_sent_count = response_data['processed']
+                            elif 'clips_received' in response_data:
+                                actual_sent_count = response_data['clips_received']
+                            elif 'success_count' in response_data:
+                                actual_sent_count = response_data['success_count']
+                            # If response contains individual clip results
+                            elif 'results' in response_data and isinstance(response_data['results'], list):
+                                successful_clips = [r for r in response_data['results'] if r.get('success', False)]
+                                actual_sent_count = len(successful_clips)
+                except Exception as e:
+                    logger.warning(f"Could not parse FMS response JSON: {e}")
+                    # Keep default assumption
+                
+                print(f"✅ FMS_API: Processed {actual_sent_count} of {len(clips)} clips successfully")
+                logger.info(f"FMS API response: {actual_sent_count} of {len(clips)} clips processed successfully")
+                
                 return {
                     "success": True,
-                    "message": f"Successfully sent {len(clips)} clips to FMS",
-                    "sent_count": len(clips),
+                    "message": f"FMS API processed {actual_sent_count} of {len(clips)} clips",
+                    "sent_count": actual_sent_count,
+                    "requested_count": len(clips),
                     "response_status": response.status_code,
-                    "response_data": response.json() if response.text else {}
+                    "response_data": response_data,
+                    "all_clips_sent": actual_sent_count == len(clips)
                 }
             else:
                 error_msg = f"FMS API returned status {response.status_code}"
                 if response.text:
                     error_msg += f": {response.text}"
+                print(f"❌ FMS_API: ERROR - {error_msg}")
                 logger.error(error_msg)
                 return {
                     "success": False,
@@ -116,6 +176,7 @@ class FMSAPIClient:
                 
         except requests.exceptions.Timeout:
             error_msg = "FMS API request timed out"
+            print(f"🔥 FMS_TIMEOUT: {error_msg}")
             logger.error(error_msg)
             return {
                 "success": False,
@@ -124,6 +185,7 @@ class FMSAPIClient:
             }
         except requests.exceptions.RequestException as e:
             error_msg = f"FMS API request failed: {str(e)}"
+            print(f"🔥 FMS_REQUEST_ERROR: {error_msg}")
             logger.error(error_msg)
             return {
                 "success": False,
@@ -132,6 +194,7 @@ class FMSAPIClient:
             }
         except Exception as e:
             error_msg = f"Unexpected error sending to FMS API: {str(e)}"
+            print(f"🔥 FMS_UNEXPECTED_ERROR: {error_msg}")
             logger.error(error_msg, exc_info=True)
             return {
                 "success": False,

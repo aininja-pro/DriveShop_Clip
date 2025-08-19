@@ -4553,26 +4553,8 @@ with approved_queue_tab:
         # Use the global cached database connection
         db = get_cached_database()
         
-        # One-time migration: Update any existing clips with 'exported' status to have proper workflow_stage
-        # This ensures legacy exported clips show up in Recent Complete
-        @st.cache_data  # Cache migration status
-        def migrate_exported_clips():
-            try:
-                # Find clips with status='exported' but wrong workflow_stage
-                result = db.supabase.table('clips').select('id').eq('status', 'exported').neq('workflow_stage', 'exported').execute()
-                if result.data:
-                    for clip in result.data:
-                        db.supabase.table('clips').update({
-                            'workflow_stage': 'exported'
-                        }).eq('id', clip['id']).execute()
-                    logger.info(f"Migrated {len(result.data)} exported clips to proper workflow_stage")
-                return True
-            except Exception as e:
-                logger.error(f"Migration error: {e}")
-                return False
-        
-        # Run migration
-        migrate_exported_clips()
+        # DISABLED: Migration was causing performance issues
+        # One-time migration should be run manually if needed, not on every page load
         
         # Cache the approved queue data with TTL of 60 seconds
         @st.cache_data
@@ -4598,30 +4580,32 @@ with approved_queue_tab:
             tab_description = "Clips with completed sentiment analysis ready for FMS export"
             
         elif st.session_state.approved_queue_filter == 'recent_complete':
-            # Get exported clips from the last 30 days
+            # Get exported clips from the last 30 days - OPTIMIZED
             from datetime import datetime, timedelta
             thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
             
             with st.spinner("Loading recent complete clips..."):
                 try:
-                    # Get all exported clips regardless of fms_export_date
-                    # Since legacy clips don't have fms_export_date, we need a different approach
-                    result = db.supabase.table('clips').select('*').in_('workflow_stage', ['exported', 'complete']).limit(1000).execute()
+                    # OPTIMIZATION 1: Select only needed columns, not '*'
+                    needed_columns = 'id,wo_number,office,make,model,contact,media_outlet,relevance_score,overall_sentiment,workflow_stage,fms_export_date,processed_date,clip_url,published_date,sentiment_completed,sentiment_data_enhanced'
                     
-                    clips_data = []
-                    if result.data:
-                        for clip in result.data:
-                            # For legacy clips without fms_export_date, use processed_date
-                            date_to_check = clip.get('fms_export_date') or clip.get('processed_date')
-                            
-                            if date_to_check and date_to_check >= thirty_days_ago:
-                                clips_data.append(clip)
-                            elif not date_to_check:
-                                # If no date at all, include it (shouldn't happen but safety)
-                                clips_data.append(clip)
+                    # OPTIMIZATION 2: Use database filtering with proper ordering and smaller limit
+                    # First get clips with fms_export_date (most recent exports)
+                    recent_exports = db.supabase.table('clips').select(needed_columns).in_('workflow_stage', ['exported', 'complete']).gte('fms_export_date', thirty_days_ago).order('fms_export_date', desc=True).limit(100).execute()
+                    
+                    clips_data = recent_exports.data if recent_exports.data else []
+                    
+                    # OPTIMIZATION 3: Only check legacy clips if we need more records
+                    if len(clips_data) < 50:  # Only if we have fewer than 50 recent clips
+                        # Get some legacy clips without fms_export_date but with recent processed_date
+                        legacy_clips = db.supabase.table('clips').select(needed_columns).in_('workflow_stage', ['exported', 'complete']).is_('fms_export_date', 'null').gte('processed_date', thirty_days_ago).order('processed_date', desc=True).limit(50).execute()
+                        
+                        if legacy_clips.data:
+                            clips_data.extend(legacy_clips.data)
                                 
                 except Exception as e:
                     st.error(f"Error loading recent complete data: {str(e)}")
+                    logger.error(f"Recent complete query error: {e}")
                     clips_data = []
             tab_title = "✅ Recent Complete (Last 30 Days)"
             tab_description = "Exported clips from the last 30 days"
@@ -4678,18 +4662,37 @@ with approved_queue_tab:
             # Add activity_id as a hidden column for hyperlink functionality
             clean_df['Activity_ID'] = approved_df['activity_id'] if 'activity_id' in approved_df.columns else ''
             
-            # Add sentiment status indicator
-            if 'sentiment_completed' in approved_df.columns:
-                clean_df['Sentiment'] = approved_df.apply(
-                    lambda row: "✅ Complete" if row.get('sentiment_completed', False) else "⏳ Pending",
-                    axis=1
-                )
-            else:
-                clean_df['Sentiment'] = "⏳ Pending"
+            # Add sentiment status indicator - check both old and new sentiment fields
+            def get_sentiment_status(row):
+                # Check if enhanced sentiment data exists (new method)
+                if pd.notna(row.get('sentiment_data_enhanced')) and row.get('sentiment_data_enhanced'):
+                    return "✅ Complete"
+                # Check legacy sentiment_completed field (old method)
+                elif row.get('sentiment_completed', False):
+                    return "✅ Complete"
+                else:
+                    return "⏳ Pending"
+            
+            clean_df['Sentiment'] = approved_df.apply(get_sentiment_status, axis=1)
             
             # Add export date for Recent Complete tab
             if st.session_state.approved_queue_filter == 'recent_complete' and 'fms_export_date' in approved_df.columns:
-                clean_df['Export Date'] = pd.to_datetime(approved_df['fms_export_date']).dt.strftime('%b %d %I:%M %p')
+                # Format export date with better handling of null values
+                def format_export_date(date_val):
+                    if pd.isna(date_val) or date_val is None:
+                        return "Not recorded"
+                    try:
+                        return pd.to_datetime(date_val).strftime('%b %d %I:%M %p')
+                    except:
+                        return "Invalid date"
+                
+                clean_df['FMS Export Date'] = approved_df['fms_export_date'].apply(format_export_date)
+                
+                # Add export status indicator
+                clean_df['Export Status'] = approved_df.apply(
+                    lambda row: "✅ Exported to FMS" if pd.notna(row.get('fms_export_date')) else "❓ Status Unknown",
+                    axis=1
+                )
             
             # Add workflow status indicator
             clean_df['Stage'] = approved_df['workflow_stage'].apply(
@@ -5213,38 +5216,88 @@ with approved_queue_tab:
                         
                 with col2:
                     if st.button("🚀 Send to FMS", key="send_to_fms_api", help="Send clips directly to FMS API", type="primary", use_container_width=True):
+                        print("🔥 BUTTON CLICKED: Send to FMS button was pressed!")
                         try:
+                            print("🔥 INITIALIZING: Creating FMS API client...")
                             # Initialize FMS API client
                             fms_client = FMSAPIClient()
+                            print(f"🔥 CLIENT CREATED: FMS client initialized for {fms_client.environment}")
                             
                             # Parse the JSON data
-                            clips_data = json.loads(st.session_state.fms_export_json)
+                            print("🔥 PARSING: Getting JSON data from session state...")
+                            clips_data_raw = json.loads(st.session_state.fms_export_json)
+                            print(f"🔥 RAW DATA TYPE: {type(clips_data_raw)}")
+                            print(f"🔥 RAW DATA SAMPLE: {str(clips_data_raw)[:200]}...")
+                            
+                            # Handle both formats: list or dict with 'clips' key
+                            if isinstance(clips_data_raw, list):
+                                clips_data = clips_data_raw  # Already a list of clips
+                                print(f"🔥 PARSED: Got {len(clips_data)} clips from list")
+                            elif isinstance(clips_data_raw, dict) and 'clips' in clips_data_raw:
+                                clips_data = clips_data_raw['clips']  # Extract clips from dict
+                                print(f"🔥 PARSED: Got {len(clips_data)} clips from dict")
+                            else:
+                                print(f"🔥 ERROR: Unexpected data format: {type(clips_data_raw)}")
+                                st.error("Invalid clips data format")
+                                clips_data = []
                             
                             # Send to FMS API
+                            print("🔥 SENDING: About to call FMS API...")
                             with st.spinner("Sending clips to FMS API..."):
                                 result = fms_client.send_clips(clips_data)
+                            print(f"🔥 RESULT: FMS API returned: {result}")
                             
                             if result["success"]:
-                                # Mark clips as sent to FMS (but keep in Ready to Export)
+                                # Mark clips as sent to FMS based on actual API response
                                 clips_to_export = st.session_state.fms_clips_to_export
                                 export_timestamp = st.session_state.fms_export_timestamp
+                                sent_count = result['sent_count']
+                                total_clips = len(clips_to_export)
+                                all_clips_sent = result.get('all_clips_sent', sent_count == total_clips)
+                                
+                                successfully_sent_clips = []
                                 marked_count = 0
                                 
-                                for clip in clips_to_export:
-                                    # Update clip to show it's been sent to FMS (using existing field)
-                                    update_result = db.supabase.table('clips').update({
-                                        'fms_export_date': export_timestamp,
-                                        # Keep workflow_stage as sentiment_analyzed so it stays in Ready to Export
-                                        'workflow_stage': 'sentiment_analyzed'
-                                    }).eq('id', clip['id']).execute()
+                                if all_clips_sent:
+                                    # All clips were processed successfully by FMS
+                                    for clip in clips_to_export:
+                                        update_result = db.supabase.table('clips').update({
+                                            'fms_export_date': export_timestamp,
+                                            'workflow_stage': 'sentiment_analyzed'  # Keep in Ready to Export
+                                        }).eq('id', clip['id']).execute()
+                                        
+                                        if update_result.data:
+                                            marked_count += 1
+                                            successfully_sent_clips.append(clip)
+                                            
+                                    st.success(f"✅ Successfully sent all {sent_count} clips to FMS API!")
                                     
-                                    if update_result.data:
-                                        marked_count += 1
+                                else:
+                                    # Partial success - only mark the number that FMS actually processed
+                                    # Since we don't know which specific clips failed, mark the first N as successful
+                                    st.warning(f"⚠️ FMS API processed {sent_count} of {total_clips} clips. {total_clips - sent_count} clips may have failed validation.")
+                                    
+                                    for i, clip in enumerate(clips_to_export):
+                                        if i < sent_count:  # Mark first N clips as sent
+                                            update_result = db.supabase.table('clips').update({
+                                                'fms_export_date': export_timestamp,
+                                                'workflow_stage': 'sentiment_analyzed'
+                                            }).eq('id', clip['id']).execute()
+                                            
+                                            if update_result.data:
+                                                marked_count += 1
+                                                successfully_sent_clips.append(clip)
+                                    
+                                    st.warning(f"⚠️ Only {sent_count} of {total_clips} clips were successfully sent to FMS!")
+                                    st.info(f"💡 The remaining {total_clips - sent_count} clips remain in Ready to Export for retry.")
                                 
-                                # Show success and ask if user wants to mark as complete
-                                st.success(f"✅ Successfully sent {result['sent_count']} clips to FMS API!")
+                                # Store only successfully processed clips for Mark Complete
+                                st.session_state.fms_successfully_sent_clips = successfully_sent_clips
+                                
+                                # Response details removed for cleaner UI
+                                        
                                 if marked_count > 0:
-                                    st.info(f"📊 {marked_count} clips marked as 'Exported' - they remain in Ready to Export until marked complete")
+                                    st.info(f"📊 {marked_count} clips marked as 'Sent to FMS' - they remain in Ready to Export until marked complete")
                                 
                                 # Store success state for confirmation dialog
                                 st.session_state.fms_send_successful = True
@@ -5260,6 +5313,7 @@ with approved_queue_tab:
                                         st.error(f"  • {error}")
                                         
                         except Exception as e:
+                            print(f"🔥 EXCEPTION: Error in FMS send: {str(e)}")
                             st.error(f"❌ Error sending to FMS API: {str(e)}")
                             logger.error(f"FMS API send error: {e}", exc_info=True)
                             
@@ -5276,14 +5330,18 @@ with approved_queue_tab:
                         
                 # Add Mark as Complete button
                 with col4:
+                    # Only show Mark Complete if clips were successfully sent
+                    clips_to_complete = st.session_state.get('fms_successfully_sent_clips', [])
+                    mark_complete_disabled = len(clips_to_complete) == 0
+                    
                     if st.button("✅ Mark as Complete", key="mark_complete", use_container_width=True,
-                                 help="Move clips to Recent Complete"):
-                        # Update clips to exported status
-                        clips_to_export = st.session_state.fms_clips_to_export
+                                 disabled=mark_complete_disabled,
+                                 help="Move successfully exported clips to Recent Complete"):
+                        # Update only successfully sent clips to exported status
                         export_timestamp = st.session_state.fms_export_timestamp
                         exported_count = 0
                         
-                        for clip in clips_to_export:
+                        for clip in clips_to_complete:
                             result = db.supabase.table('clips').update({
                                 'workflow_stage': 'exported',
                                 'fms_export_date': export_timestamp
@@ -5324,12 +5382,12 @@ with approved_queue_tab:
                     col1, col2 = st.columns(2)
                     with col1:
                         if st.button("Yes, Mark Complete", key="confirm_complete", type="primary", use_container_width=True):
-                            # Update clips to exported status
-                            clips_to_export = st.session_state.fms_clips_to_export
+                            # Update only successfully sent clips to exported status
+                            clips_to_complete = st.session_state.get('fms_successfully_sent_clips', [])
                             export_timestamp = st.session_state.fms_export_timestamp
                             exported_count = 0
                             
-                            for clip in clips_to_export:
+                            for clip in clips_to_complete:
                                 result = db.supabase.table('clips').update({
                                     'workflow_stage': 'exported',
                                     'fms_export_date': export_timestamp
