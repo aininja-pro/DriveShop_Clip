@@ -4840,12 +4840,12 @@ with approved_queue_tab:
             grid_options = gb.build()
             
             # Force column definitions exactly like Bulk Review
-            grid_options['columnDefs'] = [
+            base_columns = [
                 {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 140, 'checkboxSelection': True, 'headerCheckboxSelection': True} if st.session_state.approved_queue_filter == 'ready_to_export' else {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 100},
                 {'field': 'Office', 'minWidth': 115},
                 {'field': 'Make', 'minWidth': 120},
                 {'field': 'Model', 'minWidth': 150},
-                {'field': 'Contact', 'minWidth': 180, 'sortable': True, 'sort': 'asc'},
+                {'field': 'Contact', 'minWidth': 180, 'sortable': True},
                 {'field': 'Media Outlet', 'minWidth': 220},
                 {'field': 'Relevance', 'minWidth': 110},
                 {'field': 'Date', 'minWidth': 100},
@@ -4855,14 +4855,29 @@ with approved_queue_tab:
                 {'field': 'Clip URL', 'hide': True},
                 {'field': 'id', 'hide': True},
                 {'field': 'Activity_ID', 'hide': True}
-            ] + ([{'field': 'Export Status', 'minWidth': 160}] if st.session_state.approved_queue_filter == 'ready_to_export' and 'Export Status' in clean_df.columns else [])
+            ]
             
-            # Add default sorting by Contact field in ascending order (same as Bulk Review)
+            # Add tab-specific columns
+            if st.session_state.approved_queue_filter == 'ready_to_export' and 'Export Status' in clean_df.columns:
+                base_columns.append({'field': 'Export Status', 'minWidth': 160})
+            elif st.session_state.approved_queue_filter == 'recent_complete' and 'FMS Export Date' in clean_df.columns:
+                base_columns.append({'field': 'FMS Export Date', 'minWidth': 140, 'sortable': True})
+            
+            grid_options['columnDefs'] = base_columns
+            
+            # Set default sorting based on tab
             grid_options['defaultColDef'] = grid_options.get('defaultColDef', {})
             grid_options['defaultColDef']['sortable'] = True
-            grid_options['sortModel'] = [
-                {'colId': 'Contact', 'sort': 'asc'}
-            ]
+            if st.session_state.approved_queue_filter == 'recent_complete':
+                # Sort by FMS Export Date descending for Recent Complete
+                grid_options['sortModel'] = [
+                    {'colId': 'FMS Export Date', 'sort': 'desc'}
+                ]
+            else:
+                # Sort by Contact ascending for Ready to Export
+                grid_options['sortModel'] = [
+                    {'colId': 'Contact', 'sort': 'asc'}
+                ]
             
             selected_clips = AgGrid(
                 clean_df,
