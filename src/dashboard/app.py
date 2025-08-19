@@ -4781,15 +4781,15 @@ with approved_queue_tab:
             if st.session_state.approved_queue_filter == 'ready_to_export':
                 gb.configure_selection('multiple', use_checkbox=True, groupSelectsChildren=True, groupSelectsFiltered=True)
                 # Add checkbox selection to first column for Ready to Export
-                gb.configure_column("WO #", minWidth=100, pinned='left', checkboxSelection=True, headerCheckboxSelection=True, cellRenderer=cellRenderer_wo)
+                gb.configure_column("WO #", minWidth=100, width=140, pinned='left', checkboxSelection=True, headerCheckboxSelection=True, cellRenderer=cellRenderer_wo)
             else:
                 # Recent Complete is read-only
                 gb.configure_selection('single', use_checkbox=False)
-                gb.configure_column("WO #", minWidth=100, pinned='left', cellRenderer=cellRenderer_wo)
-            gb.configure_column("Office", minWidth=100)
+                gb.configure_column("WO #", minWidth=100, width=140, pinned='left', cellRenderer=cellRenderer_wo)
+            gb.configure_column("Office", minWidth=115)
             gb.configure_column("Make", minWidth=120)
             gb.configure_column("Model", minWidth=150)
-            gb.configure_column("Contact", minWidth=180)
+            gb.configure_column("Contact", minWidth=180, sortable=True, sort='asc')
             gb.configure_column("Media Outlet", minWidth=220)
             gb.configure_column("Relevance", minWidth=110)
             gb.configure_column("Date", minWidth=100)
@@ -4838,6 +4838,31 @@ with approved_queue_tab:
             
             # Build and display grid with ADVANCED features
             grid_options = gb.build()
+            
+            # Force column definitions exactly like Bulk Review
+            grid_options['columnDefs'] = [
+                {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 140, 'checkboxSelection': True, 'headerCheckboxSelection': True} if st.session_state.approved_queue_filter == 'ready_to_export' else {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 100},
+                {'field': 'Office', 'minWidth': 115},
+                {'field': 'Make', 'minWidth': 120},
+                {'field': 'Model', 'minWidth': 150},
+                {'field': 'Contact', 'minWidth': 180, 'sortable': True, 'sort': 'asc'},
+                {'field': 'Media Outlet', 'minWidth': 220},
+                {'field': 'Relevance', 'minWidth': 110},
+                {'field': 'Date', 'minWidth': 100},
+                {'field': 'Sentiment', 'minWidth': 140},
+                {'field': 'Stage', 'minWidth': 120},
+                {'field': '📄 View', 'cellRenderer': cellRenderer_view, 'minWidth': 100, 'sortable': False, 'filter': False},
+                {'field': 'Clip URL', 'hide': True},
+                {'field': 'id', 'hide': True},
+                {'field': 'Activity_ID', 'hide': True}
+            ] + ([{'field': 'Export Status', 'minWidth': 160}] if st.session_state.approved_queue_filter == 'ready_to_export' and 'Export Status' in clean_df.columns else [])
+            
+            # Add default sorting by Contact field in ascending order (same as Bulk Review)
+            grid_options['defaultColDef'] = grid_options.get('defaultColDef', {})
+            grid_options['defaultColDef']['sortable'] = True
+            grid_options['sortModel'] = [
+                {'colId': 'Contact', 'sort': 'asc'}
+            ]
             
             selected_clips = AgGrid(
                 clean_df,
