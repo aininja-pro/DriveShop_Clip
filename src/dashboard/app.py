@@ -3661,7 +3661,7 @@ with bulk_review_tab:
                     {'field': '✅ Approve', 'headerName': '✅', 'cellRenderer': cellRenderer_approve, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left', 'cellStyle': {'backgroundColor': '#f0f9f0'}},
                     {'field': '❌ Reject', 'headerName': '❌', 'cellRenderer': cellRenderer_reject, 'minWidth': 80, 'maxWidth': 90, 'width': 85, 'editable': True, 'sortable': False, 'filter': False, 'pinned': 'left', 'cellStyle': {'backgroundColor': '#fef0f0'}},
                     {'field': 'WO #', 'headerName': 'Work Order #', 'cellRenderer': cellRenderer_wo, 'minWidth': 100},
-                    {'field': 'Contact', 'minWidth': 180},
+                    {'field': 'Contact', 'minWidth': 180, 'sortable': True, 'sort': 'asc'},
                     {'field': 'Media Outlet', 'cellRenderer': cellRenderer_outlet_dropdown if person_outlets_mapping else None, 'minWidth': 220, 'editable': True, 'sortable': True, 'filter': True},
                     {'field': '📄 View', 'cellRenderer': cellRenderer_view, 'minWidth': 150, 'maxWidth': 600, 'sortable': False, 'filter': False, 'resizable': True},
                     {'field': 'Make', 'minWidth': 120},
@@ -3678,6 +3678,13 @@ with bulk_review_tab:
                     {'field': 'Viewed', 'hide': True},
                     {'field': 'Activity_ID', 'hide': True},
                     {'field': 'Outlet_Options', 'hide': True}
+                ]
+                
+                # Add default sorting by Contact field in ascending order
+                grid_options['defaultColDef'] = grid_options.get('defaultColDef', {})
+                grid_options['defaultColDef']['sortable'] = True
+                grid_options['sortModel'] = [
+                    {'colId': 'Contact', 'sort': 'asc'}
                 ]
                 
                 # Call AgGrid with Enterprise modules enabled for Set Filters
