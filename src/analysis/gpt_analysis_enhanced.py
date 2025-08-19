@@ -109,9 +109,116 @@ def parse_json_with_fallbacks(response_text: str) -> dict:
     except json.JSONDecodeError as e:
         logger.warning(f"Strategy 2 failed: {e}")
     
+    # Strategy 3: Try truncating at error position and rebuilding
+    try:
+        logger.info("Trying Strategy 3: Error position truncation and rebuild...")
+        cleaned = clean_json_response(response_text)
+        
+        # Try to parse and identify the exact error position
+        try:
+            json.loads(cleaned)
+        except json.JSONDecodeError as parse_error:
+            error_pos = getattr(parse_error, 'pos', None)
+            if error_pos and error_pos < len(cleaned):
+                logger.info(f"JSON error at position {error_pos}, attempting to fix...")
+                
+                # Truncate at error position and try to close the JSON properly
+                truncated = cleaned[:error_pos]
+                
+                # Count opening braces/brackets to determine how to close
+                open_braces = truncated.count('{') - truncated.count('}')
+                open_brackets = truncated.count('[') - truncated.count(']')
+                
+                # Remove any trailing incomplete elements
+                truncated = re.sub(r',\s*$', '', truncated.strip())
+                truncated = re.sub(r'[^}"\]\d]\s*$', '', truncated)
+                
+                # Close the JSON structure
+                closing = '}' * open_braces + ']' * open_brackets
+                repaired = truncated + closing
+                
+                analysis_result = json.loads(repaired)
+                logger.info(f"✅ Successfully parsed JSON with Strategy 3 (truncated at pos {error_pos})")
+                return analysis_result
+    except (json.JSONDecodeError, Exception) as e:
+        logger.warning(f"Strategy 3 failed: {e}")
+    
+    # Strategy 4: Extract valid JSON fragments
+    try:
+        logger.info("Trying Strategy 4: Extract valid JSON fragments...")
+        cleaned = clean_json_response(response_text)
+        
+        # Try to find the longest valid JSON prefix
+        for i in range(len(cleaned), 0, -50):  # Work backwards in chunks
+            try:
+                fragment = cleaned[:i].strip()
+                # Try to close it properly
+                open_braces = fragment.count('{') - fragment.count('}')
+                if open_braces > 0:
+                    fragment = fragment.rstrip(',') + '}' * open_braces
+                
+                result = json.loads(fragment)
+                logger.info(f"✅ Successfully parsed JSON fragment with Strategy 4 (length {i})")
+                return result
+            except:
+                continue
+    except Exception as e:
+        logger.warning(f"Strategy 4 failed: {e}")
+    
     # Return None if all strategies fail
     logger.error("All JSON parsing strategies failed. Returning None.")
     return None
+
+
+def analyze_clip_enhanced_with_special_char_stripping(content: str, make: str, model: str, year: str = None, trim: str = None, max_retries: int = 3, url: str = None) -> Dict[str, Any]:
+    """
+    Strategy 5: Try analysis with special characters stripped from content.
+    This is a fallback for problematic content that breaks JSON generation.
+    
+    Args:
+        content: Article or video transcript content
+        make: Vehicle make
+        model: Vehicle model
+        year: Vehicle year (optional)
+        trim: Vehicle trim level (optional)
+        max_retries: Maximum number of retry attempts
+        url: Original URL for content extraction (optional)
+        
+    Returns:
+        Analysis result dictionary or None if analysis fails
+    """
+    logger.info("Strategy 5: Attempting analysis with special characters stripped...")
+    
+    # Aggressively clean the content
+    import unicodedata
+    
+    # Remove smart quotes, em-dashes, and other problematic Unicode characters
+    cleaned_content = content
+    
+    # Replace smart quotes with regular quotes
+    cleaned_content = cleaned_content.replace('"', '"').replace('"', '"')
+    cleaned_content = cleaned_content.replace(''', "'").replace(''', "'")
+    
+    # Replace em-dashes and en-dashes with regular hyphens
+    cleaned_content = cleaned_content.replace('—', '-').replace('–', '-')
+    
+    # Remove or replace other problematic characters
+    cleaned_content = cleaned_content.replace('…', '...')
+    cleaned_content = cleaned_content.replace('•', '-')
+    
+    # Normalize Unicode characters
+    cleaned_content = unicodedata.normalize('NFKD', cleaned_content)
+    
+    # Remove any remaining non-ASCII characters
+    cleaned_content = ''.join(char for char in cleaned_content if ord(char) < 128)
+    
+    # Clean up extra whitespace
+    cleaned_content = ' '.join(cleaned_content.split())
+    
+    logger.info(f"Stripped content from {len(content)} to {len(cleaned_content)} characters")
+    
+    # Try the analysis with cleaned content
+    return analyze_clip_enhanced(cleaned_content, make, model, year, trim, max_retries, url)
 
 def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None, trim: str = None, max_retries: int = 3, url: str = None) -> Dict[str, Any]:
     """

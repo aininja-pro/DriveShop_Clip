@@ -16,7 +16,7 @@ try:
     logger.info("Using OpenAI v1.x compatible enhanced analyzer")
 except ImportError:
     # Fall back to original if v1 doesn't exist
-    from src.analysis.gpt_analysis_enhanced import analyze_clip_enhanced
+    from src.analysis.gpt_analysis_enhanced import analyze_clip_enhanced, analyze_clip_enhanced_with_special_char_stripping
     logger = setup_logger(__name__)
     logger.info("Using original enhanced analyzer")
 
@@ -131,10 +131,24 @@ class SentimentAnalyzer:
                 *analyzer_args
             )
             
+            # Strategy 5: If enhanced analysis failed and we haven't tried special char stripping yet, try it
+            if result is None and self.use_enhanced:
+                logger.warning("Enhanced analysis failed, trying Strategy 5: special character stripping...")
+                try:
+                    result = await loop.run_in_executor(
+                        None,
+                        analyze_clip_enhanced_with_special_char_stripping,
+                        content, make, model, year, trim, 3, url
+                    )
+                    if result:
+                        logger.info("✅ Strategy 5 (special char stripping) succeeded!")
+                except Exception as e:
+                    logger.warning(f"Strategy 5 failed: {e}")
+            
             # Handle None result (no API key or parsing failed)
             if result is None:
                 return {
-                    'error': 'Analysis failed - no data returned from GPT',
+                    'error': 'Analysis failed - no data returned from GPT after all strategies',
                     'sentiment_completed': False
                 }
             

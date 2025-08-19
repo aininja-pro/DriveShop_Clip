@@ -4939,6 +4939,24 @@ with approved_queue_tab:
                                                 activity_id = export_record.get('activity_id')
                                                 if activity_id in enhanced_data_lookup:
                                                     export_record['sentiment_data_enhanced'] = enhanced_data_lookup[activity_id]
+                                                else:
+                                                    # Add empty enhanced sentiment for clips that failed analysis
+                                                    export_record['sentiment_data_enhanced'] = {
+                                                        "sentiment_classification": {"overall": "neutral", "confidence": 0.0, "rationale": "Analysis failed"},
+                                                        "key_features_mentioned": [],
+                                                        "brand_attributes_captured": [],
+                                                        "purchase_drivers": [],
+                                                        "competitive_context": {"direct_comparisons": [], "market_positioning": ""},
+                                                        "trim_level_mentioned": False,
+                                                        "trim_impact_score": 0.0,
+                                                        "trim_highlights": None,
+                                                        "vehicle_identifier": f"{export_record.get('make', '')} {export_record.get('model', '')}".strip(),
+                                                        "content_type": "Web Article",
+                                                        "overall_sentiment": "neutral",
+                                                        "relevance_score": 5,
+                                                        "summary": "Enhanced sentiment analysis failed for this clip",
+                                                        "brand_alignment": False
+                                                    }
                                                 fms_export_data.append(export_record)
                                         else:
                                             # Fallback to manual mapping if view query fails
@@ -4965,6 +4983,25 @@ with approved_queue_tab:
                                                 filtered_sentiment = {k: v for k, v in enhanced_sentiment.items() if k in allowed_fields}
                                                 
                                                 # Create export record with original flat fields PLUS enhanced sentiment
+                                                # Use placeholder data if enhanced sentiment failed
+                                                if not filtered_sentiment:
+                                                    filtered_sentiment = {
+                                                        "sentiment_classification": {"overall": "neutral", "confidence": 0.0, "rationale": "Analysis failed"},
+                                                        "key_features_mentioned": [],
+                                                        "brand_attributes_captured": [],
+                                                        "purchase_drivers": [],
+                                                        "competitive_context": {"direct_comparisons": [], "market_positioning": ""},
+                                                        "trim_level_mentioned": False,
+                                                        "trim_impact_score": 0.0,
+                                                        "trim_highlights": None,
+                                                        "vehicle_identifier": f"{clip.get('make', '')} {clip.get('model', '')}".strip(),
+                                                        "content_type": "Web Article",
+                                                        "overall_sentiment": "neutral", 
+                                                        "relevance_score": 5,
+                                                        "summary": "Enhanced sentiment analysis failed for this clip",
+                                                        "brand_alignment": False
+                                                    }
+                                                
                                                 export_record = {
                                                     # Client-requested fields with their preferred names (original flat structure)
                                                     "activity_id": clip.get('activity_id'),
