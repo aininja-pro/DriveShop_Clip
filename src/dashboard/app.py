@@ -4902,17 +4902,71 @@ with approved_queue_tab:
                                     clip_ids = [clip['id'] for clip in clips_to_export if clip.get('id')]
                                     
                                     if clip_ids:
-                                        # Query the export view for these specific clips
+                                        # Query the export view for these specific clips to get original flat fields
                                         export_result = db.supabase.table('clips_export').select('*').in_('activity_id', [clip['activity_id'] for clip in clips_to_export if clip.get('activity_id')]).execute()
                                         
                                         if export_result.data:
-                                            # Use the data directly from the view - it already has client field names
-                                            fms_export_data = export_result.data
+                                            # Get enhanced sentiment data for the same clips
+                                            clips_result = db.supabase.table('clips').select('activity_id, sentiment_data_enhanced').in_('id', clip_ids).execute()
+                                            
+                                            # Create a lookup for enhanced sentiment data by activity_id
+                                            enhanced_data_lookup = {}
+                                            if clips_result.data:
+                                                for clip_data in clips_result.data:
+                                                    enhanced_sentiment = {}
+                                                    if clip_data.get('sentiment_data_enhanced'):
+                                                        try:
+                                                            if isinstance(clip_data['sentiment_data_enhanced'], str):
+                                                                enhanced_sentiment = json.loads(clip_data['sentiment_data_enhanced'])
+                                                            else:
+                                                                enhanced_sentiment = clip_data['sentiment_data_enhanced']
+                                                        except (json.JSONDecodeError, TypeError):
+                                                            enhanced_sentiment = {}
+                                                    
+                                                    # Filter to only include the fields specified by client
+                                                    allowed_fields = {
+                                                        'sentiment_classification', 'key_features_mentioned', 'brand_attributes_captured',
+                                                        'purchase_drivers', 'competitive_context', 'trim_level_mentioned', 'trim_impact_score',
+                                                        'trim_highlights', 'vehicle_identifier', 'content_type', 'overall_sentiment',
+                                                        'relevance_score', 'summary', 'brand_alignment'
+                                                    }
+                                                    
+                                                    filtered_sentiment = {k: v for k, v in enhanced_sentiment.items() if k in allowed_fields}
+                                                    enhanced_data_lookup[clip_data.get('activity_id')] = filtered_sentiment
+                                            
+                                            # Combine original flat data with enhanced sentiment data
+                                            for export_record in export_result.data:
+                                                activity_id = export_record.get('activity_id')
+                                                if activity_id in enhanced_data_lookup:
+                                                    export_record['sentiment_data_enhanced'] = enhanced_data_lookup[activity_id]
+                                                fms_export_data.append(export_record)
                                         else:
                                             # Fallback to manual mapping if view query fails
                                             for clip in clips_to_export:
+                                                # Parse the enhanced sentiment data
+                                                enhanced_sentiment = {}
+                                                if clip.get('sentiment_data_enhanced'):
+                                                    try:
+                                                        if isinstance(clip['sentiment_data_enhanced'], str):
+                                                            enhanced_sentiment = json.loads(clip['sentiment_data_enhanced'])
+                                                        else:
+                                                            enhanced_sentiment = clip['sentiment_data_enhanced']
+                                                    except (json.JSONDecodeError, TypeError):
+                                                        enhanced_sentiment = {}
+                                                
+                                                # Filter to only include the fields specified by client
+                                                allowed_fields = {
+                                                    'sentiment_classification', 'key_features_mentioned', 'brand_attributes_captured',
+                                                    'purchase_drivers', 'competitive_context', 'trim_level_mentioned', 'trim_impact_score',
+                                                    'trim_highlights', 'vehicle_identifier', 'content_type', 'overall_sentiment',
+                                                    'relevance_score', 'summary', 'brand_alignment'
+                                                }
+                                                
+                                                filtered_sentiment = {k: v for k, v in enhanced_sentiment.items() if k in allowed_fields}
+                                                
+                                                # Create export record with original flat fields PLUS enhanced sentiment
                                                 export_record = {
-                                                    # Client-requested fields with their preferred names
+                                                    # Client-requested fields with their preferred names (original flat structure)
                                                     "activity_id": clip.get('activity_id'),
                                                     "brand_fit": clip.get('brand_narrative'),
                                                     "byline": clip.get('byline_author'),
@@ -4925,7 +4979,10 @@ with approved_queue_tab:
                                                     "pros": clip.get('pros'),
                                                     "date": clip.get('published_date'),
                                                     "relevance_score": clip.get('relevance_score'),
-                                                    "ai_summary": clip.get('summary')
+                                                    "ai_summary": clip.get('summary'),
+                                                    
+                                                    # NEW: Enhanced sentiment data as additional field
+                                                    "sentiment_data_enhanced": filtered_sentiment
                                                 }
                                                 fms_export_data.append(export_record)
                                     
