@@ -237,6 +237,136 @@ class FMSAPIClient:
                         
         return errors
         
+    def get_current_token(self) -> str:
+        """
+        Get the current token (useful for manual environment updates).
+        
+        Returns:
+            Current token string
+        """
+        return self.token
+        
+    def rotate_token(self) -> Dict[str, Any]:
+        """
+        Rotate the FMS API token using the new rotate-token endpoint.
+        
+        Returns:
+            Dict with rotation results including new token
+        """
+        try:
+            if self.environment == "production":
+                rotate_url = os.getenv("FMS_API_PRODUCTION_URL", "").replace("/clips", "/rotate-token")
+            else:
+                rotate_url = os.getenv("FMS_API_STAGING_URL", "").replace("/clips", "/rotate-token")
+            
+            if not rotate_url or "/rotate-token" not in rotate_url:
+                return {
+                    "success": False,
+                    "error": "Could not determine rotate-token endpoint URL"
+                }
+            
+            print(f"🔄 FMS_TOKEN_ROTATION: Requesting new token from {rotate_url}")
+            logger.info(f"Rotating FMS token using endpoint: {rotate_url}")
+            
+            response = requests.post(
+                rotate_url,
+                headers=self.headers,
+                timeout=30
+            )
+            
+            print(f"🔄 FMS_TOKEN_ROTATION: Response Status: {response.status_code}")
+            logger.info(f"Token rotation response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                new_token = response.headers.get("Token")
+                if new_token:
+                    print(f"✅ FMS_TOKEN_ROTATION: New token received")
+                    logger.info("Token rotation successful - new token received")
+                    
+                    # Update the instance token
+                    self.token = new_token
+                    self.headers["Authorization"] = f"Token {new_token}"
+                    
+                    # Log token rotation for manual environment updates
+                    print(f"🔑 NEW_TOKEN_FOR_ENV: {new_token}")
+                    print(f"🔑 UPDATE_RENDER: Set FMS_API_TOKEN={new_token} in Render environment variables")
+                    logger.critical(f"TOKEN_ROTATION: New token for {self.environment}: {new_token}")
+                    logger.critical(f"ACTION_REQUIRED: Update Render environment variable FMS_API_TOKEN={new_token}")
+                    
+                    return {
+                        "success": True,
+                        "message": "Token rotated successfully",
+                        "new_token": new_token,
+                        "environment": self.environment,
+                        "action_required": f"Update Render environment: FMS_API_TOKEN={new_token}"
+                    }
+                else:
+                    error_msg = "Token rotation succeeded but no new token in response header"
+                    print(f"❌ FMS_TOKEN_ROTATION: {error_msg}")
+                    logger.error(error_msg)
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "response_headers": dict(response.headers)
+                    }
+            else:
+                error_msg = f"Token rotation failed with status {response.status_code}: {response.text}"
+                print(f"❌ FMS_TOKEN_ROTATION: {error_msg}")
+                logger.error(error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "response_status": response.status_code
+                }
+                
+        except Exception as e:
+            error_msg = f"Token rotation failed: {str(e)}"
+            print(f"❌ FMS_TOKEN_ROTATION: {error_msg}")
+            logger.error(error_msg, exc_info=True)
+            return {
+                "success": False,
+                "error": error_msg
+            }
+    
+    def send_clips_with_retry(self, clips: List[Dict[str, Any]], dry_run: bool = False) -> Dict[str, Any]:
+        """
+        Send clips to FMS API with automatic token rotation retry on auth failure.
+        
+        Args:
+            clips: List of clip dictionaries in FMS format
+            dry_run: If True, validate data without sending to API
+            
+        Returns:
+            Dict with results including success status and any errors
+        """
+        # First attempt
+        result = self.send_clips(clips, dry_run)
+        
+        # If auth failed (401), try rotating token and retry once
+        if not result["success"] and result.get("response_status") == 401:
+            print("🔄 FMS_AUTO_RETRY: Auth failed, attempting token rotation...")
+            logger.info("Authentication failed, attempting automatic token rotation")
+            
+            rotation_result = self.rotate_token()
+            if rotation_result["success"]:
+                print("🔄 FMS_AUTO_RETRY: Token rotated, retrying clip submission...")
+                logger.info("Token rotation successful, retrying clip submission")
+                
+                # Retry with new token
+                retry_result = self.send_clips(clips, dry_run)
+                if retry_result["success"]:
+                    retry_result["token_rotated"] = True
+                    retry_result["new_token"] = rotation_result["new_token"]
+                    retry_result["action_required"] = rotation_result["action_required"]
+                return retry_result
+            else:
+                print("❌ FMS_AUTO_RETRY: Token rotation failed")
+                logger.error("Automatic token rotation failed")
+                result["token_rotation_attempted"] = True
+                result["token_rotation_error"] = rotation_result["error"]
+        
+        return result
+
     def test_connection(self) -> Dict[str, Any]:
         """
         Test the connection to the FMS API.

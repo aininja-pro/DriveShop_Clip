@@ -5288,13 +5288,18 @@ with approved_queue_tab:
                                 st.error("Invalid clips data format")
                                 clips_data = []
                             
-                            # Send to FMS API
+                            # Send to FMS API with automatic token rotation
                             print("🔥 SENDING: About to call FMS API...")
                             with st.spinner("Sending clips to FMS API..."):
-                                result = fms_client.send_clips(clips_data)
+                                result = fms_client.send_clips_with_retry(clips_data)
                             print(f"🔥 RESULT: FMS API returned: {result}")
                             
                             if result["success"]:
+                                # Check if token was rotated during the process
+                                if result.get("token_rotated"):
+                                    st.warning(f"🔑 Token was automatically rotated during export!")
+                                    st.info(f"**Action Required:** Update Render environment variable:\n`FMS_API_TOKEN={result.get('new_token', 'ERROR_GETTING_TOKEN')}`")
+                                
                                 # Mark clips as sent to FMS based on actual API response
                                 clips_to_export = st.session_state.fms_clips_to_export
                                 export_timestamp = st.session_state.fms_export_timestamp
