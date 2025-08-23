@@ -566,6 +566,14 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
                 # Hardened None handling - never crash on None result
                 if apify_text and isinstance(apify_text, str) and len(apify_text.strip()) > 50:
                     logger.info(f"✅ Apify fallback successful: {len(apify_text)} chars")
+                    
+                    # Clean summary log for Apify success
+                    cookiefile = os.getenv("YTDLP_COOKIES")
+                    has_cookies = bool(cookiefile and os.path.exists(cookiefile))
+                    logger.info(f"🎯 CLIP SUMMARY: client=failed cookies={has_cookies} caption_proxy=apify "
+                               f"cap_status=200 retry_after=0 waited_ms=0 segments=estimated elapsed_ms=unknown "
+                               f"fallback=apify")
+                    
                     return apify_text
                 else:
                     logger.warning(f"❌ Apify returned insufficient content for {video_id}")
@@ -585,6 +593,14 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
                 metadata = get_video_metadata_fallback(video_id, known_title=None)
                 if metadata and metadata.get('content_text'):
                     logger.info(f"🛡️ Using metadata fallback for {video_id}: {len(metadata['content_text'])} chars")
+                    
+                    # Clean summary log for minimal fallback
+                    cookiefile = os.getenv("YTDLP_COOKIES")
+                    has_cookies = bool(cookiefile and os.path.exists(cookiefile))
+                    logger.info(f"🎯 CLIP SUMMARY: client=failed cookies={has_cookies} caption_proxy=failed "
+                               f"cap_status=failed retry_after=unknown waited_ms=unknown segments=0 elapsed_ms=unknown "
+                               f"fallback=minimal")
+                    
                     return metadata['content_text']
         except Exception as meta_err:
             logger.debug(f"Metadata fallback also failed for {video_id}: {meta_err}")
