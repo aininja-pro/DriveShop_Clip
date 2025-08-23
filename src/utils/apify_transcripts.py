@@ -13,12 +13,12 @@ log = logging.getLogger("apify")
 
 API = os.getenv("APIFY_API_BASE_URL", "https://api.apify.com")
 
-def run_apify_transcript(payload: dict, wait_budget_s: int = 18) -> Tuple[str | None, str | None]:
+def run_apify_transcript(payload, wait_budget_s: int = 18) -> Tuple[str | None, str | None]:
     """
     Hardened Apify transcript extraction with proper error handling.
     
     Args:
-        payload: Complete payload dict with startUrls, videoId, etc.
+        payload: URL string or dict payload for the actor
         wait_budget_s: Maximum time to wait for completion
         
     Returns:
@@ -31,7 +31,15 @@ def run_apify_transcript(payload: dict, wait_budget_s: int = 18) -> Tuple[str | 
         log.error("Apify missing config; skipping call.")
         return None, None
 
-    # Use provided payload directly (caller handles format)
+    # Handle both string URL and dict payload formats
+    if isinstance(payload, str):
+        # Simple URL string format (what works!)
+        actual_payload = payload
+        video_id = payload.split('v=')[-1].split('&')[0] if 'v=' in payload else "unknown"
+    else:
+        # Dict payload format (legacy)
+        actual_payload = payload
+        video_id = payload.get("videoId", "unknown")
     
     # Convert actor format for API URL: topaz_sharingan/Youtube-Transcript-Scraper → topaz_sharingan~youtube-transcript-scraper  
     if actor:
@@ -41,10 +49,8 @@ def run_apify_transcript(payload: dict, wait_budget_s: int = 18) -> Tuple[str | 
         start_url = f"{API}/v2/actor-tasks/{task}/runs"
     
     try:
-        # Extract video_id from payload for logging
-        video_id = payload.get("videoId", "unknown")
         log.info("Starting Apify run for video %s...", video_id)
-        r = requests.post(start_url, params={"token": token}, json=payload, timeout=8)
+        r = requests.post(start_url, params={"token": token}, json=actual_payload, timeout=8)
         r.raise_for_status()
         
         run_data = r.json().get("data", {})
@@ -166,16 +172,11 @@ def get_transcript_from_apify(video_url: str, timeout_s: int = None) -> Optional
     # Cap at reasonable limit for transcript extraction
     wait_budget = min(wait_budget, 120)
     
-    # Use EXACT format that worked in Docker (simple startUrls only)
+    # Use EXACT format that works - just the URL string
     yt_url = f"https://www.youtube.com/watch?v={video_id}"
-    payload = {
-        "startUrls": [yt_url],
-        "language": "Default", 
-        "includeTimestamps": "No"
-    }
     
-    # Use the new hardened wrapper with proper payload
-    text, run_id = run_apify_transcript(payload, wait_budget)
+    # Use the new hardened wrapper with simple URL payload
+    text, run_id = run_apify_transcript(yt_url, wait_budget)
     
     # Guard the result and provide crash-proof fallback handling
     if not isinstance(text, str) or len(text.strip()) < 200:
