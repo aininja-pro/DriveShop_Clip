@@ -162,14 +162,17 @@ def _cap_once(url: str, vid: str, left_s: float) -> httpx.Response:
     
     timeout = httpx.Timeout(connect=5.0, read=min(10.0, max(3.0, left_s)), write=5.0, pool=5.0)
     
-    with httpx.Client(
-        proxies={"all://": caption_proxy} if caption_proxy else None,
-        headers=_cap_headers(vid), 
-        timeout=timeout,
-        follow_redirects=True, 
-        verify=False, 
-        trust_env=False
-    ) as c:
+    client_kwargs = {
+        "headers": _cap_headers(vid), 
+        "timeout": timeout,
+        "follow_redirects": True, 
+        "verify": False, 
+        "trust_env": False
+    }
+    if caption_proxy:
+        client_kwargs["proxy"] = caption_proxy  # httpx uses 'proxy' not 'proxies'
+        
+    with httpx.Client(**client_kwargs) as c:
         return c.get(url)
 
 def fetch_caption_with_retry(url: str, vid: str, left) -> httpx.Response:

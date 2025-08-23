@@ -41,7 +41,8 @@ def run_apify_transcript(payload: dict, wait_budget_s: int = 18) -> Tuple[str | 
         start_url = f"{API}/v2/actor-tasks/{task}/runs"
     
     try:
-        # Start the run
+        # Extract video_id from payload for logging
+        video_id = payload.get("videoId", "unknown")
         log.info("Starting Apify run for video %s...", video_id)
         r = requests.post(start_url, params={"token": token}, json=payload, timeout=8)
         r.raise_for_status()
