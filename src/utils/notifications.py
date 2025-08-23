@@ -12,8 +12,9 @@ logger = setup_logger(__name__)
 
 def load_slack_webhook():
     """Load Slack webhook URL from environment variables"""
-    load_dotenv()
-    webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
+    # Use centralized environment loading (no .env dependency)
+    from src.config.env import getenv_any
+    webhook_url = getenv_any(["SLACK_WEBHOOK_URL", "SLACK_WEBHOOK"])
     
     if not webhook_url:
         logger.warning("SLACK_WEBHOOK_URL environment variable not found")

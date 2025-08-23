@@ -310,7 +310,7 @@ def process_tiktok_video(url: str) -> Optional[Dict[str, Any]]:
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
-            'cookiefile': os.getenv('TIKTOK_COOKIES_FILE'),  # Optional: browser cookies
+            'cookiefile': os.getenv('TIKTOK_COOKIES_FILE') if os.getenv('TIKTOK_COOKIES_FILE') and os.path.exists(os.getenv('TIKTOK_COOKIES_FILE', '')) else None,  # Optional: browser cookies
             'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'extractor_args': {
                 'tiktok': {
@@ -448,7 +448,7 @@ def get_channel_videos(channel_url: str, max_videos: int = 50) -> List[Dict[str,
             'no_warnings': True,
             'extract_flat': 'in_playlist',  # Only extract metadata, not full videos
             'playlistend': max_videos,      # Limit number of videos
-            'cookiefile': os.getenv('TIKTOK_COOKIES_FILE'),
+            'cookiefile': os.getenv('TIKTOK_COOKIES_FILE') if os.getenv('TIKTOK_COOKIES_FILE') and os.path.exists(os.getenv('TIKTOK_COOKIES_FILE', '')) else None,
             'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         }
         

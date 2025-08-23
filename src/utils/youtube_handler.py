@@ -457,16 +457,26 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
 
     # Shortcut: force Apify path for testing
     try:
-        if os.getenv('YOUTUBE_FORCE_APIFY', '').lower() in {'1','true','yes'}:
+        from src.config.env import should_force_apify
+        from src.utils.apify_transcripts import get_transcript_from_apify
+        
+        if should_force_apify():
             if not video_url and video_id:
                 video_url = f"https://www.youtube.com/watch?v={video_id}"
             if video_url:
                 logger.info(f"🧪 Forcing Apify transcript for {video_id}")
-                from src.utils.apify_transcripts import get_transcript_from_apify
                 apify_text = get_transcript_from_apify(video_url, timeout_s=120)
-                return apify_text
+                
+                # Hardened None handling for force path too
+                if apify_text and isinstance(apify_text, str) and len(apify_text.strip()) > 50:
+                    return apify_text
+                else:
+                    logger.warning(f"❌ Force-Apify returned insufficient content for {video_id}")
+                    # Continue to normal flow instead of crashing
+                    
     except Exception as _e:
-        logger.debug(f"Force-Apify test path failed: {_e}")
+        logger.warning(f"Force-Apify test path failed for {video_id}: {_e}")
+        # Continue to normal flow instead of crashing
 
     # Try the new yt-dlp-based transcript fetcher first
     try:
@@ -545,17 +555,40 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
         
         # Final optional fallback: Apify actor
         try:
-            if os.getenv('YOUTUBE_APIFY_ENABLE', 'true').lower() in {'1','true','yes'} and video_url:
+            # Use centralized config to check if Apify is enabled
+            from src.config.env import is_apify_enabled
+            from src.utils.apify_transcripts import get_transcript_from_apify
+            
+            if is_apify_enabled() and video_url:
                 logger.info(f"🤝 Calling Apify transcript actor for {video_id}")
-                from src.utils.apify_transcripts import get_transcript_from_apify
                 apify_text = get_transcript_from_apify(video_url, timeout_s=120)
-                if apify_text and len(apify_text) > 50:
+                
+                # Hardened None handling - never crash on None result
+                if apify_text and isinstance(apify_text, str) and len(apify_text.strip()) > 50:
                     logger.info(f"✅ Apify fallback successful: {len(apify_text)} chars")
                     return apify_text
+                else:
+                    logger.warning(f"❌ Apify returned insufficient content for {video_id}")
+                    # Continue to final error instead of crashing
+            else:
+                logger.debug(f"Apify disabled or no video URL for {video_id}")
+                
         except Exception as apify_err:
-            logger.debug(f"Apify fallback failed: {apify_err}")
+            logger.warning(f"Apify fallback failed for {video_id}: {apify_err}")
+            # Continue to final error instead of crashing
         
         logger.error(f"❌ All transcript extraction methods failed for video {video_id}")
+        
+        # Final safety net: create minimal content from video metadata to prevent pipeline death
+        try:
+            if video_url:
+                metadata = get_video_metadata_fallback(video_id, known_title=None)
+                if metadata and metadata.get('content_text'):
+                    logger.info(f"🛡️ Using metadata fallback for {video_id}: {len(metadata['content_text'])} chars")
+                    return metadata['content_text']
+        except Exception as meta_err:
+            logger.debug(f"Metadata fallback also failed for {video_id}: {meta_err}")
+        
         return None
 
 def get_video_metadata_fallback(video_id, known_title=None):

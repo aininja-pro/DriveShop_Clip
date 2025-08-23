@@ -163,12 +163,13 @@ def _download_caption(url: str, proxy_info: str | None, total_left_s: float, ses
     caption_pool = get_session_pool()  # For now, same pool - TODO: separate Pool B
     caption_session_id, caption_proxy = caption_pool.acquire()
     
-    # Load cookies if available (same as yt-dlp)
+    # Load cookies if available (same as yt-dlp) - safe and optional
     cookies = None
-    cookiefile = os.getenv("YTDLP_COOKIES")
-    if cookiefile and os.path.exists(cookiefile):
+    from src.config.env import cookiefile_path
+    cookies_file = cookiefile_path()
+    if cookies_file:
         try:
-            cookies = load_netscape_cookies(cookiefile)
+            cookies = load_netscape_cookies(cookies_file)
             if cookies:
                 logger.debug(f"🍪 Using {len(cookies)} cookies for caption download")
         except Exception as e:
@@ -380,11 +381,12 @@ def _extract_info_single_attempt(url: str, proxy: str | None, client: str, socke
         "geo_bypass_country": "US",       # Consistent geo context
     })
     
-    # Add cookies if available for bot protection
-    cookiefile = os.getenv("YTDLP_COOKIES") 
-    if cookiefile and os.path.exists(cookiefile):
-        ydl_opts["cookiefile"] = cookiefile
-        logger.debug(f"🍪 Using cookies from {cookiefile} for bot protection")
+    # Add cookies if available for bot protection - safe and optional
+    from src.config.env import cookiefile_path
+    cookies_file = cookiefile_path()
+    if cookies_file:
+        ydl_opts["cookiefile"] = cookies_file
+        logger.debug(f"🍪 Using cookies from {cookies_file} for bot protection")
     
     # Enhanced headers for bot detection evasion
     ydl_opts["http_headers"] = {

@@ -24,28 +24,22 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 import requests
 from streamlit_extras.stylable_container import stylable_container
 
-# Add explicit .env loading with debug output
-from dotenv import load_dotenv
+# Initialize environment (handles .env loading gracefully)
+from src.config.env import init_environment
+from src.utils.apify_healthcheck import apify_startup_check
 from PIL import Image
 
-# Determine the location of the .env file
-# Check both the current directory and project root
-possible_env_paths = [
-    '.env',                                       # Current directory
-    os.path.join(os.path.dirname(__file__), '.env'),  # Same dir as this file
-    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'),  # Project root
-]
+# Initialize environment variables (works with or without .env file)
+init_environment()
 
-env_loaded = False
-for env_path in possible_env_paths:
-    if os.path.exists(env_path):
-        print(f"Loading .env file from: {env_path}")
-        load_dotenv(env_path)
-        env_loaded = True
-        break
-
-if not env_loaded:
-    print("WARNING: No .env file found!")
+# Validate Apify configuration at startup (fail fast if misconfigured)
+try:
+    apify_startup_check()
+except RuntimeError as e:
+    print(f"[STARTUP ERROR] {e}")
+    print("[STARTUP] Fix environment variables and restart")
+    import sys
+    sys.exit(1)
 
 # Initialize authentication
 auth = SupabaseAuth()

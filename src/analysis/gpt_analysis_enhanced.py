@@ -5,7 +5,15 @@ from typing import Dict, Any, Optional, Tuple, List
 import re
 
 import openai
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
+
+# Load .env file if it exists (dev environments), continue without it (production)
+path = find_dotenv(usecwd=True)
+if path:
+    load_dotenv(path, override=False)
+    print(f"[startup] .env loaded from: {path}")
+else:
+    print("[startup] No .env file found (expected in Render). Continuing with OS env.")
 
 # Import local modules
 from src.utils.logger import setup_logger
