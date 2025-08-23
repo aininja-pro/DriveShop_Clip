@@ -175,8 +175,35 @@ def get_transcript_from_apify(video_url: str, timeout_s: int = None) -> Optional
     # Use EXACT format that works - just the URL string
     yt_url = f"https://www.youtube.com/watch?v={video_id}"
     
-    # Use the new hardened wrapper with simple URL payload
-    text, run_id = run_apify_transcript(yt_url, wait_budget)
+    # Use ApifyClient like the working Docker version
+    try:
+        from apify_client import ApifyClient
+        client = ApifyClient(apify_token())
+        actor_name, _ = apify_actor_or_task()
+        run_input = {
+            "startUrls": [video_url],
+            "language": "Default",
+            "includeTimestamps": "No",
+        }
+        
+        logger.info(f"▶️ Apify client call {actor_name} for {video_url} (timeout {wait_budget}s)")
+        run = client.actor(actor_name).call(run_input=run_input, timeout_secs=wait_budget)
+        
+        dataset_id = run.get("defaultDatasetId") if isinstance(run, dict) else None
+        if dataset_id:
+            items = list(client.dataset(dataset_id).iterate_items())
+            if items:
+                text = _flatten_transcript_item(items[0])
+                if text and len(text) > 50:
+                    logger.info(f"✅ Apify transcript (client): {len(text)} chars")
+                    return text
+                    
+        logger.warning("Apify completed but no transcript extracted")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Apify client call failed: {e}")
+        return None
     
     # Guard the result and provide crash-proof fallback handling
     if not isinstance(text, str) or len(text.strip()) < 200:
