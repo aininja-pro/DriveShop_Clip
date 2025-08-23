@@ -198,9 +198,8 @@ def load_loans_data_for_filtering(url: str):
 
 # Load environment variables
 def load_env():
-    """Load environment variables from .env file"""
-    from dotenv import load_dotenv
-    load_dotenv()
+    """Get environment variables (no longer loads .env - handled at startup)"""
+    # Environment already loaded by init_environment() at startup
     return os.environ.get("STREAMLIT_PASSWORD", "password")
 
 # Helper function to parse URL tracking data
