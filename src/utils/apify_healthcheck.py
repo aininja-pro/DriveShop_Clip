@@ -26,15 +26,22 @@ def apify_startup_check():
     if not (actor or task):
         raise RuntimeError("Apify enabled but no actor/task found. Set APIFY_ACTOR_ID, APIFY_ACTOR, or APIFY_TASK_ID in environment")
 
-    # Test Apify API connectivity
+    # Test Apify API connectivity using a simple endpoint
     try:
         log.info("Testing Apify API connectivity...")
-        r = requests.get("https://api.apify.com/v2/me", params={"token": token}, timeout=6)
-        r.raise_for_status()
-        
-        user_data = r.json().get("data", {})
-        username = user_data.get("username", "unknown")
-        log.info("✅ Apify auth OK for user: %s", username)
+        if actor:
+            # Convert actor slug format: topaz_sharingan/Youtube-Transcript-Scraper → topaz_sharingan~youtube-transcript-scraper
+            actor_url_format = actor.replace('/', '~').lower().replace('youtube-transcript-scraper', 'youtube-transcript-scraper')
+            test_url = f"https://api.apify.com/v2/acts/{actor_url_format}"
+            log.info("Testing actor endpoint: %s", test_url)
+            r = requests.get(test_url, params={"token": token}, timeout=6)
+            r.raise_for_status()
+            log.info("✅ Apify auth OK - can access actor: %s", actor)
+        else:
+            # Just test if token works by listing actors (with minimal limit)
+            r = requests.get("https://api.apify.com/v2/acts", params={"token": token, "limit": 1}, timeout=6)
+            r.raise_for_status()
+            log.info("✅ Apify auth OK - token valid")
         
         # Log configured actor/task
         if actor:

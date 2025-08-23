@@ -38,7 +38,12 @@ def run_apify_transcript(video_id: str, url: str | None = None, wait_budget_s: i
         "url": url or f"https://www.youtube.com/watch?v={video_id}"
     }
     
-    start_url = f"{API}/v2/acts/{actor}/runs" if actor else f"{API}/v2/actor-tasks/{task}/runs"
+    # Convert actor format for API URL: topaz_sharingan/Youtube-Transcript-Scraper → topaz_sharingan~youtube-transcript-scraper  
+    if actor:
+        actor_url_format = actor.replace('/', '~').lower().replace('youtube-transcript-scraper', 'youtube-transcript-scraper')
+        start_url = f"{API}/v2/acts/{actor_url_format}/runs"
+    else:
+        start_url = f"{API}/v2/actor-tasks/{task}/runs"
     
     try:
         # Start the run
