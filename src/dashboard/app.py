@@ -32,14 +32,13 @@ from PIL import Image
 # Initialize environment variables (works with or without .env file)
 init_environment()
 
-# Validate Apify configuration at startup (fail fast if misconfigured)
+# Validate Apify configuration at startup (warn but don't kill app)
 try:
     apify_startup_check()
 except RuntimeError as e:
-    print(f"[STARTUP ERROR] {e}")
-    print("[STARTUP] Fix environment variables and restart")
-    import sys
-    sys.exit(1)
+    print(f"[STARTUP WARNING] {e}")
+    print("[STARTUP] Apify will be disabled until configuration is fixed")
+    # Continue loading - don't kill the UI!
 
 # Initialize authentication
 auth = SupabaseAuth()
