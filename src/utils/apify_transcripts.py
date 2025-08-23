@@ -166,13 +166,11 @@ def get_transcript_from_apify(video_url: str, timeout_s: int = None) -> Optional
     # Cap at reasonable limit for transcript extraction
     wait_budget = min(wait_budget, 120)
     
-    # Prepare enhanced payload format (always send URL; never crash on None)
+    # Use EXACT format that worked in Docker (simple startUrls only)
     yt_url = f"https://www.youtube.com/watch?v={video_id}"
     payload = {
-        "url": yt_url,
-        "videoId": video_id, 
-        "startUrls": [{"url": yt_url}],
-        "language": "Default",
+        "startUrls": [yt_url],
+        "language": "Default", 
         "includeTimestamps": "No"
     }
     
