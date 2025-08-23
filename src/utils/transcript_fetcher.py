@@ -7,7 +7,6 @@ from yt_dlp import YoutubeDL
 import io
 import json
 import os
-import random
 import re
 import time
 import tempfile
@@ -17,8 +16,15 @@ from datetime import datetime, timedelta
 import hashlib
 import httpx
 import webvtt
+import random
+import secrets
+import string
+from urllib.parse import urlparse
+import http.cookiejar
 
 from src.utils.logger import setup_logger
+from src.utils.rate_limiter import should_wait, register_backoff, clear_backoff
+from src.utils.proxy_pool import get_session_pool
 
 logger = setup_logger(__name__)
 
@@ -26,12 +32,73 @@ logger = setup_logger(__name__)
 LANG_PREF = ["en", "en-US", "en-GB"]
 AUTO_OK = True
 
-def _pick_proxy(base: str | None) -> str | None:
+def _normalize_proxy_url(value: str) -> str:
+    """Accepts either full URL or HOST:PORT:USER:PASS and returns http URL string."""
+    if not value:
+        return None
+    v = value.strip()
+    if v.startswith("http://") or v.startswith("https://"):
+        return v
+    # HOST:PORT:USER:PASS form
+    parts = v.split(":")
+    if len(parts) == 4:
+        host, port, user, pwd = parts
+        return f"http://{user}:{pwd}@{host}:{port}"
+    return v
+
+def _random_token(length: int = 8) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+def load_netscape_cookies(cookiefile: str) -> Optional[Dict[str, str]]:
+    """
+    Load cookies from Netscape/Mozilla format cookie file.
+    Compatible with yt-dlp cookie files.
+    """
+    try:
+        cj = http.cookiejar.MozillaCookieJar(cookiefile)
+        cj.load(ignore_discard=True, ignore_expires=True)
+        
+        # Convert to dict format for httpx
+        cookies = {}
+        for cookie in cj:
+            # Only include cookies for YouTube domains
+            if cookie.domain in ['.youtube.com', 'youtube.com', '.google.com', 'google.com']:
+                cookies[cookie.name] = cookie.value
+        
+        return cookies if cookies else None
+        
+    except Exception as e:
+        logger.debug(f"Failed to load Netscape cookies from {cookiefile}: {e}")
+        return None
+
+def _make_sticky_from_base(base: str, region: str, ttl_minutes: str) -> str:
+    """
+    Build a sticky-session proxy URL from a base credential.
+    Supports:
+      - http://USER:PASS@host:port
+      - host:port:USER:PASS
+    Returns http://USER_region-REG_session-RANDOM_lifetime-TTLm:PASS@host:port
+    """
     if not base:
         return None
-    sess = random.randint(10_000, 99_999)
-    sep = "&" if "?" in base else "?"
-    return f"{base}{sep}session={sess}"
+    url = _normalize_proxy_url(base)
+    parsed = urlparse(url)
+    host = parsed.hostname
+    port = parsed.port
+    user = parsed.username or ""
+    pwd = parsed.password or ""
+    session = _random_token(8)
+    # IPRoyal sticky parameters are appended to the PASSWORD, not the username
+    sticky_pwd = f"{pwd}_region-{region}_session-{session}_lifetime-{ttl_minutes}m"
+    return f"http://{user}:{sticky_pwd}@{host}:{port}"
+
+# Legacy _pick_proxy replaced by session pool - keeping for compatibility
+def _pick_proxy(base: str | None) -> str | None:
+    """Legacy function - now uses session pool for better management"""
+    session_pool = get_session_pool()
+    session_id, proxy_url = session_pool.acquire()
+    return proxy_url
 
 def _deadline(budget_s: float):
     t0 = time.monotonic()
@@ -60,41 +127,7 @@ def _norm_vtt(b: bytes):
             out.append({"start": st, "duration": max(en-st,0.0), "text": txt})
     return out
 
-def _extract_info(url: str, proxy: str | None, left):
-    # Try android first, then web if time remains
-    clients = ["android", "web"]  # drop "tv" (often slower/blocked)
-    last_err=None
-    for client in clients:
-        if left() < 3:  # not enough time to attempt
-            break
-        ydl_opts = {
-            "skip_download": True,
-            "quiet": True,
-            "no_warnings": True,
-            "socket_timeout": min(8, max(3, int(left()))),
-            "extract_flat": False,
-            "cachedir": False,
-            "proxy": proxy,
-            "subtitleslangs": LANG_PREF + ["en.*"],
-            "writesubtitles": True,
-            "writeautomaticsub": AUTO_OK,
-            "subtitlesformat": "json3/vtt/best",
-            "retries": 1,
-            "fragment_retries": 0,
-            "source_address": "0.0.0.0",  # force IPv4
-            "extractor_args": {"youtube": {"player_client": [client], "skip": ["dash","hls"]}},
-        }
-        try:
-            logger.debug(f"Trying client '{client}' with {left():.1f}s remaining, socket_timeout={ydl_opts['socket_timeout']}s")
-            with YoutubeDL(ydl_opts) as ydl:
-                return ydl.extract_info(url, download=False)
-        except Exception as e:
-            last_err = e
-            logger.debug(f"Client '{client}' failed: {e}")
-            # rotate proxy session for next attempt
-            proxy = _pick_proxy(os.getenv("YOUTUBE_PROXY_URL"))
-            continue
-    raise RuntimeError(f"Innertube extraction failed: {last_err}")
+# Old _extract_info function removed - replaced by _extract_info_single_attempt for surgical timing control
 
 def _choose_track(info):
     subs = info.get("subtitles") or {}
@@ -111,85 +144,311 @@ def _choose_track(info):
         source = "auto" if track else None
     return source, lang, track
 
-def _download_caption(url: str, proxy: str | None, total_left_s: float) -> tuple[bytes,str]:
+def _download_caption(url: str, proxy_info: str | None, total_left_s: float, session_id: str = None) -> tuple[bytes,str]:
+    """
+    Download caption with separate proxy pool (Pool B) for caption requests.
+    On 429, try Pool B rotation or direct connection as fallback.
+    """
     # Strict, total deadline. Fail fast on stalls.
     timeout = httpx.Timeout(connect=5.0, read=min(10.0, max(3.0, total_left_s)), write=5.0, pool=5.0)
+    
+    # Use same headers as yt-dlp for consistency
     headers = {
-        "User-Agent": "Mozilla/5.0 (Android 14; Mobile) AppleWebKit/537.36 Chrome/125 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9",
     }
-    # One rotate-and-retry on 403/429/empty
+    
+    # Get separate caption proxy pool (Pool B)
+    caption_pool = get_session_pool()  # For now, same pool - TODO: separate Pool B
+    caption_session_id, caption_proxy = caption_pool.acquire()
+    
+    # Load cookies if available (same as yt-dlp)
+    cookies = None
+    cookiefile = os.getenv("YTDLP_COOKIES")
+    if cookiefile and os.path.exists(cookiefile):
+        try:
+            cookies = load_netscape_cookies(cookiefile)
+            if cookies:
+                logger.debug(f"🍪 Using {len(cookies)} cookies for caption download")
+        except Exception as e:
+            logger.debug(f"Cookie loading failed: {e}")
+            cookies = None
+    
+    # Two attempts: Pool B → rotate or direct
     for attempt in (1, 2):
-        logger.debug(f"Caption download attempt {attempt}, proxy: {'Yes' if proxy else 'No'}, timeout: {total_left_s:.1f}s")
+        logger.debug(f"Caption download attempt {attempt}, session: {caption_session_id[:8] if caption_session_id else 'none'}, timeout: {total_left_s:.1f}s")
+        
         client_kwargs = {
             'headers': headers, 
             'timeout': timeout, 
             'follow_redirects': True, 
             'verify': False, 
-            'trust_env': False
+            'trust_env': False,
+            'cookies': cookies
         }
-        if proxy:
-            client_kwargs['proxy'] = proxy
+        
+        # Use caption proxy (different from info proxy)
+        if caption_proxy:
+            client_kwargs['proxy'] = caption_proxy
             
-        with httpx.Client(**client_kwargs) as c:
-            r = c.get(url)
-            logger.debug(f"Caption response: status={r.status_code}, length={len(r.content)} bytes")
-            if r.status_code in (403, 429) or not r.content:
-                # rotate proxy and try once more
-                proxy = _pick_proxy(os.getenv("YOUTUBE_PROXY_URL"))
-                logger.debug(f"Rotating proxy due to status {r.status_code} or empty content")
+        try:
+            with httpx.Client(**client_kwargs) as c:
+                r = c.get(url)
+                logger.debug(f"Caption response: status={r.status_code}, length={len(r.content)} bytes")
+                
+                if r.status_code in (403, 429) or not r.content:
+                    # Smart backoff based on response
+                    retry_after = None
+                    if 'retry-after' in r.headers:
+                        try:
+                            retry_after = float(r.headers['retry-after'])
+                            logger.info(f"📡 YouTube Retry-After header: {retry_after}s")
+                        except:
+                            pass
+                    
+                    # Register backoff for caption session
+                    register_backoff('youtube.com', caption_session_id, retry_after, r.status_code)
+                    
+                    # On attempt 1, try Pool B rotation or direct
+                    if attempt == 1:
+                        # Budget-aware backoff (never eat the remaining SLA)
+                        min_headroom = 12.0  # seconds needed for final attempt
+                        proposed = retry_after or random.uniform(6.0, 10.0)
+                        wait_s = max(0.0, min(proposed, max(0.0, total_left_s - min_headroom)))
+                        
+                        if wait_s > 0:
+                            logger.info(f"⏰ Caption retry: waiting {wait_s:.1f}s (budget-aware)")
+                            time.sleep(wait_s)
+                            total_left_s -= wait_s
+                        else:
+                            logger.info(f"⚡ Skipping wait - insufficient budget ({total_left_s:.1f}s remaining)")
+                            
+                        # Update timeout for remaining requests
+                        timeout = httpx.Timeout(connect=5.0, read=min(10.0, max(3.0, total_left_s)), write=5.0, pool=5.0)
+                        
+                        # Rotate caption egress or go direct
+                        try:
+                            caption_session_id, caption_proxy = caption_pool.rotate()
+                            logger.info(f"🔄 Rotated caption session: {caption_session_id[:8]}")
+                        except:
+                            # Fallback: direct connection (no proxy) with short fuse
+                            caption_proxy = None
+                            logger.info(f"🔄 Fallback: direct caption download (no proxy)")
+                        
+                        continue
+                        
+                else:
+                    # Success!
+                    clear_backoff('youtube.com', caption_session_id)
+                    return r.content, ("json3" if "fmt=json3" in url or "json3" in url else "vtt")
+                    
+        except Exception as e:
+            logger.warning(f"Caption download error (attempt {attempt}): {e}")
+            if attempt == 1:
+                # Try direct on network error
+                caption_proxy = None
                 continue
-            return r.content, ("json3" if "fmt=json3" in url or "json3" in url else "vtt")
+                
     raise RuntimeError(f"Caption fetch failed with status {r.status_code}")
 
 def fetch_youtube_transcript(video_url: str, proxy_base: str | None, timeout_s: int = 25) -> dict:
+    """
+    Surgical transcript extraction: 1 attempt android (6-8s) → rotate + web (8s) → fail to Apify
+    Total budget stays <25s to avoid falling through to expensive Apify every time
+    """
+    # Initialize session pool with proxy base
+    session_pool = get_session_pool(proxy_base)
+    session_id, proxy = session_pool.acquire()
+    
+    # Check if this session is in backoff (post-response only!)
+    wait_s = should_wait('youtube.com', session_id)
+    if wait_s > 0:
+        actual_wait = min(wait_s, max(3.0, timeout_s - 5))  # Don't wait longer than budget allows
+        logger.info(f"⏰ Session backoff: waiting {actual_wait:.1f}s (session: {session_id[:8]})")
+        time.sleep(actual_wait)
+    
     left = _deadline(timeout_s)
-    proxy = _pick_proxy(proxy_base)
+    start_time = time.time()
 
-    logger.info(f"Starting transcript extraction with {timeout_s}s budget, proxy: {'Yes' if proxy else 'No'}")
+    logger.info(f"🚀 Starting transcript extraction with {timeout_s}s budget, session: {session_id[:8] if session_id else 'none'}")
     
-    info = _extract_info(video_url, proxy, left)  # ~<= 10–16s worst case
-    logger.debug(f"Info extraction completed, {left():.1f}s remaining")
-
-    src, lang, track = _choose_track(info)
-    if not track:
-        raise RuntimeError("No captions available (manual or auto).")
+    # SURGICAL APPROACH: 1 android attempt → rotate once + ios → fail fast
+    clients_attempts = [
+        ("android", min(8, max(6, int(left()) - 10))),  # 6-8s for android
+        ("ios", min(8, max(6, int(left()) - 5)))        # 6-8s for ios after rotate (bypasses "not available on this app")
+    ]
     
-    logger.debug(f"Chosen track: source={src}, lang={lang}, {left():.1f}s remaining")
+    last_error = None
+    for attempt, (client, socket_timeout) in enumerate(clients_attempts, 1):
+        if left() < 5:  # Need at least 5s for meaningful attempt
+            logger.warning(f"⏰ Insufficient time remaining ({left():.1f}s), aborting")
+            break
+            
+        try:
+            logger.info(f"📱 Attempt {attempt}/2: {client} client (timeout: {socket_timeout}s, session: {session_id[:8]})")
+            
+            # Single extraction attempt with this client/session
+            info = _extract_info_single_attempt(video_url, proxy, client, socket_timeout, session_id)
+            
+            # Success! Extract captions
+            src, lang, track = _choose_track(info)
+            if not track:
+                raise RuntimeError("No captions available (manual or auto).")
+            
+            if left() < 3:
+                raise RuntimeError("Transcript exceeded time budget before caption download.")
 
-    if left() < 3:
-        raise RuntimeError("Transcript exceeded time budget before download.")
+            # Use separate proxy for caption download (Pool B concept)
+            data, ext = _download_caption(track["url"], None, left(), session_id)  # Uses separate pool internally
+            
+            segments = _norm_json3(json.loads(data.decode("utf-8", "ignore")).get("events", [])) if ext=="json3" else _norm_vtt(data)
+            if not segments:
+                raise RuntimeError("Empty caption segments after parsing.")
 
-    data, ext = _download_caption(track["url"], proxy, left())
-    logger.debug(f"Caption download completed: format={ext}, size={len(data)} bytes, {left():.1f}s remaining")
-
-    segments = _norm_json3(json.loads(data.decode("utf-8", "ignore")).get("events", [])) if ext=="json3" else _norm_vtt(data)
-    if not segments:
-        raise RuntimeError("Empty caption segments after parsing.")
-
-    if left() <= 0:
-        raise RuntimeError("Transcript exceeded time budget after parsing.")
-
-    logger.info(f"✅ Transcript extracted: {len(segments)} segments, {src} {lang} in {timeout_s - left():.1f}s")
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            logger.info(f"✅ Transcript extracted: {len(segments)} segments, {src} {lang} in {elapsed_ms}ms")
+            
+            # Clear any previous backoff on success
+            clear_backoff('youtube.com', session_id)
+            
+            # Log metrics for monitoring
+            logger.info(f"📊 Metrics: session_id={session_id[:8]}, client_used={client}, "
+                       f"status_code=200, elapsed_ms={elapsed_ms}, fallback_tier=primary, segments={len(segments)}")
+            
+            return {
+                "source": src,
+                "lang": lang,
+                "segments": segments,
+                "raw": {"id": info.get("id"), "title": info.get("title")},
+            }
+            
+        except Exception as e:
+            last_error = e
+            error_str = str(e)
+            logger.warning(f"❌ Attempt {attempt} failed: {error_str}")
+            
+            # Check for rate limiting - register backoff and rotate session for retry
+            if '429' in error_str or 'rate' in error_str.lower() or 'too many requests' in error_str.lower():
+                logger.warning(f"⏰ Rate limit detected, registering backoff for session {session_id[:8]}")
+                register_backoff('youtube.com', session_id, None, 429)
+                
+                # Rotate to new session for next attempt (if we have one)
+                if attempt < len(clients_attempts):
+                    session_id, proxy = session_pool.rotate()
+                    logger.info(f"🔄 Rotated to new session: {session_id[:8]}")
+                    
+            elif '407' in error_str or 'proxy' in error_str.lower():
+                logger.warning(f"🔄 Proxy auth issue, rotating session")
+                if attempt < len(clients_attempts):
+                    session_id, proxy = session_pool.rotate()
+                    
+            # Continue to next attempt if available
+            continue
     
-    return {
-        "source": src,
-        "lang": lang,
-        "segments": segments,
-        "raw": {"id": info.get("id"), "title": info.get("title")},
+    # All attempts failed - log metrics and raise
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    logger.info(f"📊 Metrics: session_id={session_id[:8]}, client_used=failed, "
+               f"status_code=failed, elapsed_ms={elapsed_ms}, fallback_tier=failed")
+    
+    raise RuntimeError(f"All yt-dlp attempts failed in {elapsed_ms}ms: {last_error}")
+
+def _extract_info_single_attempt(url: str, proxy: str | None, client: str, socket_timeout: int, session_id: str) -> dict:
+    """Single yt-dlp extraction attempt with specific client and timeout"""
+    
+    # Base options for fast, reliable extraction
+    ydl_opts = {
+        "skip_download": True,
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": False,
+        "cachedir": False,
+        "proxy": proxy,
+        "subtitleslangs": LANG_PREF + ["en.*"],
+        "writesubtitles": True,
+        "writeautomaticsub": AUTO_OK,
+        "subtitlesformat": "json3/vtt/best",
+        "retries": 0,  # Single attempt only
+        "fragment_retries": 0,
     }
+    
+    # Enhanced settings for reliability and geo-bypass
+    ydl_opts.update({
+        "socket_timeout": socket_timeout,
+        "source_address": "0.0.0.0",     # Force IPv4
+        "extractor_args": {"youtube": {"player_client": [client], "skip": ["dash","hls"]}},
+        "geo_bypass_country": "US",       # Consistent geo context
+    })
+    
+    # Add cookies if available for bot protection
+    cookiefile = os.getenv("YTDLP_COOKIES") 
+    if cookiefile and os.path.exists(cookiefile):
+        ydl_opts["cookiefile"] = cookiefile
+        logger.debug(f"🍪 Using cookies from {cookiefile} for bot protection")
+    
+    # Enhanced headers for bot detection evasion
+    ydl_opts["http_headers"] = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+    }
+    
+    logger.debug(f"🎯 Trying {client} client (timeout: {socket_timeout}s, session: {session_id[:8]})")
+    
+    with YoutubeDL(ydl_opts) as ydl:
+        result = ydl.extract_info(url, download=False)
+        logger.info(f"✅ yt-dlp info extraction successful with {client} client")
+        return result
+
+def detect_language(text: str) -> str:
+    """
+    Simple language detection for transcript text.
+    Returns 'en' for English, 'ar' for Arabic, etc.
+    """
+    if not text or len(text) < 50:
+        return "en"  # Default to English for short text
+    
+    # Simple heuristic-based detection (can be enhanced with proper library)
+    sample = text[:2000].lower()
+    
+    # Arabic indicators
+    arabic_chars = len([c for c in sample if '\u0600' <= c <= '\u06FF'])
+    if arabic_chars > len(sample) * 0.1:  # >10% Arabic characters
+        return "ar"
+    
+    # Spanish indicators
+    spanish_words = ['el ', 'la ', 'de ', 'que ', 'y ', 'en ', 'un ', 'es ', 'se ', 'no ']
+    spanish_count = sum(1 for word in spanish_words if word in sample)
+    if spanish_count >= 3:
+        return "es"
+    
+    # French indicators  
+    french_words = ['le ', 'de ', 'et ', 'à ', 'un ', 'il ', 'être ', 'et ', 'en ', 'avoir ']
+    french_count = sum(1 for word in french_words if word in sample)
+    if french_count >= 3:
+        return "fr"
+    
+    # Default to English
+    return "en"
 
 def segments_to_text(segments: List[dict], max_chars: int = None) -> str:
     """
     Convert segments to plain text for sentiment analysis.
     Optionally limit to max_chars for token management.
+    Includes language detection for non-English content.
     """
     if not segments:
         return ""
     
     text = " ".join(segment["text"].strip() for segment in segments if segment.get("text"))
     text = re.sub(r'\s+', ' ', text).strip()  # Normalize whitespace
+    
+    # Language detection for auto captions
+    detected_lang = detect_language(text)
+    if detected_lang != "en":
+        logger.info(f"🌍 Non-English content detected: {detected_lang}")
+        # For now, log it - translation can be added later
+        # TODO: Add translation service integration if needed
     
     if max_chars and len(text) > max_chars:
         # Smart truncation at sentence boundaries
@@ -271,7 +530,7 @@ class FastTranscriptFetcher:
         else:
             logger.warning("⚠️ No proxy configured - may face rate limiting")
     
-    def get_transcript(self, video_id: str, max_chars: int = None, timeout_s: int = 25) -> Optional[str]:
+    def get_transcript(self, video_id: str, max_chars: int = None, timeout_s: int = 90) -> Optional[str]:
         """
         Get transcript text for a YouTube video.
         

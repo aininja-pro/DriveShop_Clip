@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 
 # Import local modules
 from src.utils.logger import setup_logger
-from src.utils.rate_limiter import rate_limiter
+# Rate limiting now handled by smart_rate_limiter in transcript_fetcher
 from src.utils.config import YOUTUBE_SCRAPFLY_CONFIG
 from src.utils.youtube_relative_date_parser import extract_youtube_date_from_html, parse_youtube_relative_date, extract_video_upload_date
 
@@ -203,8 +203,7 @@ def resolve_handle_to_channel_id(handle):
         str: Channel ID or None if not found
     """
     try:
-        # Apply rate limiting
-        rate_limiter.wait_if_needed('youtube.com')
+        # Rate limiting now handled by smart_rate_limiter in transcript_fetcher
         
         url = f"https://www.youtube.com/@{handle}"
         headers = {
@@ -274,8 +273,7 @@ def resolve_username_to_channel_id(username):
         str: Channel ID or None if not found
     """
     try:
-        # Apply rate limiting
-        rate_limiter.wait_if_needed('youtube.com')
+        # Rate limiting now handled by smart_rate_limiter in transcript_fetcher
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -358,8 +356,7 @@ def get_latest_videos(channel_id, max_videos=25):
         return []
     
     try:
-        # Apply rate limiting
-        rate_limiter.wait_if_needed('youtube.com')
+        # Rate limiting now handled by smart_rate_limiter in transcript_fetcher
         
         # Use YouTube's RSS feed
         rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
@@ -405,8 +402,7 @@ def get_latest_videos(channel_id, max_videos=25):
             actual_date = None
             
             try:
-                # Apply rate limiting before fetching
-                rate_limiter.wait_if_needed('youtube.com')
+                # Rate limiting now handled by smart_rate_limiter
                 
                 # Get the video page to extract real upload date
                 response = requests.get(video_url, headers={
@@ -455,6 +451,23 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
     if not video_id:
         return None
     
+    # Ensure we always have a full URL for downstream fallbacks (Apify)
+    if not video_url and video_id:
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    # Shortcut: force Apify path for testing
+    try:
+        if os.getenv('YOUTUBE_FORCE_APIFY', '').lower() in {'1','true','yes'}:
+            if not video_url and video_id:
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+            if video_url:
+                logger.info(f"🧪 Forcing Apify transcript for {video_id}")
+                from src.utils.apify_transcripts import get_transcript_from_apify
+                apify_text = get_transcript_from_apify(video_url, timeout_s=120)
+                return apify_text
+    except Exception as _e:
+        logger.debug(f"Force-Apify test path failed: {_e}")
+
     # Try the new yt-dlp-based transcript fetcher first
     try:
         from src.utils.transcript_fetcher import get_transcript_fetcher
@@ -462,7 +475,7 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
         logger.info(f"🚀 Using new yt-dlp transcript fetcher for {video_id}")
         
         fetcher = get_transcript_fetcher()
-        transcript_text = fetcher.get_transcript(video_id, timeout_s=25)
+        transcript_text = fetcher.get_transcript(video_id, timeout_s=25)  # Surgical 25s budget
         
         if transcript_text and len(transcript_text) > 100:
             logger.info(f"✅ New transcript fetcher successful: {len(transcript_text)} characters")
@@ -476,8 +489,7 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
     
     # Fallback to legacy youtube-transcript-api method
     try:
-        # Apply rate limiting
-        rate_limiter.wait_if_needed('youtube.com')
+        # Rate limiting now handled by smart_rate_limiter in transcript_fetcher
         
         # Use proxied API if available, otherwise use regular API
         if proxied_transcript_api:
@@ -528,15 +540,20 @@ def get_transcript(video_id, video_url=None, use_whisper_fallback=True):
             logger.info(f"⚠️ Whisper fallback disabled for approval workflow - too slow (5+ minutes)")
             logger.info(f"💡 Consider using Apify actor or browser-based extraction instead")
         
-        # Try browser-based extraction as final fallback
-        logger.info(f"🌐 Attempting browser-based transcript extraction for {video_id}...")
+        # Browser extraction disabled - missing Playwright deps in container
+        logger.debug(f"🚫 Browser extraction disabled (missing dependencies)")
+        
+        # Final optional fallback: Apify actor
         try:
-            browser_transcript = extract_transcript_with_browser(video_id)
-            if browser_transcript:
-                logger.info(f"✅ Browser extraction successful: {len(browser_transcript)} chars")
-                return browser_transcript
-        except Exception as browser_error:
-            logger.debug(f"Browser extraction failed: {browser_error}")
+            if os.getenv('YOUTUBE_APIFY_ENABLE', 'true').lower() in {'1','true','yes'} and video_url:
+                logger.info(f"🤝 Calling Apify transcript actor for {video_id}")
+                from src.utils.apify_transcripts import get_transcript_from_apify
+                apify_text = get_transcript_from_apify(video_url, timeout_s=120)
+                if apify_text and len(apify_text) > 50:
+                    logger.info(f"✅ Apify fallback successful: {len(apify_text)} chars")
+                    return apify_text
+        except Exception as apify_err:
+            logger.debug(f"Apify fallback failed: {apify_err}")
         
         logger.error(f"❌ All transcript extraction methods failed for video {video_id}")
         return None
@@ -556,8 +573,7 @@ def get_video_metadata_fallback(video_id, known_title=None):
         return None
     
     try:
-        # Apply rate limiting
-        rate_limiter.wait_if_needed('youtube.com')
+        # Rate limiting now handled by smart_rate_limiter in transcript_fetcher
         
         url = f"https://www.youtube.com/watch?v={video_id}"
         headers = {

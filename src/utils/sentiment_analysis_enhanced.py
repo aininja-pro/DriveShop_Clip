@@ -60,16 +60,24 @@ class SentimentAnalyzer:
                         # Re-extract with Whisper fallback
                         new_content = get_transcript(video_id, video_url=clip_data.get('clip_url', ''), use_whisper_fallback=True)
                         
-                        if new_content and len(new_content) > len(content):
-                            logger.info(f"✅ Re-extracted YouTube content: {len(new_content)} chars (was {len(content)} chars)")
+                        # Compare content quality with smart thresholds
+                        old_len = len(content)
+                        new_len = len(new_content) if new_content else 0
+                        MIN_CONTENT_LEN = 1000
+                        
+                        if new_content and new_len > old_len:
+                            logger.info(f"✅ Re-extracted YouTube content: {new_len} chars (was {old_len} chars)")
                             content = new_content
                             
                             # Update the database with new content
                             self.db.supabase.table('clips').update({
                                 'extracted_content': content
                             }).eq('id', clip_data['id']).execute()
+                        elif new_len <= old_len * 1.10 and new_len < MIN_CONTENT_LEN:
+                            logger.warning(f"Re-extraction not materially better: {new_len} chars vs {old_len} chars")
                         else:
-                            logger.warning(f"Failed to get better content for YouTube video {video_id}")
+                            logger.info(f"Re-extraction returned {new_len} chars (was {old_len} chars) - using better version")
+                            content = new_content if new_content and new_len > old_len else content
             
             if not content:
                 logger.warning(f"No content found for clip {clip_data.get('wo_number')}")
