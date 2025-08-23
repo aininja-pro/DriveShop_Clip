@@ -32,10 +32,11 @@ def run_apify_transcript(video_id: str, url: str | None = None, wait_budget_s: i
         log.error("Apify missing config; skipping call.")
         return None, None
 
-    # Prepare payload and endpoint
+    # Prepare payload in the format the actor expects (based on working Docker version)
     payload = {
-        "videoId": video_id, 
-        "url": url or f"https://www.youtube.com/watch?v={video_id}"
+        "startUrls": [url or f"https://www.youtube.com/watch?v={video_id}"],
+        "language": "Default",
+        "includeTimestamps": "No"
     }
     
     # Convert actor format for API URL: topaz_sharingan/Youtube-Transcript-Scraper → topaz_sharingan~youtube-transcript-scraper  
