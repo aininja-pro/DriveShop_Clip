@@ -7,15 +7,15 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import os
 from typing import List, Dict, Any, Optional
 import time
 from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode, JsCode
 
 from src.utils.logger import setup_logger
 from src.utils.database import get_database
-from src.analysis.gpt_analysis_enhanced import analyze_clip_enhanced
-from src.utils.rate_limiter import rate_limiter
-from src.utils.youtube_handler import extract_video_id, get_transcript
+from src.utils.sentiment_analysis import run_sentiment_analysis
+from src.utils.trim_extractor import extract_trim_from_model
 
 logger = setup_logger(__name__)
 
@@ -322,204 +322,137 @@ def get_status_color(status: str) -> str:
 
 
 def process_clips_queue(db, all_clips: List[Dict[str, Any]], queue_ids: List[str]):
-    """Process the selected clips with enhanced sentiment analysis"""
+    """Process clips using EXACT same workflow as approval process"""
     
-    # Safety check - don't process if no clips selected
     if not queue_ids:
-        logger.warning("process_clips_queue called with no queue_ids")
+        logger.warning("No clips selected for processing")
         return
     
-    # Update status
-    st.session_state.reprocess_status = 'processing'
-    st.session_state.reprocess_progress = {
-        'current': 0,
-        'total': len(queue_ids),
-        'succeeded': 0,
-        'failed': 0,
-        'current_clip': ''
-    }
-    
-    # Get clips to process - fetch full data if needed
+    # Get full clip data for processing
     clips_to_process = []
     for clip_id in queue_ids:
-        # First check if we have the clip in our list
-        clip = next((c for c in all_clips if c['id'] == clip_id), None)
-        
-        if clip:
-            # Check if we have extracted_content, if not fetch full clip
-            if not clip.get('extracted_content'):
-                try:
-                    # Fetch full clip data
-                    full_clip_result = db.supabase.table('clips').select('*').eq('id', clip_id).single().execute()
-                    if full_clip_result.data:
-                        clips_to_process.append(full_clip_result.data)
-                    else:
-                        clips_to_process.append(clip)  # Use partial data
-                except Exception as e:
-                    logger.error(f"Failed to fetch full clip data for {clip_id}: {e}")
-                    clips_to_process.append(clip)  # Use partial data
-            else:
-                clips_to_process.append(clip)
-    
-    # Create a progress dialog
-    with st.container():
-        progress_container = st.empty()
-        
-        with progress_container.container():
-            st.markdown("### 🔄 Processing Clips")
-            
-            # Progress bar
-            progress_bar = st.progress(0)
-            
-            # Status text
-            status_text = st.empty()
-            status_text.markdown("Initializing...")
-            
-            # Metrics row
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                current_metric = st.empty()
-            with col2:
-                success_metric = st.empty()
-            with col3:
-                failed_metric = st.empty()
-            with col4:
-                rate_metric = st.empty()
-            
-            # Current clip details
-            current_clip_container = st.empty()
-            
-            # Log area
-            with st.expander("Processing Log", expanded=False):
-                log_container = st.empty()
-                processing_log = []
-    
-    for idx, clip in enumerate(clips_to_process):
-        # Check if processing should stop
-        if st.session_state.reprocess_status == 'stopped':
-            status_text.warning("⏹️ Processing stopped by user")
-            break
-        
-        # Update progress
-        st.session_state.reprocess_progress['current'] = idx + 1
-        st.session_state.reprocess_progress['current_clip'] = clip['wo_number']
-        
-        # Update UI elements
-        progress_value = (idx + 1) / len(clips_to_process)
-        progress_bar.progress(progress_value)
-        
-        status_text.markdown(f"**Processing clip {idx + 1} of {len(clips_to_process)}**")
-        
-        # Update metrics
-        current_metric.metric("Progress", f"{idx + 1}/{len(clips_to_process)}")
-        success_metric.metric("✅ Succeeded", st.session_state.reprocess_progress['succeeded'])
-        failed_metric.metric("❌ Failed", st.session_state.reprocess_progress['failed'])
-        
-        if st.session_state.reprocess_progress['current'] > 0:
-            success_rate = (st.session_state.reprocess_progress['succeeded'] / st.session_state.reprocess_progress['current']) * 100
-            rate_metric.metric("Success Rate", f"{success_rate:.1f}%")
-        
-        # Show current clip details
-        current_clip_container.info(
-            f"**Current Clip:** WO# {clip['wo_number']} - {clip.get('make', '')} {clip.get('model', '')} "
-            f"({clip.get('year', 'N/A')})"
-        )
-        
         try:
-            # Apply rate limiting for OpenAI API
-            rate_limiter.wait_if_needed('openai.com')
-            
-            # Get content for analysis
-            content = clip.get('extracted_content', '')
-            
-            # Check if this is a YouTube video with insufficient content
-            clip_url = clip.get('clip_url', '')
-            if 'youtube.com' in clip_url or 'youtu.be' in clip_url:
-                # Check if content is too short OR looks like metadata
-                is_metadata = (
-                    'Video Title:' in content and 'Channel:' in content and 'Video Description:' in content
-                ) or (
-                    'video_title' in content.lower() or 'channel_name' in content.lower()
-                )
-                
-                # If content is too short (likely just metadata), re-extract
-                if not content or len(content) < 1000 or is_metadata:
-                    status_text.markdown(f"**📹 Extracting YouTube transcript for WO# {clip['wo_number']}...**")
-                    processing_log.append(f"YouTube clip has insufficient content ({len(content or '')} chars), re-extracting...")
-                    log_container.text('\n'.join(processing_log[-10:]))  # Show last 10 log entries
-                    
-                    logger.info(f"YouTube clip WO# {clip['wo_number']} has insufficient content ({len(content or '')} chars), re-extracting...")
-                    
-                    video_id = extract_video_id(clip_url)
-                    if video_id:
-                        # Re-extract with Whisper fallback
-                        status_text.markdown(f"**🎙️ Getting transcript (with Whisper fallback if needed)...**")
-                        new_content = get_transcript(video_id, video_url=clip_url, use_whisper_fallback=True)
-                        
-                        if new_content and len(new_content) > len(content or ''):
-                            logger.info(f"✅ Re-extracted YouTube content: {len(new_content)} chars (was {len(content or '')} chars)")
-                            processing_log.append(f"✅ Extracted {len(new_content)} chars of content")
-                            log_container.text('\n'.join(processing_log[-10:]))
-                            content = new_content
-                            
-                            # Update the database with new content
-                            db.supabase.table('clips').update({
-                                'extracted_content': content
-                            }).eq('id', clip['id']).execute()
-                        else:
-                            logger.warning(f"Failed to get better content for YouTube video {video_id}")
-                            processing_log.append(f"⚠️ Failed to extract better content")
-                            log_container.text('\n'.join(processing_log[-10:]))
-            
-            if not content:
-                logger.warning(f"No content found for WO# {clip['wo_number']}")
-                st.session_state.reprocess_progress['failed'] += 1
-                continue
-            
-            # Run enhanced sentiment analysis
-            status_text.markdown(f"**🤖 Analyzing sentiment with AI...**")
-            processing_log.append(f"Running enhanced sentiment analysis...")
-            log_container.text('\n'.join(processing_log[-10:]))
-            
-            logger.info(f"Running enhanced sentiment analysis for WO# {clip['wo_number']}")
-            
-            sentiment_result = analyze_clip_enhanced(
-                content=content,
-                make=clip.get('make', ''),
-                model=clip.get('model', ''),
-                trim=clip.get('trim'),
-                url=clip.get('clip_url')
-            )
-            
-            if sentiment_result:
-                # Update the clip with enhanced sentiment
-                status_text.markdown(f"**💾 Saving results to database...**")
-                success = db.update_clip_sentiment(clip['id'], sentiment_result)
-                
-                if success:
-                    st.session_state.reprocess_progress['succeeded'] += 1
-                    processing_log.append(f"✅ Successfully analyzed WO# {clip['wo_number']}")
-                    log_container.text('\n'.join(processing_log[-10:]))
-                    logger.info(f"✅ Successfully updated sentiment for WO# {clip['wo_number']}")
-                else:
-                    st.session_state.reprocess_progress['failed'] += 1
-                    processing_log.append(f"❌ Failed to save results for WO# {clip['wo_number']}")
-                    log_container.text('\n'.join(processing_log[-10:]))
-                    logger.error(f"Failed to update database for WO# {clip['wo_number']}")
-            else:
-                st.session_state.reprocess_progress['failed'] += 1
-                processing_log.append(f"❌ No sentiment result for WO# {clip['wo_number']}")
-                log_container.text('\n'.join(processing_log[-10:]))
-                logger.error(f"No sentiment result for WO# {clip['wo_number']}")
-        
+            # Always fetch full clip data to ensure we have all fields
+            result = db.supabase.table('clips').select('*').eq('id', clip_id).single().execute()
+            if result.data:
+                clips_to_process.append(result.data)
         except Exception as e:
-            st.session_state.reprocess_progress['failed'] += 1
-            processing_log.append(f"❌ Error: {str(e)}")
-            log_container.text('\n'.join(processing_log[-10:]))
-            logger.error(f"Error processing WO# {clip['wo_number']}: {e}")
+            logger.error(f"Failed to fetch clip {clip_id}: {e}")
+    
+    if not clips_to_process:
+        st.error("No clips could be loaded for processing")
+        return
+    
+    # Progress display
+    with st.container():
+        st.markdown("### 🚀 Processing with EXACT Approval Workflow")
         
-        # Small delay to respect API limits
-        time.sleep(0.5)
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Log area
+        with st.expander("Processing Log", expanded=True):
+            log_container = st.empty()
+            processing_log = []
+        
+        def add_log(message):
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            processing_log.append(f"[{timestamp}] {message}")
+            log_container.text_area("Live Processing Logs", "\n".join(processing_log), height=300)
+        
+        add_log(f"🎯 Processing {len(clips_to_process)} approved clips")
+        
+        # STEP 1: Extract trim for clips that don't have it (EXACT same as approval)
+        add_log("📋 Step 1: Extracting trim information...")
+        status_text.info("📋 Extracting trim information...")
+        
+        for clip in clips_to_process:
+            if not clip.get('trim'):
+                make = clip.get('make', '')
+                model = clip.get('model', '')
+                if model:
+                    base_model, extracted_trim = extract_trim_from_model(model, make)
+                    if extracted_trim:
+                        try:
+                            # Update database with trim
+                            db.supabase.table('clips').update({
+                                'trim': extracted_trim,
+                                'model': base_model
+                            }).eq('wo_number', clip['wo_number']).execute()
+                            
+                            # Update clip object
+                            clip['trim'] = extracted_trim
+                            clip['model'] = base_model
+                            add_log(f"✅ Extracted trim '{extracted_trim}' for WO# {clip['wo_number']}")
+                        except Exception as e:
+                            add_log(f"❌ Failed to update trim for WO# {clip['wo_number']}: {e}")
+        
+        # STEP 2: Run sentiment analysis (EXACT same as approval)
+        add_log("🧠 Step 2: Running enhanced sentiment analysis...")
+        status_text.info("🧠 Running enhanced sentiment analysis...")
+        
+        # Progress callback
+        def progress_callback(progress, message):
+            progress_bar.progress(progress)
+            status_text.info(f"🧠 {message}")
+            add_log(f"Progress: {message}")
+        
+        # Check OpenAI API key
+        if not os.environ.get('OPENAI_API_KEY'):
+            add_log("❌ OpenAI API key not found")
+            st.error("❌ OpenAI API key not found")
+            return
+        
+        add_log("🤖 Calling run_sentiment_analysis() - EXACT same function as approval")
+        
+        # EXACT same call as approval workflow
+        try:
+            results = run_sentiment_analysis(clips_to_process, progress_callback)
+        except Exception as e:
+            add_log(f"❌ Sentiment analysis error: {str(e)}")
+            st.error(f"❌ Sentiment analysis error: {str(e)}")
+            return
+        
+        # STEP 3: Process results (EXACT same as approval)
+        add_log("💾 Step 3: Saving results to database...")
+        status_text.info("💾 Saving results to database...")
+        
+        success_count = 0
+        if results and 'results' in results:
+            for clip, result in zip(clips_to_process, results['results']):
+                clip_wo = clip.get('wo_number', 'N/A')
+                
+                if result.get('sentiment_completed'):
+                    # EXACT same database update as approval
+                    success = db.update_clip_sentiment(clip['id'], result)
+                    if success:
+                        # EXACT same workflow stage update as approval
+                        db.supabase.table('clips').update({
+                            'workflow_stage': 'sentiment_analyzed'
+                        }).eq('id', clip['id']).execute()
+                        
+                        success_count += 1
+                        add_log(f"✅ Successfully processed WO# {clip_wo}")
+                    else:
+                        add_log(f"❌ Failed to save results for WO# {clip_wo}")
+                else:
+                    # EXACT same failure handling as approval
+                    db.supabase.table('clips').update({
+                        'workflow_stage': 'sentiment_analyzed',
+                        'sentiment_completed': False
+                    }).eq('id', clip['id']).execute()
+                    
+                    error_msg = result.get('error', 'Unknown error')
+                    add_log(f"❌ Analysis failed for WO# {clip_wo}: {error_msg}")
+        
+        # Final results
+        progress_bar.progress(1.0)
+        add_log(f"🎉 Processing complete: {success_count}/{len(clips_to_process)} successful")
+        
+        if success_count > 0:
+            status_text.success(f"✅ Successfully processed {success_count}/{len(clips_to_process)} clips!")
+        else:
+            status_text.error("❌ No clips were processed successfully")
     
     # Update final status
     if st.session_state.reprocess_status == 'stopped':

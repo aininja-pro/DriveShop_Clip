@@ -277,12 +277,12 @@ def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None,
         logger.info(f"Truncating content from {len(content)} to {max_content_length} characters")
         content = content[:max_content_length] + "..."
     
-    # Pre-filters to save OpenAI costs (same as original)
-    # Filter 1: Content Length Check
+    # Pre-filters to save OpenAI costs (but skip for approved clips)
+    # Filter 1: Content Length Check (skip for approved clips - they're already vetted)
     MIN_CONTENT_LENGTH = 200
     if len(content.strip()) < MIN_CONTENT_LENGTH:
-        logger.info(f"💰 PRE-FILTER: Content too short ({len(content)} chars < {MIN_CONTENT_LENGTH}) - skipping GPT analysis")
-        return None
+        logger.info(f"⚠️ APPROVED CLIP: Short content ({len(content)} chars) but proceeding anyway (approved clip)")
+        # Continue instead of returning None
     
     # Enhanced Content Quality Check
     # Check if content is still HTML (extraction failed)
@@ -317,8 +317,9 @@ def analyze_clip_enhanced(content: str, make: str, model: str, year: str = None,
     model_found = bool(model_lower) and (model_lower in content_lower or (model_base and model_base in content_lower))
     
     if not make_found and not model_found:
-        logger.info(f"💰 PRE-FILTER: Neither '{make}' nor '{model}' found in content - skipping GPT analysis")
-        return None
+        # For approved clips, skip this filter - they've already been vetted
+        logger.info(f"⚠️ APPROVED CLIP: Make/model not found in content but proceeding anyway (approved clip)")
+        logger.info(f"   Make '{make}' found: {make_found}, Model '{model}' found: {model_found}")
     
     # Build vehicle identifier string
     vehicle_parts = [make, model]

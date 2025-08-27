@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 TRIM_INDICATORS = [
     # Luxury/Premium trims
     'Limited', 'Platinum', 'Premium', 'Ultimate', 'Signature', 'Executive',
-    'Elite', 'Touring', 'Grand Touring', 'Luxury', 'Reserve',
+    'Elite', 'Touring', 'Grand Touring', 'Luxury', 'Reserve', 'Ultra Luxury',
+    'Prestige', 'Ultra', 'Overtrail', 'Autobahn',
     
     # Sport/Performance trims
     'Sport', 'S', 'RS', 'ST', 'GT', 'GTI', 'Type R', 'Type S', 'SRT',
@@ -28,6 +29,7 @@ TRIM_INDICATORS = [
     'TrailHawk', 'Rubicon', 'Sahara', 'Overland', 'TRD Pro', 'TRD Off-Road',
     'Trail', 'Adventure', 'Wilderness', 'Badlands', 'Bronco Sport', 'Big Bend',
     'Black Diamond', 'Outer Banks', 'Wildtrak', 'Z71', 'ZR2', 'FX4',
+    'TrailHunter', 'Trail Hunter',
     
     # Hybrid/Electric trims
     'Hybrid', 'Plug-in Hybrid', 'PHEV', 'EV', 'Electric', 'e-tron', 'EQS',
@@ -44,7 +46,8 @@ TRIM_INDICATORS = [
     
     # Special editions
     'Anniversary Edition', 'Special Edition', 'Launch Edition', 'First Edition',
-    'Night Edition', 'Black Edition', 'Sport Edition',
+    'Night Edition', 'Black Edition', 'Sport Edition', 'Nightshade',
+    'TRD Rally', 'Pro S', 'Pro', 'Plus',
     
     # Size/configuration
     'Long Range', 'Extended Range', 'Max', 'L', 'XL', 'Plus',

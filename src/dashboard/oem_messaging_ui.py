@@ -284,25 +284,35 @@ def display_pdf_extraction():
                     st.info("This PDF might have a different format. Try Manual Entry instead.")
 
 def display_url_extraction():
-    """URL extraction interface"""
+    """URL extraction interface with smart method detection"""
     st.markdown("### 🌐 Extract from URL")
     
-    url = st.text_input(
-        "Enter URL",
-        placeholder="https://www.mazdausa.com/press-release/2024-cx-50"
-    )
+    col1, col2, col3 = st.columns([3, 2, 1])
     
-    make = st.text_input("Make (leave blank to auto-detect)", placeholder="e.g., Mazda")
+    with col1:
+        url = st.text_input(
+            "Enter URL",
+            placeholder="https://www.volvocars.com/us/cars/xc60-hybrid/"
+        )
     
-    if st.button("🔍 Extract OEM Messaging"):
-        if url:
-            with st.spinner("Extracting messaging from URL..."):
-                # Here we would call the extraction tool
-                st.info("URL extraction functionality coming soon...")
-                # extractor = OEMExtractorUnified()
-                # results = extractor.extract(url, make)
+    with col2:
+        make = st.text_input("Make", placeholder="VOLVO")
+    
+    with col3:
+        year = st.number_input("Year", min_value=2024, max_value=2027, value=2025)
+    
+    model = st.text_input("Model", placeholder="XC60 T8")
+    
+    # Auto-detection info
+    if url:
+        method = get_extraction_method(url)
+        st.info(f"🤖 Will use: **{method}** based on URL domain")
+    
+    if st.button("🚀 Extract & Save OEM Messaging", type="primary"):
+        if url and make and model:
+            extract_and_save_from_url(url, make.upper().strip(), model.strip(), year)
         else:
-            st.error("Please enter a URL")
+            st.error("Please fill in all required fields (URL, Make, Model)")
 
 def save_oem_messaging(data):
     """Save OEM messaging to database"""
@@ -401,3 +411,340 @@ def display_existing_messages():
                     st.rerun()
     else:
         st.info("No OEM messages saved yet")
+
+def get_extraction_method(url: str) -> str:
+    """Determine which extraction method to use based on URL"""
+    from urllib.parse import urlparse
+    domain = urlparse(url).netloc.lower()
+    
+    # Domains that need enhanced crawler (ScrapFly)
+    complex_domains = {
+        'media.audiusa.com',
+        'www.media.maserati.com',
+        'media.vw.com', 
+        'www.volvocars.com',
+        'media.polestar.com',
+        'pressroom.toyota.com',
+        'pressroom.lexus.com'
+    }
+    
+    for complex_domain in complex_domains:
+        if complex_domain in domain:
+            return "Enhanced Crawler (ScrapFly)"
+    
+    return "Simple HTTP"
+
+def extract_and_save_from_url(url: str, make: str, model: str, year: int):
+    """Extract and save OEM messaging from URL"""
+    import os
+    import json
+    import requests
+    from bs4 import BeautifulSoup
+    
+    # Progress tracking
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        # Step 1: Extract content
+        status_text.text("🌐 Extracting content from URL...")
+        progress_bar.progress(20)
+        
+        method = get_extraction_method(url)
+        
+        if "Enhanced Crawler" in method:
+            content = extract_with_enhanced_crawler(url, make, model, status_text)
+        else:
+            content = extract_with_simple_http(url, status_text)
+        
+        if not content:
+            st.error("❌ Failed to extract content from URL")
+            return
+        
+        progress_bar.progress(50)
+        status_text.text(f"✅ Extracted {len(content):,} characters")
+        
+        # Step 2: Smart trimming for large content
+        if len(content) > 25000:
+            content = smart_trim_content(content)
+            status_text.text(f"✂️ Trimmed to {len(content):,} characters preserving key sections")
+        
+        progress_bar.progress(70)
+        
+        # Step 3: Extract messaging with OpenAI
+        status_text.text("🤖 Analyzing content with OpenAI...")
+        
+        messaging = extract_messaging_with_openai(content, make, model, year)
+        
+        if not messaging:
+            st.error("❌ Failed to extract OEM messaging")
+            return
+        
+        progress_bar.progress(90)
+        
+        # Step 4: Save to database
+        status_text.text("💾 Saving to database...")
+        
+        model_id = save_extracted_messaging(messaging, make, model, url, year)
+        
+        if model_id:
+            progress_bar.progress(100)
+            status_text.text("✅ Complete!")
+            
+            st.balloons()
+            st.success(f"🎉 Successfully processed **{make} {model}**!")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Features", len(messaging.get('key_features_intended', [])))
+            with col2:
+                st.metric("Brand Attributes", len(messaging.get('brand_attributes_intended', [])))
+            with col3:
+                st.metric("Year", year)
+            
+            st.info(f"📋 Database ID: {model_id}")
+        else:
+            st.error("❌ Failed to save to database")
+            
+    except Exception as e:
+        st.error(f"❌ Processing failed: {e}")
+        logger.error(f"Error processing {make} {model}: {e}")
+
+def extract_with_enhanced_crawler(url: str, make: str, model: str, status_text) -> str:
+    """Extract using enhanced crawler"""
+    try:
+        from src.utils.enhanced_crawler_manager import EnhancedCrawlerManager
+        crawler = EnhancedCrawlerManager()
+        
+        result = crawler.crawl_url(url, make, model)
+        
+        if result and result.get('success'):
+            return result.get('content', '')
+        return None
+    except Exception as e:
+        status_text.text(f"❌ Enhanced crawler failed: {e}")
+        return None
+
+def extract_with_simple_http(url: str, status_text) -> str:
+    """Extract using simple HTTP"""
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        for script in soup(["script", "style", "nav", "header", "footer", "noscript"]):
+            script.decompose()
+        
+        for selector in ['main', 'article', '.content', '#content']:
+            elements = soup.select(selector)
+            if elements:
+                content = elements[0].get_text()
+                break
+        else:
+            content = soup.get_text()
+        
+        lines = (line.strip() for line in content.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        content = ' '.join(chunk for chunk in chunks if chunk)
+        
+        return content if len(content) > 500 else None
+        
+    except Exception as e:
+        status_text.text(f"❌ Simple extraction failed: {e}")
+        return None
+
+def smart_trim_content(content: str) -> str:
+    """Smart trimming that preserves marketing sections"""
+    content_lower = content.lower()
+    marketing_sections = []
+    
+    section_markers = [
+        ('overview', 'OVERVIEW'),
+        ('features', 'FEATURES'), 
+        ('interior', 'INTERIOR'),
+        ('specifications', 'SPECIFICATIONS'),
+        ('performance', 'PERFORMANCE'),
+        ('safety', 'SAFETY'),
+        ('technology', 'TECHNOLOGY'),
+        ('design', 'DESIGN'),
+        ('comfort', 'COMFORT'),
+        ('utility', 'UTILITY'),
+    ]
+    
+    for marker, name in section_markers:
+        if marker in content_lower:
+            start_idx = content_lower.find(marker)
+            section_content = content[start_idx:start_idx + 3000]
+            marketing_sections.append(f"=== {name} ===\n{section_content}")
+    
+    if marketing_sections:
+        return "\n\n".join(marketing_sections[:8])
+    else:
+        return content[:25000] + "..."
+
+def extract_messaging_with_openai(content: str, make: str, model: str, year: int) -> dict:
+    """Extract OEM messaging using OpenAI"""
+    import openai
+    
+    openai.api_key = os.environ.get('OPENAI_API_KEY')
+    
+    prompt = f"""
+You are an expert at extracting OEM (Original Equipment Manufacturer) intended messaging from marketing materials.
+
+Analyze this {make} {model} content and extract the following structured information:
+
+CONTENT:
+{content}
+
+Extract the following (matching our sentiment analysis structure):
+
+1. POSITIONING STATEMENT: The main positioning or value proposition for this vehicle
+2. TARGET AUDIENCE: Who is this vehicle designed for?
+3. KEY FEATURES (aim for 10): What features does the OEM emphasize? Include:
+   - Feature name
+   - Category (performance, technology, design, safety, comfort, utility)
+   - Priority (primary, secondary, tertiary)
+   - How they want it described (messaging)
+4. BRAND ATTRIBUTES (3-5): What brand values/attributes are emphasized?
+5. PURCHASE DRIVERS: Why would someone buy this? (in order of importance)
+6. COMPETITIVE POSITIONING: How is it positioned against competitors?
+
+Return as JSON in this exact format:
+{{
+    "model_detected": "{model}",
+    "year": {year},
+    "positioning_statement": "...",
+    "target_audience": "...",
+    "key_features_intended": [
+        {{
+            "feature": "Feature Name",
+            "category": "category",
+            "priority": "primary/secondary/tertiary",
+            "messaging": "How OEM describes it",
+            "target_sentiment": "positive"
+        }}
+    ],
+    "brand_attributes_intended": ["attribute1", "attribute2", ...],
+    "purchase_drivers_intended": [
+        {{
+            "reason": "reason",
+            "priority": 1,
+            "target_audience": "who this appeals to",
+            "messaging": "supporting message"
+        }}
+    ],
+    "competitive_positioning": {{
+        "direct_comparisons": [
+            {{
+                "competitor": "Make Model",
+                "advantages": ["advantage1", "advantage2"],
+                "comparison_type": "direct/aspirational"
+            }}
+        ],
+        "market_positioning": "overall market position"
+    }}
+}}
+"""
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": "You are an expert at extracting structured OEM messaging from marketing materials."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        response_content = response.choices[0].message.content.strip()
+        
+        if response_content.startswith('```json'):
+            response_content = response_content[7:]
+        if response_content.endswith('```'):
+            response_content = response_content[:-3]
+        
+        extracted_data = json.loads(response_content.strip())
+        extracted_data['year'] = year  # Ensure correct year
+        
+        return extracted_data
+        
+    except Exception as e:
+        st.error(f"OpenAI extraction failed: {e}")
+        return None
+
+def save_extracted_messaging(extracted_data: dict, make: str, model: str, url: str, year: int) -> str:
+    """Save extracted messaging to database"""
+    try:
+        db = get_cached_db()
+        
+        # Check if exists
+        existing = db.supabase.table('oem_model_messaging')\
+            .select('id')\
+            .eq('make', make)\
+            .eq('model', model)\
+            .execute()
+        
+        if existing.data:
+            # Update existing
+            model_result = db.supabase.table('oem_model_messaging')\
+                .update({
+                    'year': year,
+                    'positioning_statement': extracted_data.get('positioning_statement'),
+                    'target_audience': extracted_data.get('target_audience'),
+                    'messaging_data_enhanced': json.dumps({
+                        'positioning_statement': extracted_data.get('positioning_statement'),
+                        'target_audience': extracted_data.get('target_audience'),
+                        'key_features_intended': extracted_data.get('key_features_intended', []),
+                        'brand_attributes_intended': extracted_data.get('brand_attributes_intended', []),
+                        'purchase_drivers_intended': extracted_data.get('purchase_drivers_intended', []),
+                        'competitive_positioning': extracted_data.get('competitive_positioning', {})
+                    })
+                })\
+                .eq('id', existing.data[0]['id'])\
+                .execute()
+            
+            st.success(f"✅ Updated existing {make} {model}")
+            return existing.data[0]['id']
+        else:
+            # Create new
+            source_data = {
+                'make': make,
+                'document_title': f"{make} {model} Marketing Material", 
+                'document_type': 'url',
+                'source_url': url,
+                'model_year': year
+            }
+            
+            source_result = db.supabase.table('oem_messaging_sources').insert(source_data).execute()
+            source_id = source_result.data[0]['id']
+            
+            messaging_data = {
+                'source_id': source_id,
+                'make': make,
+                'model': model,
+                'year': year,
+                'positioning_statement': extracted_data.get('positioning_statement'),
+                'target_audience': extracted_data.get('target_audience'),
+                'messaging_data_enhanced': json.dumps({
+                    'positioning_statement': extracted_data.get('positioning_statement'),
+                    'target_audience': extracted_data.get('target_audience'),
+                    'key_features_intended': extracted_data.get('key_features_intended', []),
+                    'brand_attributes_intended': extracted_data.get('brand_attributes_intended', []),
+                    'purchase_drivers_intended': extracted_data.get('purchase_drivers_intended', []),
+                    'competitive_positioning': extracted_data.get('competitive_positioning', {})
+                })
+            }
+            
+            model_result = db.supabase.table('oem_model_messaging').insert(messaging_data).execute()
+            st.success(f"✅ Created new {make} {model}")
+            return model_result.data[0]['id']
+            
+    except Exception as e:
+        st.error(f"Database save failed: {e}")
+        return None

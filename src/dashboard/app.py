@@ -4564,10 +4564,14 @@ with approved_queue_tab:
             # Get clips that are ready to export (workflow_stage = 'ready_to_export')
             @st.cache_data
             def get_ready_to_export_data():
+                # OPTIMIZED: Exclude massive content fields to prevent 820MB data transfer
+                needed_columns = 'id,wo_number,office,make,model,contact,media_outlet,relevance_score,overall_sentiment,workflow_stage,processed_date,clip_url,published_date,sentiment_completed'
+                
                 # Get clips with workflow_stage = 'sentiment_analyzed' (ready to export)
-                result = db.supabase.table('clips').select('*').eq('workflow_stage', 'sentiment_analyzed').execute()
+                result = db.supabase.table('clips').select(needed_columns).eq('workflow_stage', 'sentiment_analyzed').execute()
+                
                 # Also get any legacy clips that are approved with sentiment completed but not exported
-                legacy_result = db.supabase.table('clips').select('*').eq('status', 'approved').eq('sentiment_completed', True).eq('workflow_stage', 'found').execute()
+                legacy_result = db.supabase.table('clips').select(needed_columns).eq('status', 'approved').eq('sentiment_completed', True).eq('workflow_stage', 'found').execute()
                 
                 all_clips = result.data if result.data else []
                 if legacy_result.data:
