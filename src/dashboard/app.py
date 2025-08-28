@@ -4565,7 +4565,7 @@ with approved_queue_tab:
             @st.cache_data
             def get_ready_to_export_data():
                 # OPTIMIZED: Exclude massive content fields to prevent 820MB data transfer
-                needed_columns = 'id,wo_number,office,make,model,contact,media_outlet,relevance_score,overall_sentiment,workflow_stage,processed_date,clip_url,published_date,sentiment_completed'
+                needed_columns = 'id,wo_number,office,make,model,contact,media_outlet,relevance_score,overall_sentiment,workflow_stage,processed_date,clip_url,published_date,sentiment_completed,sentiment_data_enhanced,marketing_impact_score,executive_summary,brand_narrative,sentiment_version'
                 
                 # Get clips with workflow_stage = 'sentiment_analyzed' (ready to export)
                 result = db.supabase.table('clips').select(needed_columns).eq('workflow_stage', 'sentiment_analyzed').execute()
@@ -4953,9 +4953,9 @@ with approved_queue_tab:
                                         
                                         if export_result.data:
                                             # Get enhanced sentiment data for the same clips
-                                            clips_result = db.supabase.table('clips').select('activity_id, sentiment_data_enhanced').in_('id', clip_ids).execute()
+                                            clips_result = db.supabase.table('clips').select('wo_number, sentiment_data_enhanced').in_('id', clip_ids).execute()
                                             
-                                            # Create a lookup for enhanced sentiment data by activity_id
+                                            # Create a lookup for enhanced sentiment data by wo_number
                                             enhanced_data_lookup = {}
                                             if clips_result.data:
                                                 for clip_data in clips_result.data:
@@ -4978,13 +4978,13 @@ with approved_queue_tab:
                                                     }
                                                     
                                                     filtered_sentiment = {k: v for k, v in enhanced_sentiment.items() if k in allowed_fields}
-                                                    enhanced_data_lookup[clip_data.get('activity_id')] = filtered_sentiment
+                                                    enhanced_data_lookup[clip_data.get('wo_number')] = filtered_sentiment
                                             
                                             # Combine original flat data with enhanced sentiment data
                                             for export_record in export_result.data:
-                                                activity_id = export_record.get('activity_id')
-                                                if activity_id in enhanced_data_lookup:
-                                                    export_record['sentiment_data_enhanced'] = enhanced_data_lookup[activity_id]
+                                                wo_number = export_record.get('wo_number')
+                                                if wo_number in enhanced_data_lookup:
+                                                    export_record['sentiment_data_enhanced'] = enhanced_data_lookup[wo_number]
                                                 else:
                                                     # Add empty enhanced sentiment for clips that failed analysis
                                                     export_record['sentiment_data_enhanced'] = {
