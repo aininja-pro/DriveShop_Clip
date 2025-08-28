@@ -4565,7 +4565,7 @@ with approved_queue_tab:
             @st.cache_data
             def get_ready_to_export_data():
                 # OPTIMIZED: Exclude massive content fields to prevent 820MB data transfer
-                needed_columns = 'id,wo_number,office,make,model,contact,media_outlet,relevance_score,overall_sentiment,workflow_stage,processed_date,clip_url,published_date,sentiment_completed,sentiment_data_enhanced,marketing_impact_score,executive_summary,brand_narrative,sentiment_version'
+                needed_columns = 'id,wo_number,office,make,model,contact,media_outlet,activity_id,relevance_score,overall_sentiment,workflow_stage,processed_date,clip_url,published_date,sentiment_completed,sentiment_data_enhanced,marketing_impact_score,executive_summary,brand_narrative,sentiment_version'
                 
                 # Get clips with workflow_stage = 'sentiment_analyzed' (ready to export)
                 result = db.supabase.table('clips').select(needed_columns).eq('workflow_stage', 'sentiment_analyzed').execute()
