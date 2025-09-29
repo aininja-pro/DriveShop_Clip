@@ -161,7 +161,7 @@ def display_cooldown_management_tab():
             })
             
             # Add option to reset these clips
-            if st.button("🔄 Reset All Failed Clips to Pending", type="secondary"):
+            if st.button("🔗 Delete Failed Clips for Reprocessing", type="secondary", help="Removes failed clips from database so they can be reprocessed in next run"):
                 reset_failed_clips(db)
             
             st.dataframe(
@@ -273,18 +273,41 @@ def reset_specific_cooldowns(db, wo_numbers):
         st.error(f"Error resetting specific cooldowns: {e}")
 
 def reset_failed_clips(db):
-    """Reset all failed clips to pending_review status"""
+    """Reset failed clips for reprocessing by clearing cooldowns"""
     try:
-        with st.spinner("Resetting failed clips..."):
-            result = db.supabase.table('clips').update({
-                'status': 'pending_review',
-                'attempt_count': 0
-            }).in_('status', ['no_content_found', 'processing_failed']).execute()
-            
-            count = len(result.data) if result.data else 0
-            
-            st.success(f"✅ Reset {count} failed clips to pending review!")
+        with st.spinner("Resetting failed clips for reprocessing..."):
+            # First, get all WO numbers for failed clips
+            failed_clips = db.supabase.table('clips')\
+                .select('wo_number')\
+                .in_('status', ['no_content_found', 'processing_failed'])\
+                .execute()
+
+            if not failed_clips.data:
+                st.info("No failed clips to reset")
+                return
+
+            wo_numbers = [clip['wo_number'] for clip in failed_clips.data]
+
+            # Option 1: Delete the failed clips entirely so they can be reprocessed fresh
+            # This is the cleanest approach
+            result = db.supabase.table('clips')\
+                .delete()\
+                .in_('wo_number', wo_numbers)\
+                .in_('status', ['no_content_found', 'processing_failed'])\
+                .execute()
+
+            deleted_count = len(result.data) if result.data else 0
+
+            # Clear the cooldown tracking for these WOs
+            db.supabase.table('wo_tracking').update({
+                'retry_after_date': None,
+                'attempt_count': 0,
+                'status': None  # Clear status so they're eligible for processing
+            }).in_('wo_number', wo_numbers).execute()
+
+            st.success(f"✅ Reset {deleted_count} failed clips for reprocessing!")
+            st.info("These work orders will be picked up in the next processing run.")
             st.rerun()
-            
+
     except Exception as e:
         st.error(f"Error resetting failed clips: {e}")
