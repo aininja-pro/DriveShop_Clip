@@ -2409,12 +2409,12 @@ with st.sidebar:
             else:
                 st.error("❌ Failed")
 
-# Create tabs for different user workflows  
-active_jobs_tab, bulk_review_tab, approved_queue_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, cooldown_tab, export_tab = st.tabs([
-    "Active Jobs",
+# Create tabs for different user workflows
+bulk_review_tab, approved_queue_tab, active_jobs_tab, rejected_tab, analysis_tab, pullthrough_tab, oem_tab, reprocess_tab, cooldown_tab, export_tab = st.tabs([
     "Bulk Review",
     "Approved Queue",
-    "Rejected/Issues", 
+    "Active Jobs",
+    "Rejected/Issues",
     "Strategic Intelligence",
     "Message Pull-Through",
     "OEM Messaging",
