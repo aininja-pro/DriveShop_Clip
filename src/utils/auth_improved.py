@@ -142,13 +142,39 @@ class ImprovedSupabaseAuth:
             print(f"Session refresh error: {e}")
             return False
     
+    def _is_token_expired(self, expires_at: int, buffer_minutes: int = 5) -> bool:
+        """
+        Check if a token is expired or will expire soon.
+
+        Args:
+            expires_at: Unix timestamp when the token expires
+            buffer_minutes: Consider token expired if it expires within this many minutes
+
+        Returns:
+            True if token is expired or will expire soon
+        """
+        if not expires_at:
+            return True
+
+        try:
+            expiry_time = datetime.fromtimestamp(expires_at)
+            now = datetime.now()
+            buffer = timedelta(minutes=buffer_minutes)
+
+            # Token is expired if current time is past expiry, or within buffer period
+            return now >= (expiry_time - buffer)
+        except Exception as e:
+            print(f"Error checking token expiry: {e}")
+            return True  # Assume expired if we can't check
+
     def check_and_refresh_session(self, session_timeout_hours: int = 48) -> bool:
         """
         Check if the session is still valid and refresh if needed.
-        
+        Proactively refreshes tokens before they expire.
+
         Args:
             session_timeout_hours: Number of hours before requiring a session refresh
-            
+
         Returns:
             True if session is valid or successfully refreshed, False if user needs to log in again
         """
@@ -157,7 +183,21 @@ class ImprovedSupabaseAuth:
         print(f"Auth check: is_authenticated = {is_auth}")
         if not is_auth:
             return False
-            
+
+        # Proactively check token expiry and refresh before it expires
+        persisted = self.session_persistence.retrieve_session()
+        if persisted:
+            expires_at = persisted.get('expires_at')
+            # Use 10-minute buffer for proactive refresh during active use
+            if self._is_token_expired(expires_at, buffer_minutes=10):
+                print("Token expiring soon, proactively refreshing...")
+                if self.refresh_session():
+                    print("Proactive token refresh successful")
+                else:
+                    print("Proactive token refresh failed")
+                    self.logout()
+                    return False
+
         # Check if we need to refresh based on time
         login_time = st.session_state.get('login_time')
         if login_time:
@@ -167,7 +207,7 @@ class ImprovedSupabaseAuth:
                 if not self.refresh_session():
                     self.logout()
                     return False
-        
+
         # Also check if the session is still valid with Supabase
         try:
             user = self.supabase.auth.get_user()
@@ -182,7 +222,7 @@ class ImprovedSupabaseAuth:
             if not self.refresh_session():
                 self.logout()
                 return False
-                
+
         return True
     
     def _restore_session(self) -> bool:
@@ -196,31 +236,15 @@ class ImprovedSupabaseAuth:
             if persisted:
                 access_token = persisted.get('access_token')
                 refresh_token = persisted.get('refresh_token')
-                
+                expires_at = persisted.get('expires_at')
+
                 if access_token and refresh_token:
-                    try:
-                        # Set the session in Supabase client
-                        self.supabase.auth.set_session(access_token, refresh_token)
-                        
-                        # Verify the session is valid
-                        user = self.supabase.auth.get_user()
-                        if user and user.user:
-                            # Get the current session details
-                            session = self.supabase.auth.get_session()
-                            if session and session.session:
-                                # Update session state
-                                st.session_state['authenticated'] = True
-                                st.session_state['user'] = user.user
-                                st.session_state['session'] = session.session
-                                st.session_state['login_time'] = datetime.now()
-                                
-                                # Update persisted session with fresh data
-                                self.session_persistence.store_session(session.session)
-                                
-                                return True
-                    except Exception as e:
-                        print(f"Failed to restore session from tokens: {e}")
-                        # Try to refresh if access token is expired
+                    # Check if access token is expired BEFORE trying to use it
+                    token_expired = self._is_token_expired(expires_at, buffer_minutes=5)
+
+                    if token_expired:
+                        print(f"Access token is expired or expiring soon, refreshing immediately...")
+                        # Skip straight to refresh flow instead of trying to use expired token
                         if refresh_token:
                             try:
                                 response = self.supabase.auth.refresh_session(refresh_token)
@@ -230,13 +254,56 @@ class ImprovedSupabaseAuth:
                                     st.session_state['user'] = response.user
                                     st.session_state['session'] = response.session
                                     st.session_state['login_time'] = datetime.now()
-                                    
+
                                     # Persist the new session
                                     self.session_persistence.store_session(response.session)
-                                    
+
+                                    print("Session refreshed successfully during restoration")
                                     return True
                             except Exception as refresh_error:
                                 print(f"Failed to refresh expired session: {refresh_error}")
+                                return False
+                    else:
+                        # Token is still valid, use it
+                        try:
+                            # Set the session in Supabase client
+                            self.supabase.auth.set_session(access_token, refresh_token)
+
+                            # Verify the session is valid
+                            user = self.supabase.auth.get_user()
+                            if user and user.user:
+                                # Get the current session details
+                                session = self.supabase.auth.get_session()
+                                if session and session.session:
+                                    # Update session state
+                                    st.session_state['authenticated'] = True
+                                    st.session_state['user'] = user.user
+                                    st.session_state['session'] = session.session
+                                    st.session_state['login_time'] = datetime.now()
+
+                                    # Update persisted session with fresh data
+                                    self.session_persistence.store_session(session.session)
+
+                                    return True
+                        except Exception as e:
+                            print(f"Failed to restore session from tokens: {e}")
+                            # Try to refresh if access token is expired
+                            if refresh_token:
+                                try:
+                                    response = self.supabase.auth.refresh_session(refresh_token)
+                                    if response and response.session:
+                                        # Update everything with new session
+                                        st.session_state['authenticated'] = True
+                                        st.session_state['user'] = response.user
+                                        st.session_state['session'] = response.session
+                                        st.session_state['login_time'] = datetime.now()
+
+                                        # Persist the new session
+                                        self.session_persistence.store_session(response.session)
+
+                                        return True
+                                except Exception as refresh_error:
+                                    print(f"Failed to refresh expired session: {refresh_error}")
             
             # If no persisted session or it failed, check with Supabase directly
             try:
