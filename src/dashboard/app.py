@@ -2083,6 +2083,7 @@ with st.sidebar:
             st.session_state.mapping_update_msg = (success, msg)
             if success:
                 st.cache_data.clear()  # Clear cache so new mapping data is loaded
+                st.session_state.outlet_data_mapping = {}  # Clear stale outlet lookup data
             st.rerun()
 
     # Thin separator line
@@ -2492,6 +2493,7 @@ with bulk_review_tab:
     with col1:
         if st.button("🔄 Refresh Data", help="Manually refresh clips data from database"):
             st.cache_data.clear()
+            st.session_state.outlet_data_mapping = {}  # Clear stale outlet lookup data
             st.rerun()
     
     # Cache database calls to improve performance
