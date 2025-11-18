@@ -2081,6 +2081,8 @@ with st.sidebar:
         with st.spinner("Updating mapping from URL..."):
             success, msg = update_person_outlets_mapping_from_url(mapping_url)
             st.session_state.mapping_update_msg = (success, msg)
+            if success:
+                st.cache_data.clear()  # Clear cache so new mapping data is loaded
             st.rerun()
 
     # Thin separator line
