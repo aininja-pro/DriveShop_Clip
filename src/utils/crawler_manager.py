@@ -586,15 +586,16 @@ class CrawlerManager:
     def _crawl_level4_headless(self, url: str, wait_time: int = 5) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Level 4: Headless browser using Playwright.
-        
+
         Args:
             url: URL to crawl
             wait_time: Time to wait for page to load (seconds)
-            
+
         Returns:
             Tuple of (content, title, error)
         """
-        return self.browser_crawler.crawl(url, wait_time=wait_time, scroll=True)
+        import asyncio
+        return asyncio.run(self.browser_crawler.crawl(url, wait_time=wait_time, scroll=True))
     
     def close(self):
         """Close any open resources."""

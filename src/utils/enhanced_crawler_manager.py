@@ -620,13 +620,13 @@ class EnhancedCrawlerManager:
             
             if article_result['success']:
                 # Apply date filtering to Google Search results
-                from src.utils.date_extractor import extract_publication_date
+                from src.utils.date_extractor import extract_date_from_html
                 from src.utils.enhanced_date_filter import is_content_acceptable
-                
+
                 # Extract publication date from the article content
                 article_date = None
                 try:
-                    article_date = extract_publication_date(article_result['content'], specific_url)
+                    article_date = extract_date_from_html(article_result['content'], specific_url)
                     if article_date:
                         logger.info(f"📅 Extracted publication date: {article_date.strftime('%Y-%m-%d')} for {specific_url}")
                     else:

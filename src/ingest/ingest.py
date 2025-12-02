@@ -642,15 +642,15 @@ def process_youtube_url(url: str, loan: Dict[str, Any], cancel_check: Optional[c
             if title and model:
                 title_lower = title.lower()
                 model_lower = model.lower()
-                
+
                 # Check for model variations in title
                 model_variations = [
                     model_lower,
-                    model_lower.replace('-', ''),  # "cx-90" -> "cx90"  
+                    model_lower.replace('-', ''),  # "cx-90" -> "cx90"
                     model_lower.replace(' ', ''),  # Remove spaces
                     model_lower.replace('-', ' ')  # "cx-90" -> "cx 90"
                 ]
-                
+
                 # Check if title contains the target model
                 title_is_relevant = False
                 for variant in model_variations:
@@ -658,7 +658,18 @@ def process_youtube_url(url: str, loan: Dict[str, Any], cancel_check: Optional[c
                         logger.info(f"✅ Video title '{title}' contains target model '{variant}' - proceeding with transcript extraction")
                         title_is_relevant = True
                         break
-                
+
+                # Fallback: Check if make + base model are both present (for variants/trims)
+                if not title_is_relevant and make:
+                    make_lower = make.lower()
+                    # Extract base model (first word/token)
+                    base_model = model_lower.split()[0] if model_lower and ' ' in model_lower else model_lower
+
+                    # Accept if BOTH make and base model are in title
+                    if make_lower in title_lower and base_model and base_model in title_lower:
+                        logger.info(f"✅ Video title '{title}' contains make '{make}' and base model '{base_model}' - accepting variant/trim")
+                        title_is_relevant = True
+
                 if not title_is_relevant:
                     logger.warning(f"⚠️ SKIPPING TRANSCRIPT: Video title '{title}' doesn't mention {make} {model}")
                     logger.info(f"💰 Saved transcript extraction cost for irrelevant video")
