@@ -4983,10 +4983,20 @@ with approved_queue_tab:
                                                     
                                                     filtered_sentiment = {k: v for k, v in enhanced_sentiment.items() if k in allowed_fields}
                                                     enhanced_data_lookup[clip_data.get('wo_number')] = filtered_sentiment
-                                            
+
+                                            # Create lookup from clips_to_export for media_outlet (VIEW doesn't have this column)
+                                            media_outlet_lookup = {clip['activity_id']: clip.get('media_outlet') for clip in clips_to_export if clip.get('activity_id')}
+
                                             # Combine original flat data with enhanced sentiment data
                                             for export_record in export_result.data:
                                                 wo_number = export_record.get('wo_number')
+
+                                                # Fix publication field using clips_to_export lookup
+                                                if 'publication' not in export_record or not export_record.get('publication'):
+                                                    activity_id = export_record.get('activity_id')
+                                                    if activity_id in media_outlet_lookup:
+                                                        export_record['publication'] = media_outlet_lookup[activity_id]
+
                                                 if wo_number in enhanced_data_lookup:
                                                     export_record['sentiment_data_enhanced'] = enhanced_data_lookup[wo_number]
                                                 else:
@@ -5060,6 +5070,7 @@ with approved_queue_tab:
                                                     "link": clip.get('clip_url'),
                                                     "cons": clip.get('cons'),
                                                     "impressions": clip.get('impressions'),
+                                                    "publication": clip.get('media_outlet'),
                                                     "publication_id": clip.get('media_outlet_id'),
                                                     "overall_score": clip.get('overall_score'),
                                                     "sentiment": clip.get('overall_sentiment'),
