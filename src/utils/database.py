@@ -1258,28 +1258,6 @@ class DatabaseManager:
             logger.error(f"❌ Failed to update byline author for WO# {wo_number}: {e}")
             return False
     
-    def update_clip_media_outlet(self, wo_number: str, media_outlet: str, outlet_id: Optional[str] = None, impressions: Optional[int] = None) -> bool:
-        """Update the media outlet information for a specific clip"""
-        try:
-            update_data = {'media_outlet': media_outlet}
-            if outlet_id:
-                update_data['outlet_id'] = outlet_id
-            if impressions:
-                update_data['impressions'] = impressions
-                
-            result = self.supabase.table('clips').update(update_data).eq('wo_number', wo_number).execute()
-            
-            if result.data:
-                logger.info(f"✅ Updated media outlet for WO# {wo_number} to: {media_outlet}")
-                return True
-            else:
-                logger.warning(f"⚠️ No clip found with WO# {wo_number}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"❌ Failed to update media outlet for WO# {wo_number}: {e}")
-            return False
-    
     def update_clip_published_date(self, wo_number: str, new_date: str) -> bool:
         """Update the published_date field for a specific clip"""
         try:
