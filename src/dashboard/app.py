@@ -6209,6 +6209,7 @@ with analysis_tab:
                 .select('id, wo_number, make, model, contact, media_outlet, overall_sentiment, published_date, clip_url')
                 .not_.is_('sentiment_data_enhanced', 'null')
                 .order('published_date', desc=True)
+                .limit(1000)
                 .execute()
             )
             return result.data if result.data else []
@@ -6226,7 +6227,8 @@ with analysis_tab:
             )
             return result.data[0] if result.data else {}
 
-        clip_index = load_sentiment_clip_index()
+        with st.spinner('Loading Strategic Intelligence...'):
+            clip_index = load_sentiment_clip_index()
         display_strategic_intelligence_tab(clip_index, load_clip_detail)
 
     except Exception as e:
