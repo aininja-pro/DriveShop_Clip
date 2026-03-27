@@ -1192,35 +1192,53 @@ class DatabaseManager:
             return []
     
     def _enrich_clips_with_retry_status(self, clips: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Add retry status information to failed clips"""
+        """Add retry status information to failed clips (batch query)"""
+        # Collect all WO numbers that need retry status
+        failed_wos = [
+            clip.get('wo_number') for clip in clips
+            if clip.get('wo_number') and clip.get('status') in ['no_content_found', 'processing_failed']
+        ]
+
+        if not failed_wos:
+            return clips
+
+        # Single batch query instead of N individual queries
+        retry_lookup = {}
+        # Supabase .in_() has a limit, batch in chunks of 200
+        for i in range(0, len(failed_wos), 200):
+            batch = failed_wos[i:i + 200]
+            result = self.supabase.table('wo_tracking').select('wo_number, retry_after_date').in_('wo_number', batch).execute()
+            if result.data:
+                for row in result.data:
+                    if row.get('retry_after_date'):
+                        retry_lookup[row['wo_number']] = row['retry_after_date']
+
+        current_time = datetime.now()
+        current_time_utc = None  # Lazy init if needed
+
         for clip in clips:
             wo_number = clip.get('wo_number')
-            if wo_number and clip['status'] in ['no_content_found', 'processing_failed']:
-                # Check WO tracking for retry status
-                result = self.supabase.table('wo_tracking').select('retry_after_date').eq('wo_number', wo_number).execute()
-                
-                if result.data and result.data[0].get('retry_after_date'):
-                    retry_after = datetime.fromisoformat(result.data[0]['retry_after_date'])
-                    current_time = datetime.now()
-                    
+            if wo_number and clip.get('status') in ['no_content_found', 'processing_failed']:
+                retry_date_str = retry_lookup.get(wo_number)
+                if retry_date_str:
+                    retry_after = datetime.fromisoformat(retry_date_str)
                     # Handle timezone awareness
                     if retry_after.tzinfo is not None:
-                        from datetime import timezone
-                        current_time = datetime.now(timezone.utc)
-                    elif current_time.tzinfo is not None:
-                        retry_after = retry_after.replace(tzinfo=None)
-                    
-                    if current_time < retry_after:
-                        # Still in cooldown
+                        if current_time_utc is None:
+                            from datetime import timezone
+                            current_time_utc = datetime.now(timezone.utc)
+                        compare_time = current_time_utc
+                    else:
+                        compare_time = current_time
+
+                    if compare_time < retry_after:
                         clip['retry_status'] = 'in_cooldown'
                         clip['retry_after'] = retry_after.isoformat()
                     else:
-                        # Ready for retry
                         clip['retry_status'] = 'ready'
                 else:
-                    # No retry date set
                     clip['retry_status'] = 'ready'
-        
+
         return clips
     
     def get_processing_run_info(self, run_id: str) -> Optional[Dict[str, Any]]:
