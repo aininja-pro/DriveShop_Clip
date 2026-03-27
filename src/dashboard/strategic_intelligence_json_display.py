@@ -122,8 +122,8 @@ def display_strategic_intelligence_tab(search_clips, fetch_detail):
     gb.configure_pagination(paginationAutoPageSize=True)
     grid_options = gb.build()
 
-    # Dynamic height: 42px per row + 56px header, capped at 300px
-    grid_height = min(len(display_df) * 42 + 56, 300)
+    # Dynamic height: 42px per row + 95px for header/pagination, capped at 300px, min 150px
+    grid_height = max(min(len(display_df) * 42 + 95, 300), 150)
 
     st.markdown("**Select a clip to view detailed analysis:**")
     grid_response = AgGrid(
