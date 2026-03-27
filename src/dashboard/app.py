@@ -6195,47 +6195,43 @@ with rejected_tab:
     else:
         st.info("📊 No rejected records found")
 
-# ========== STRATEGIC INTELLIGENCE TAB (Single Column Layout) ==========
+# ========== STRATEGIC INTELLIGENCE TAB ==========
 with analysis_tab:
-    # Single column layout for Strategic Intelligence
     try:
-        # Use the already cached database instance instead of getting a new one
-        # db is already available from the main cached database instance
+        db = get_cached_database()
 
-        # Cached lightweight fetch (projection + limit) to speed initial render
+        # Stage 1: lightweight metadata (no sentiment JSON blobs)
         @st.cache_data(ttl=300, show_spinner=False)
-        def load_sentiment_clips():
-            projection = 'wo_number, make, model, contact, media_outlet, overall_sentiment, published_date, sentiment_data_enhanced, clip_url'
+        def load_sentiment_clip_index():
             result = (
                 db.supabase
                 .table('clips')
-                .select(projection)
-                .eq('sentiment_completed', True)
+                .select('id, wo_number, make, model, contact, media_outlet, overall_sentiment, published_date, clip_url')
+                .not_.is_('sentiment_data_enhanced', 'null')
                 .order('published_date', desc=True)
-                .limit(500)
                 .execute()
             )
             return result.data if result.data else []
 
-        # Optional refresh to bust the cache explicitly
-        refresh_col1, _ = st.columns([1, 5])
-        with refresh_col1:
-            if st.button('🔄 Refresh Data', key='refresh_strategic_cache'):
-                load_sentiment_clips.clear()
-                st.rerun()
+        # Stage 2: on-demand detail for a single clip
+        @st.cache_data(ttl=600, show_spinner=False)
+        def load_clip_detail(clip_id: str):
+            result = (
+                db.supabase
+                .table('clips')
+                .select('sentiment_data_enhanced')
+                .eq('id', clip_id)
+                .limit(1)
+                .execute()
+            )
+            return result.data[0] if result.data else {}
 
-        with st.spinner('Loading clips with sentiment...'):
-            sentiment_clips = load_sentiment_clips()
-        
-        # Use the new single column display
-        display_strategic_intelligence_tab(sentiment_clips)
-        
+        clip_index = load_sentiment_clip_index()
+        display_strategic_intelligence_tab(clip_index, load_clip_detail)
+
     except Exception as e:
         st.error(f"Error loading Strategic Intelligence: {e}")
         logger.error(f"Strategic Intelligence tab error: {e}")
-
-# Remove all old Strategic Intelligence code - it's now handled by display_strategic_intelligence_tab
-# The old code from here to the export tab is no longer needed
 
 # ========== MESSAGE PULL-THROUGH TAB ==========
 with pullthrough_tab:

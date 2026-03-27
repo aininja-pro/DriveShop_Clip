@@ -1,318 +1,441 @@
 """
-Strategic Intelligence display - Shows JSON data exactly as stored
-Displays all fields with proper formatting
+Strategic Intelligence Dashboard - Searchable, two-stage loaded sentiment analysis viewer.
 """
 import json
+import pandas as pd
 import streamlit as st
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-def display_strategic_intelligence_tab(sentiment_clips):
+
+def display_strategic_intelligence_tab(clip_index: list, fetch_detail):
     """
-    Display the entire Strategic Intelligence tab showing exact JSON data
+    Display the Strategic Intelligence tab with filterable clip table
+    and on-demand sentiment analysis detail.
+
+    Args:
+        clip_index: List of clip metadata dicts (no sentiment JSON).
+        fetch_detail: Callable(clip_id) -> dict with sentiment_data_enhanced.
     """
-    st.markdown("## 🔍 Strategic Intelligence Dashboard")
+    # ── Header ──────────────────────────────────────────────────────────
+    st.markdown(
+        '<h2 style="margin-bottom: 0.2rem;">Strategic Intelligence Dashboard</h2>'
+        '<p style="color: #6c757d; margin-top: 0; margin-bottom: 1rem;">'
+        'Search, filter, and explore enhanced sentiment analysis across all reviewed clips</p>',
+        unsafe_allow_html=True,
+    )
     st.markdown("---")
-    
-    if not sentiment_clips:
-        st.info("No clips with sentiment analysis found. Run sentiment analysis on approved clips to see detailed insights.")
+
+    if not clip_index:
+        st.info("No clips with enhanced sentiment analysis found. "
+                "Approve clips and run sentiment analysis to populate this dashboard.")
         return
-    
-    # Create DataFrame for selection
-    import pandas as pd
-    
-    # Prepare data for display
-    display_data = []
-    for clip in sentiment_clips:
-        display_data.append({
-            'WO #': clip.get('wo_number', ''),
-            'Make': clip.get('make', ''),
-            'Model': clip.get('model', ''),
-            'Media Personality': f"{clip.get('contact_first_name', '')} {clip.get('contact_last_name', '')}".strip() or 'Unknown',
-            'Affiliation': clip.get('media_outlet', ''),
-            'Sentiment': clip.get('overall_sentiment', 'N/A'),
-            'Date': clip.get('publish_date', '')
-        })
-    
-    df = pd.DataFrame(display_data)
-    
-    # Work Order Selection at the top
-    st.markdown("### Select a Clip to Analyze")
-    
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        selected_wo = st.selectbox(
-            "Choose Work Order:",
-            options=[''] + df['WO #'].tolist(),
-            format_func=lambda x: f"{x} - {df[df['WO #']==x]['Model'].iloc[0]}" if x else "Select a clip...",
-            key="strategic_wo_selector"
-        )
-    
-    with col2:
-        if st.button("🔄 Refresh Data", key="refresh_strategic"):
+
+    # ── Build DataFrame ─────────────────────────────────────────────────
+    df = pd.DataFrame(clip_index)
+    df['published_date'] = pd.to_datetime(df['published_date'], errors='coerce')
+
+    # ── Refresh button (top-right) ──────────────────────────────────────
+    _, refresh_col = st.columns([5, 1])
+    with refresh_col:
+        if st.button("Refresh", key="si_refresh"):
+            st.cache_data.clear()
             st.rerun()
-    
-    if not selected_wo:
-        st.info("👆 Select a work order above to view detailed sentiment analysis")
-        return
-    
-    # Get the selected clip data
-    selected_clip = next((clip for clip in sentiment_clips if clip.get('wo_number') == selected_wo), None)
-    if not selected_clip:
-        st.error("Could not find selected clip data")
-        return
-    
-    # Display clip header info
+
+    # ── Filter Bar ──────────────────────────────────────────────────────
+    f1, f2, f3 = st.columns([1.5, 1.5, 3])
+
+    with f1:
+        makes = sorted(df['make'].dropna().unique().tolist())
+        selected_make = st.selectbox("Make / Brand", ["All"] + makes, key="si_make")
+
+    with f2:
+        sentiments = ["All", "positive", "neutral", "negative"]
+        selected_sentiment = st.selectbox("Sentiment", sentiments, key="si_sentiment")
+
+    with f3:
+        search_text = st.text_input(
+            "Search WO#, Contact, or Media Outlet",
+            placeholder="e.g. 126-1373",
+            key="si_search",
+        )
+
+    # Apply filters
+    filtered = df.copy()
+    if selected_make != "All":
+        filtered = filtered[filtered['make'] == selected_make]
+    if selected_sentiment != "All":
+        filtered = filtered[filtered['overall_sentiment'].str.lower() == selected_sentiment.lower()]
+    if search_text:
+        q = search_text.lower()
+        mask = (
+            filtered['wo_number'].astype(str).str.lower().str.contains(q, na=False)
+            | filtered['contact'].astype(str).str.lower().str.contains(q, na=False)
+            | filtered['media_outlet'].astype(str).str.lower().str.contains(q, na=False)
+        )
+        filtered = filtered[mask]
+
+    # ── Summary Metrics ─────────────────────────────────────────────────
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Total Clips", len(filtered))
+    with m2:
+        st.metric("Positive", int((filtered['overall_sentiment'].str.lower() == 'positive').sum()))
+    with m3:
+        st.metric("Neutral", int((filtered['overall_sentiment'].str.lower() == 'neutral').sum()))
+    with m4:
+        st.metric("Negative", int((filtered['overall_sentiment'].str.lower() == 'negative').sum()))
+
     st.markdown("---")
-    info_cols = st.columns(4)
-    with info_cols[0]:
-        # Support either split name fields or a single 'contact' field
-        contact_name = selected_clip.get('contact') or f"{selected_clip.get('contact_first_name', '')} {selected_clip.get('contact_last_name', '')}".strip()
-        st.markdown(f"**👤 Media Contact**  \n{contact_name or 'Unknown'}")
-    with info_cols[1]:
-        st.markdown(f"**📰 Publication**  \n{selected_clip.get('media_outlet', 'N/A')}")
-    with info_cols[2]:
-        st.markdown(f"**🚗 Vehicle**  \n{selected_clip.get('make', '')} {selected_clip.get('model', '')}")
-    with info_cols[3]:
-        # Support both publish_date and published_date
-        date_val = selected_clip.get('publish_date') or selected_clip.get('published_date') or 'N/A'
-        st.markdown(f"**📅 Date**  \n{date_val}")
-    
+
+    # ── Results Table (AgGrid) ──────────────────────────────────────────
+    if filtered.empty:
+        st.warning("No clips match your filters.")
+        return
+
+    display_df = filtered[['wo_number', 'make', 'model', 'contact',
+                            'media_outlet', 'published_date', 'overall_sentiment']].copy()
+    display_df.columns = ['WO #', 'Make', 'Model', 'Contact',
+                           'Media Outlet', 'Published Date', 'Sentiment']
+    display_df['Published Date'] = display_df['Published Date'].dt.strftime('%Y-%m-%d')
+    display_df = display_df.fillna('')
+    display_df = display_df.reset_index(drop=True)
+
+    gb = GridOptionsBuilder.from_dataframe(display_df)
+    gb.configure_selection(selection_mode="single", use_checkbox=False)
+    gb.configure_default_column(sortable=True, resizable=True)
+    gb.configure_column("WO #", minWidth=120)
+    gb.configure_column("Make", minWidth=90)
+    gb.configure_column("Model", minWidth=110)
+    gb.configure_column("Contact", minWidth=150)
+    gb.configure_column("Media Outlet", minWidth=180)
+    gb.configure_column("Published Date", minWidth=120)
+    gb.configure_column("Sentiment", minWidth=100)
+    gb.configure_pagination(paginationAutoPageSize=True)
+    grid_options = gb.build()
+
+    st.markdown("**Select a clip to view detailed analysis:**")
+    grid_response = AgGrid(
+        display_df,
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        height=350,
+        fit_columns_on_grid_load=True,
+        columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',
+        theme="alpine",
+        enable_enterprise_modules=True,
+        key="si_grid",
+    )
+
+    # ── Selection → Detail Fetch ────────────────────────────────────────
+    selected_rows = grid_response.selected_rows
+    has_selection = (
+        selected_rows is not None
+        and (len(selected_rows) > 0 if not hasattr(selected_rows, 'empty') else not selected_rows.empty)
+    )
+
+    if not has_selection:
+        return
+
+    # Get the selected WO and look up the clip id from the index
+    if hasattr(selected_rows, 'iloc'):
+        sel = selected_rows.iloc[0].to_dict()
+    else:
+        sel = selected_rows[0]
+
+    selected_wo = sel.get('WO #', '')
+    clip_record = next((c for c in clip_index if c.get('wo_number') == selected_wo), None)
+    if not clip_record:
+        st.error(f"Could not locate clip data for WO {selected_wo}")
+        return
+
+    # Stage 2: fetch the heavy sentiment payload for this one clip
+    with st.spinner(f"Loading analysis for WO {selected_wo}..."):
+        detail = fetch_detail(clip_record['id'])
+
+    raw_data = detail.get('sentiment_data_enhanced') if detail else None
+    if not raw_data:
+        st.warning("No enhanced sentiment data available for this clip.")
+        return
+
+    enhanced = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
+
+    # ── Render Full Analysis ────────────────────────────────────────────
+    _render_analysis(clip_record, enhanced)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Private rendering helpers
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _render_analysis(clip: dict, data: dict):
+    """Render the complete analysis view for a selected clip."""
     st.markdown("---")
-    
-    # Parse enhanced sentiment data
-    enhanced_data = {}
-    raw_data = selected_clip.get('sentiment_data_enhanced')
-    
-    if raw_data:
-        try:
-            if isinstance(raw_data, str):
-                enhanced_data = json.loads(raw_data)
+
+    # ── Clip Info Header ────────────────────────────────────────────────
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        contact = clip.get('contact') or 'Unknown'
+        st.markdown(f"**Media Contact**  \n{contact}")
+    with c2:
+        st.markdown(f"**Publication**  \n{clip.get('media_outlet') or 'N/A'}")
+    with c3:
+        st.markdown(f"**Vehicle**  \n{clip.get('make', '')} {clip.get('model', '')}")
+    with c4:
+        date_val = clip.get('published_date') or 'N/A'
+        st.markdown(f"**Date**  \n{date_val}")
+
+    # ── Executive Summary ───────────────────────────────────────────────
+    if data.get('summary'):
+        st.markdown("")
+        st.info(f"**Executive Summary:** {data['summary']}")
+
+    # ── Scores Row ──────────────────────────────────────────────────────
+    _render_scores(data)
+
+    # ── Tabbed Detail Sections ──────────────────────────────────────────
+    tab_overview, tab_features, tab_brand, tab_competitive, tab_raw = st.tabs([
+        "Overview", "Key Features", "Brand & Purchase",
+        "Competitive", "Raw Data",
+    ])
+
+    with tab_overview:
+        _render_overview(data)
+    with tab_features:
+        _render_features(data)
+    with tab_brand:
+        _render_brand_purchase(data)
+    with tab_competitive:
+        _render_competitive(data)
+    with tab_raw:
+        st.json(data)
+
+    # ── Action Bar ──────────────────────────────────────────────────────
+    st.markdown("---")
+    a1, a2, _ = st.columns([1, 1, 4])
+    with a1:
+        if st.button("Export Analysis", key="si_export"):
+            st.info("Export functionality coming soon.")
+    with a2:
+        url = clip.get('clip_url')
+        if url:
+            st.link_button("View Original Clip", url)
+
+
+def _render_scores(data: dict):
+    """Render the 4-column scores metrics row."""
+    scores = [
+        ('overall_score', 'Overall Score'),
+        ('relevance_score', 'Relevance'),
+        ('marketing_impact_score', 'Marketing Impact'),
+        ('brand_alignment', 'Brand Alignment'),
+    ]
+    has_any = any(k in data for k, _ in scores)
+    if not has_any:
+        return
+
+    cols = st.columns(4)
+    for i, (key, label) in enumerate(scores):
+        with cols[i]:
+            val = data.get(key)
+            if val is not None:
+                if isinstance(val, bool):
+                    st.metric(label, "Yes" if val else "No")
+                else:
+                    st.metric(label, f"{val}/10" if isinstance(val, (int, float)) else str(val))
+
+
+def _sentiment_color(sentiment: str) -> str:
+    """Return emoji indicator for a sentiment string."""
+    s = str(sentiment).lower()
+    if 'positive' in s:
+        return '🟢'
+    if 'negative' in s:
+        return '🔴'
+    return '🟡'
+
+
+def _render_overview(data: dict):
+    """Render sentiment classification and pros/cons."""
+    # Sentiment Classification
+    sent = data.get('sentiment_classification', {})
+    if sent:
+        st.markdown("#### Sentiment Classification")
+        c1, c2, c3 = st.columns([1, 1, 2])
+        with c1:
+            overall = sent.get('overall', 'N/A')
+            st.metric("Overall", f"{_sentiment_color(overall)} {overall.title()}")
+        with c2:
+            conf = sent.get('confidence', 'N/A')
+            display = f"{conf:.0%}" if isinstance(conf, (float, int)) else conf
+            st.metric("Confidence", display)
+        with c3:
+            rationale = sent.get('rationale', '')
+            if rationale:
+                st.markdown(f"**Rationale**")
+                st.markdown(f"> {rationale}")
+
+    # Recommendation
+    if data.get('recommendation'):
+        st.markdown("")
+        st.warning(f"**Recommendation:** {data['recommendation']}")
+
+    # Pros / Cons side-by-side
+    pros = data.get('pros', [])
+    cons = data.get('cons', [])
+    if pros or cons:
+        st.markdown("---")
+        st.markdown("#### Pros & Cons")
+        pc1, pc2 = st.columns(2)
+        with pc1:
+            if pros:
+                for p in pros:
+                    st.success(f"{p}")
             else:
-                enhanced_data = raw_data
-        except Exception as e:
-            st.error(f"Failed to parse sentiment data: {e}")
-            return
-    
-    if not enhanced_data:
-        st.warning("No enhanced sentiment data available.")
+                st.caption("No pros identified")
+        with pc2:
+            if cons:
+                for c in cons:
+                    st.warning(f"{c}")
+            else:
+                st.caption("No cons identified")
+
+
+def _render_features(data: dict):
+    """Render key features mentioned with quotes."""
+    features = data.get('key_features_mentioned', [])
+    if not features:
+        st.info("No key features identified in this clip.")
         return
-    
-    # Display each section of the JSON data exactly as it appears
-    
-    # 1. Sentiment Classification
-    if 'sentiment_classification' in enhanced_data:
-        st.markdown("### 📊 Sentiment Classification")
-        sent_class = enhanced_data['sentiment_classification']
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            overall = sent_class.get('overall', 'N/A')
-            color = {'positive': '🟢', 'neutral': '🟡', 'negative': '🔴'}.get(overall, '🔵')
-            st.metric("Overall", f"{color} {overall}")
-        
-        with col2:
-            confidence = sent_class.get('confidence', 'N/A')
-            st.metric("Confidence", f"{confidence:.2f}" if isinstance(confidence, (float, int)) else confidence)
-        
-        with col3:
-            st.markdown("**Rationale:**")
-            st.info(sent_class.get('rationale', 'No rationale provided'))
-    
-    # 2. Key Features Mentioned
-    if 'key_features_mentioned' in enhanced_data:
-        st.markdown("### 🔑 Key Features Mentioned")
-        features = enhanced_data['key_features_mentioned']
-        
-        if features:
-            for i, feature in enumerate(features[:10]):  # Limit to top 10
-                feature_name = feature.get('feature', 'Unknown')
-                sentiment = feature.get('sentiment', 'neutral')
-                quote = feature.get('quote', '')
-                context = feature.get('context', '')
-                
-                # Create a container for each feature
-                with st.container():
-                    # Title bar with feature name and sentiment
-                    if sentiment == 'positive':
-                        st.success(f"**Feature {i+1}: {feature_name.upper()}** ({sentiment})")
-                    elif sentiment == 'negative':
-                        st.warning(f"**Feature {i+1}: {feature_name.upper()}** ({sentiment})")
-                    else:
-                        st.info(f"**Feature {i+1}: {feature_name.upper()}** ({sentiment})")
-                    
-                    # Quote below if available
-                    if quote:
-                        st.markdown(f"**Quote:** *\"{quote}\"*")
-                    
-                    # Context if available
-                    if context and context != quote:  # Don't repeat if context is same as quote
-                        st.markdown(f"**Context:** {context}")
-                    
-                    st.markdown("")  # Add spacing
+
+    st.markdown(f"#### {len(features)} Key Features Mentioned")
+    st.markdown("")
+
+    for i, feat in enumerate(features):
+        name = feat.get('feature', 'Unknown')
+        sentiment = feat.get('sentiment', 'neutral')
+        quote = feat.get('quote', '')
+        context = feat.get('context', '')
+
+        icon = _sentiment_color(sentiment)
+        label = f"**{i+1}. {name}** {icon} _{sentiment}_"
+
+        if sentiment == 'positive':
+            st.success(label)
+        elif sentiment == 'negative':
+            st.warning(label)
         else:
-            st.info("No features found")
-    
-    # 3. Brand Attributes
-    if 'brand_attributes_identified' in enhanced_data:
-        st.markdown("### 🏷️ Brand Attributes Identified")
-        attributes = enhanced_data['brand_attributes_identified']
-        
-        if attributes:
-            attr_cols = st.columns(min(len(attributes), 3))
-            for i, attr in enumerate(attributes):
-                with attr_cols[i % 3]:
-                    st.info(f"**{attr}**")
-        else:
-            st.info("No brand attributes identified")
-    
-    # 4. Purchase Drivers
-    if 'purchase_drivers' in enhanced_data:
-        st.markdown("### 💰 Purchase Drivers")
-        drivers = enhanced_data['purchase_drivers']
-        
-        if drivers:
-            for i, driver in enumerate(drivers):
-                reason = driver.get('reason', 'Unknown')
-                sentiment = driver.get('sentiment', 'neutral')
-                strength = driver.get('strength', 'unknown')
-                quote = driver.get('quote', '')
-                
-                # Create a container for each driver
-                with st.container():
-                    # Title bar with reason and sentiment
-                    if sentiment == 'positive':
-                        st.success(f"**Driver {i+1}: {reason.upper()}** ({sentiment})")
-                    elif sentiment == 'negative':
-                        st.warning(f"**Driver {i+1}: {reason.upper()}** ({sentiment})")
-                    else:
-                        st.info(f"**Driver {i+1}: {reason.upper()}** ({sentiment})")
-                    
-                    # Details below
-                    col1, col2 = st.columns([1, 3])
-                    with col1:
-                        st.markdown(f"**Strength:** {strength}")
-                    with col2:
-                        if quote:
-                            st.markdown(f"**Quote:** *\"{quote}\"*")
-                    
-                    st.markdown("")  # Add spacing
-        else:
-            st.info("No purchase drivers identified")
-    
-    # 5. Competitive Context
-    if 'competitive_context' in enhanced_data:
-        st.markdown("### 🚗 Competitive Context")
-        competitive = enhanced_data['competitive_context']
-        
-        if isinstance(competitive, dict):
-            # Direct Comparisons
-            if 'direct_comparisons' in competitive:
-                st.markdown("#### Direct Comparisons")
-                comparisons = competitive['direct_comparisons']
-                for i, comp in enumerate(comparisons):
-                    # Parse the comparison to extract competitor name
-                    if ':' in comp:
-                        competitor, details = comp.split(':', 1)
-                        st.info(f"**{competitor.strip().upper()}**")
-                        st.markdown(f"*{details.strip()}*")
-                    else:
-                        st.info(f"**Comparison {i+1}**")
-                        st.markdown(f"*{comp}*")
-                    st.markdown("")  # Add spacing
-            
-            # Market Positioning
-            if 'market_positioning' in competitive:
-                st.markdown("#### Market Positioning")
-                st.success(competitive['market_positioning'])
-            
-            # Any other competitive fields
-            for key, value in competitive.items():
-                if key not in ['direct_comparisons', 'market_positioning']:
-                    st.markdown(f"#### {key.replace('_', ' ').title()}")
-                    if isinstance(value, list):
-                        for item in value:
-                            st.write(f"• {item}")
-                    else:
-                        st.write(value)
-        
-        elif isinstance(competitive, str):
-            st.info(competitive)
-        else:
-            st.info("No competitive context found")
-    
-    # Also check for direct competitors_mentioned field
-    elif 'competitors_mentioned' in enhanced_data:
-        st.markdown("### 🚗 Competitors Mentioned")
-        for comp in enhanced_data['competitors_mentioned']:
-            st.write(f"• {comp}")
-    
-    # Pros and Cons removed per user request - data is covered in other sections
-    
-    # 7. Summary
-    if 'summary' in enhanced_data:
-        st.markdown("### 📝 Summary")
-        st.info(enhanced_data['summary'])
-    
-    # 8. Additional scores
-    if 'overall_score' in enhanced_data or 'relevance_score' in enhanced_data:
-        st.markdown("### 📊 Additional Scores")
-        score_cols = st.columns(4)
-        
-        scores = [
-            ('overall_score', 'Overall Score'),
-            ('relevance_score', 'Relevance Score'),
-            ('marketing_impact_score', 'Marketing Impact'),
-            ('brand_alignment', 'Brand Alignment')
-        ]
-        
-        for i, (key, label) in enumerate(scores):
-            if key in enhanced_data:
-                with score_cols[i]:
-                    value = enhanced_data[key]
-                    st.metric(label, f"{value}/10" if value else "N/A")
-    
-    # 9. Recommendation
-    if 'recommendation' in enhanced_data:
-        st.markdown("### 💼 Recommendation")
-        st.warning(enhanced_data['recommendation'])
-    
-    # 10. Any other fields in the JSON
-    st.markdown("### 📋 Additional Data")
-    
-    # Show any fields we haven't displayed yet
-    displayed_fields = {
-        'sentiment_classification', 'key_features_mentioned', 'brand_attributes_identified',
-        'purchase_drivers', 'competitive_context', 'competitors_mentioned', 'pros', 'cons',
-        'summary', 'overall_score', 'relevance_score', 'marketing_impact_score',
-        'brand_alignment', 'recommendation'
-    }
-    
-    other_fields = {k: v for k, v in enhanced_data.items() if k not in displayed_fields and v}
-    
-    if other_fields:
-        for field, value in other_fields.items():
-            with st.expander(f"📌 {field.replace('_', ' ').title()}", expanded=False):
-                if isinstance(value, (dict, list)):
-                    st.json(value)
+            st.info(label)
+
+        if quote:
+            st.markdown(f'> *"{quote}"*')
+        if context and context != quote:
+            st.caption(f"Context: {context}")
+        st.markdown("")
+
+
+def _render_brand_purchase(data: dict):
+    """Render brand attributes and purchase drivers."""
+    # Brand Attributes
+    attrs = data.get('brand_attributes_identified', data.get('brand_attributes_captured', []))
+    if attrs:
+        st.markdown("#### Brand Attributes")
+        if isinstance(attrs, list) and attrs:
+            if isinstance(attrs[0], dict):
+                # Structured: {attribute, sentiment, evidence}
+                for attr in attrs:
+                    name = attr.get('attribute', str(attr))
+                    sentiment = attr.get('sentiment', '')
+                    evidence = attr.get('evidence', '')
+                    icon = _sentiment_color(sentiment) if sentiment else ''
+                    st.markdown(f"- **{name}** {icon} {sentiment}")
+                    if evidence:
+                        st.markdown(f'  > *"{evidence}"*')
+            else:
+                # Simple list of strings
+                cols = st.columns(min(len(attrs), 3))
+                for i, attr in enumerate(attrs):
+                    with cols[i % 3]:
+                        st.info(f"**{attr}**")
+        st.markdown("---")
+
+    # Purchase Drivers
+    drivers = data.get('purchase_drivers', [])
+    if drivers:
+        st.markdown("#### Purchase Drivers")
+        st.markdown("")
+        for i, driver in enumerate(drivers):
+            reason = driver.get('reason', 'Unknown')
+            sentiment = driver.get('sentiment', 'neutral')
+            strength = driver.get('strength', '')
+            quote = driver.get('quote', '')
+
+            icon = _sentiment_color(sentiment)
+            header = f"**{i+1}. {reason}** {icon}"
+            if strength:
+                header += f" | Strength: _{strength}_"
+
+            if sentiment == 'positive':
+                st.success(header)
+            elif sentiment == 'negative':
+                st.warning(header)
+            else:
+                st.info(header)
+
+            if quote:
+                st.markdown(f'> *"{quote}"*')
+            st.markdown("")
+
+    if not attrs and not drivers:
+        st.info("No brand attributes or purchase drivers identified.")
+
+
+def _render_competitive(data: dict):
+    """Render competitive context."""
+    competitive = data.get('competitive_context', {})
+
+    if isinstance(competitive, dict) and competitive:
+        # Direct Comparisons
+        comparisons = competitive.get('direct_comparisons', [])
+        if comparisons:
+            st.markdown("#### Direct Comparisons")
+            for comp in comparisons:
+                if isinstance(comp, str) and ':' in comp:
+                    competitor, details = comp.split(':', 1)
+                    st.markdown(f"**{competitor.strip()}**")
+                    st.markdown(f"> {details.strip()}")
+                else:
+                    st.markdown(f"- {comp}")
+                st.markdown("")
+
+        # Market Positioning
+        positioning = competitive.get('market_positioning', '')
+        if positioning:
+            st.markdown("#### Market Positioning")
+            st.success(positioning)
+
+        # Any other competitive fields
+        other_keys = set(competitive.keys()) - {'direct_comparisons', 'market_positioning'}
+        for key in sorted(other_keys):
+            value = competitive[key]
+            if value:
+                st.markdown(f"#### {key.replace('_', ' ').title()}")
+                if isinstance(value, list):
+                    for item in value:
+                        st.markdown(f"- {item}")
                 else:
                     st.write(value)
-    
-    # Actions and raw data
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("📥 Export Analysis", key="export_analysis"):
-            st.info("Export functionality coming soon...")
-    
-    with col2:
-        if st.button("🔗 View Clip", key="view_clip_url"):
-            url = selected_clip.get('clip_url')
-            if url:
-                st.markdown(f"[Open clip in new tab]({url})")
-    
-    with col3:
-        with st.expander("🔧 View Complete Raw JSON"):
-            st.json(enhanced_data)
+
+    elif isinstance(competitive, str) and competitive:
+        st.info(competitive)
+
+    # Fallback: competitors_mentioned at root level
+    elif 'competitors_mentioned' in data:
+        st.markdown("#### Competitors Mentioned")
+        for comp in data['competitors_mentioned']:
+            st.markdown(f"- {comp}")
+
+    else:
+        st.info("No competitive context identified.")
