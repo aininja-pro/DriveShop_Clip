@@ -2,6 +2,7 @@
 Strategic Intelligence Dashboard - Zero-query initial load.
 All database queries are deferred until the user searches.
 """
+import io
 import json
 import pandas as pd
 import streamlit as st
@@ -15,10 +16,6 @@ def display_strategic_intelligence_tab(search_clips, fetch_detail):
     """
     Display the Strategic Intelligence tab. No database queries run
     until the user types a search or clicks Search.
-
-    Args:
-        search_clips: Callable(make, sentiment, search_text) -> list of clip dicts.
-        fetch_detail: Callable(clip_id) -> dict with sentiment_data_enhanced.
     """
     # ── Header ──────────────────────────────────────────────────────────
     st.markdown(
@@ -29,7 +26,7 @@ def display_strategic_intelligence_tab(search_clips, fetch_detail):
     )
     st.markdown("---")
 
-    # ── Search Bar (no DB queries — just UI inputs) ─────────────────────
+    # ── Search Bar ──────────────────────────────────────────────────────
     s1, s2, s3, s4 = st.columns([3, 1.5, 1.5, 1])
 
     with s1:
@@ -62,7 +59,6 @@ def display_strategic_intelligence_tab(search_clips, fetch_detail):
     sentiment_filter = selected_sentiment if selected_sentiment != "All" else ''
     has_input = search_text or make_filter or sentiment_filter
 
-    # Store search state so results persist after clicking a grid row
     if search_clicked and has_input:
         st.session_state['si_last_search'] = (make_filter, sentiment_filter, search_text.strip())
 
@@ -91,17 +87,18 @@ def display_strategic_intelligence_tab(search_clips, fetch_detail):
     df = pd.DataFrame(results)
     df['published_date'] = pd.to_datetime(df['published_date'], errors='coerce')
 
-    # ── Summary Metrics ─────────────────────────────────────────────────
-    st.markdown("---")
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        st.metric("Results", len(df))
-    with m2:
-        st.metric("Positive", int((df['overall_sentiment'].str.lower() == 'positive').sum()))
-    with m3:
-        st.metric("Neutral", int((df['overall_sentiment'].str.lower() == 'neutral').sum()))
-    with m4:
-        st.metric("Negative", int((df['overall_sentiment'].str.lower() == 'negative').sum()))
+    # ── Summary Metrics (only when enough results to be useful) ─────────
+    if len(df) > 3:
+        st.markdown("---")
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.metric("Results", len(df))
+        with m2:
+            st.metric("Positive", int((df['overall_sentiment'].str.lower() == 'positive').sum()))
+        with m3:
+            st.metric("Neutral", int((df['overall_sentiment'].str.lower() == 'neutral').sum()))
+        with m4:
+            st.metric("Negative", int((df['overall_sentiment'].str.lower() == 'negative').sum()))
 
     # ── Results Table ───────────────────────────────────────────────────
     display_df = df[['wo_number', 'make', 'model', 'contact',
@@ -125,12 +122,15 @@ def display_strategic_intelligence_tab(search_clips, fetch_detail):
     gb.configure_pagination(paginationAutoPageSize=True)
     grid_options = gb.build()
 
+    # Dynamic height: 42px per row + 56px header, capped at 300px
+    grid_height = min(len(display_df) * 42 + 56, 300)
+
     st.markdown("**Select a clip to view detailed analysis:**")
     grid_response = AgGrid(
         display_df,
         gridOptions=grid_options,
         update_mode=GridUpdateMode.SELECTION_CHANGED,
-        height=350,
+        height=grid_height,
         fit_columns_on_grid_load=True,
         columns_auto_size_mode='FIT_ALL_COLUMNS_TO_VIEW',
         theme="alpine",
@@ -168,17 +168,18 @@ def display_strategic_intelligence_tab(search_clips, fetch_detail):
         return
 
     enhanced = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
-    _render_analysis(clip_record, enhanced)
+    _render_analysis(clip_record, enhanced, selected_wo)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Private rendering helpers
+# Analysis rendering
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _render_analysis(clip: dict, data: dict):
+def _render_analysis(clip: dict, data: dict, wo_number: str):
     """Render the complete analysis view for a selected clip."""
     st.markdown("---")
 
+    # ── Clip Info Header ────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(f"**Media Contact**  \n{clip.get('contact') or 'Unknown'}")
@@ -189,12 +190,15 @@ def _render_analysis(clip: dict, data: dict):
     with c4:
         st.markdown(f"**Date**  \n{clip.get('published_date') or 'N/A'}")
 
+    # ── Executive Summary ───────────────────────────────────────────────
     if data.get('summary'):
         st.markdown("")
         st.info(f"**Executive Summary:** {data['summary']}")
 
+    # ── Scores Row ──────────────────────────────────────────────────────
     _render_scores(data)
 
+    # ── Tabbed Detail Sections ──────────────────────────────────────────
     tab_overview, tab_features, tab_brand, tab_competitive, tab_raw = st.tabs([
         "Overview", "Key Features", "Brand & Purchase",
         "Competitive", "Raw Data",
@@ -211,15 +215,25 @@ def _render_analysis(clip: dict, data: dict):
     with tab_raw:
         st.json(data)
 
+    # ── Action Bar ──────────────────────────────────────────────────────
     st.markdown("---")
-    a1, a2, _ = st.columns([1, 1, 4])
+    a1, a2, _ = st.columns([1.5, 1, 3.5])
     with a1:
-        if st.button("Export Analysis", key="si_export"):
-            st.info("Export functionality coming soon.")
+        pdf_bytes = _generate_pdf(clip, data)
+        st.download_button(
+            "Download PDF Report",
+            pdf_bytes,
+            file_name=f"SI_Report_{wo_number}.pdf",
+            mime="application/pdf",
+            key="si_pdf_download",
+        )
     with a2:
         url = clip.get('clip_url')
         if url:
             st.link_button("View Original Clip", url)
+
+    # Bottom padding
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 
 def _render_scores(data: dict):
@@ -416,3 +430,205 @@ def _render_competitive(data: dict):
 
     else:
         st.info("No competitive context identified.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PDF Generation
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _generate_pdf(clip: dict, data: dict) -> bytes:
+    """Generate a professional PDF summary of the sentiment analysis."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+
+    # ── Title ───────────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(25, 118, 210)  # #1976d2
+    pdf.cell(0, 12, "Strategic Intelligence Report", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_draw_color(25, 118, 210)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(6)
+
+    # ── Clip Info ───────────────────────────────────────────────────────
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(0, 0, 0)
+
+    vehicle = f"{clip.get('make', '')} {clip.get('model', '')}".strip()
+    info_rows = [
+        ("Work Order", clip.get('wo_number', 'N/A')),
+        ("Vehicle", vehicle or 'N/A'),
+        ("Media Contact", clip.get('contact') or 'N/A'),
+        ("Publication", clip.get('media_outlet') or 'N/A'),
+        ("Published Date", str(clip.get('published_date') or 'N/A')),
+    ]
+
+    pdf.set_fill_color(240, 245, 250)
+    for i, (label, value) in enumerate(info_rows):
+        fill = i % 2 == 0
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(45, 7, label, fill=fill)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 7, str(value), new_x="LMARGIN", new_y="NEXT", fill=fill)
+
+    pdf.ln(4)
+
+    # ── Executive Summary ───────────────────────────────────────────────
+    summary = data.get('summary', '')
+    if summary:
+        _pdf_section_header(pdf, "Executive Summary")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 5, _clean_text(summary))
+        pdf.ln(4)
+
+    # ── Sentiment Classification ────────────────────────────────────────
+    sent = data.get('sentiment_classification', {})
+    if sent:
+        _pdf_section_header(pdf, "Sentiment Classification")
+        pdf.set_font("Helvetica", "", 10)
+        overall = sent.get('overall', 'N/A')
+        confidence = sent.get('confidence', 'N/A')
+        if isinstance(confidence, (float, int)):
+            confidence = f"{confidence:.0%}"
+        pdf.cell(0, 6, f"Overall: {overall}    |    Confidence: {confidence}", new_x="LMARGIN", new_y="NEXT")
+
+        rationale = sent.get('rationale', '')
+        if rationale:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(80, 80, 80)
+            pdf.multi_cell(0, 5, _clean_text(rationale))
+            pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+
+    # ── Scores ──────────────────────────────────────────────────────────
+    score_items = []
+    for key, label in [('relevance_score', 'Relevance'), ('overall_score', 'Overall Score'),
+                        ('marketing_impact_score', 'Marketing Impact'), ('brand_alignment', 'Brand Alignment')]:
+        val = data.get(key)
+        if val is not None:
+            display_val = "Yes" if isinstance(val, bool) and val else ("No" if isinstance(val, bool) else f"{val}/10")
+            score_items.append(f"{label}: {display_val}")
+
+    if score_items:
+        _pdf_section_header(pdf, "Scores")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, "    |    ".join(score_items), new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+    # ── Key Features ────────────────────────────────────────────────────
+    features = data.get('key_features_mentioned', [])
+    if features:
+        _pdf_section_header(pdf, f"Key Features ({len(features)})")
+        for feat in features:
+            name = feat.get('feature', 'Unknown')
+            sentiment = feat.get('sentiment', 'neutral')
+            quote = feat.get('quote', '')
+
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 6, f"  {name} ({sentiment})", new_x="LMARGIN", new_y="NEXT")
+            if quote:
+                pdf.set_font("Helvetica", "I", 9)
+                pdf.set_text_color(80, 80, 80)
+                pdf.cell(5)  # indent
+                pdf.multi_cell(0, 5, _clean_text(f'"{quote}"'))
+                pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+
+    # ── Brand Attributes ────────────────────────────────────────────────
+    attrs = data.get('brand_attributes_identified', data.get('brand_attributes_captured', []))
+    if attrs:
+        _pdf_section_header(pdf, "Brand Attributes")
+        pdf.set_font("Helvetica", "", 10)
+        for attr in attrs:
+            if isinstance(attr, dict):
+                name = attr.get('attribute', str(attr))
+                sentiment = attr.get('sentiment', '')
+                pdf.cell(0, 6, f"  {name} ({sentiment})" if sentiment else f"  {name}", new_x="LMARGIN", new_y="NEXT")
+            else:
+                pdf.cell(0, 6, f"  {attr}", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+    # ── Purchase Drivers ────────────────────────────────────────────────
+    drivers = data.get('purchase_drivers', [])
+    if drivers:
+        _pdf_section_header(pdf, f"Purchase Drivers ({len(drivers)})")
+        for driver in drivers:
+            reason = driver.get('reason', 'Unknown')
+            sentiment = driver.get('sentiment', 'neutral')
+            strength = driver.get('strength', '')
+            quote = driver.get('quote', '')
+
+            pdf.set_font("Helvetica", "B", 10)
+            label = f"  {reason} ({sentiment})"
+            if strength:
+                label += f" - {strength}"
+            pdf.cell(0, 6, label, new_x="LMARGIN", new_y="NEXT")
+            if quote:
+                pdf.set_font("Helvetica", "I", 9)
+                pdf.set_text_color(80, 80, 80)
+                pdf.cell(5)
+                pdf.multi_cell(0, 5, _clean_text(f'"{quote}"'))
+                pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+
+    # ── Competitive Context ─────────────────────────────────────────────
+    competitive = data.get('competitive_context', {})
+    if isinstance(competitive, dict) and competitive:
+        _pdf_section_header(pdf, "Competitive Context")
+        pdf.set_font("Helvetica", "", 10)
+
+        comparisons = competitive.get('direct_comparisons', [])
+        if comparisons:
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 6, "Direct Comparisons:", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("Helvetica", "", 10)
+            for comp in comparisons:
+                pdf.cell(5)
+                pdf.multi_cell(0, 5, _clean_text(f"  {comp}"))
+
+        positioning = competitive.get('market_positioning', '')
+        if positioning:
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 6, "Market Positioning:", new_x="LMARGIN", new_y="NEXT")
+            pdf.set_font("Helvetica", "", 10)
+            pdf.multi_cell(0, 5, _clean_text(positioning))
+
+    # ── Footer ──────────────────────────────────────────────────────────
+    pdf.ln(8)
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(0, 5, "Generated by DriveShop Strategic Intelligence Dashboard", align="C")
+
+    return pdf.output()
+
+
+def _pdf_section_header(pdf, title: str):
+    """Render a styled section header in the PDF."""
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(25, 118, 210)
+    pdf.cell(0, 8, title, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(0, 0, 0)
+
+
+def _clean_text(text: str) -> str:
+    """Clean text for PDF output — remove characters that fpdf can't render."""
+    if not text:
+        return ''
+    # Replace common unicode characters with ASCII equivalents
+    replacements = {
+        '\u2018': "'", '\u2019': "'",  # smart single quotes
+        '\u201c': '"', '\u201d': '"',  # smart double quotes
+        '\u2013': '-', '\u2014': '--',  # en/em dash
+        '\u2026': '...',  # ellipsis
+        '\u00a0': ' ',  # non-breaking space
+    }
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    # Remove any remaining non-latin1 characters
+    return text.encode('latin-1', errors='replace').decode('latin-1')
