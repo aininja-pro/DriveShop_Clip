@@ -1,6 +1,6 @@
 """
-Strategic Intelligence Dashboard - Search-driven sentiment analysis viewer.
-Loads filter options instantly, queries clips only when user searches/filters.
+Strategic Intelligence Dashboard - Zero-query initial load.
+All database queries are deferred until the user searches.
 """
 import json
 import pandas as pd
@@ -11,70 +11,80 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-def display_strategic_intelligence_tab(search_clips, load_filter_options, fetch_detail):
+def display_strategic_intelligence_tab(search_clips, fetch_detail):
     """
-    Display the Strategic Intelligence tab with search-driven clip loading.
+    Display the Strategic Intelligence tab. No database queries run
+    until the user types a search or clicks Search.
 
     Args:
         search_clips: Callable(make, sentiment, search_text) -> list of clip dicts.
-        load_filter_options: Callable() -> (makes_list, sentiments_list, total_count).
         fetch_detail: Callable(clip_id) -> dict with sentiment_data_enhanced.
     """
     # ── Header ──────────────────────────────────────────────────────────
     st.markdown(
         '<h2 style="margin-bottom: 0.2rem;">Strategic Intelligence Dashboard</h2>'
         '<p style="color: #6c757d; margin-top: 0; margin-bottom: 1rem;">'
-        'Search, filter, and explore enhanced sentiment analysis across all reviewed clips</p>',
+        'Search and explore enhanced sentiment analysis across all reviewed clips</p>',
         unsafe_allow_html=True,
     )
     st.markdown("---")
 
-    # ── Load filter options (lightweight) ───────────────────────────────
-    makes, sentiments, total_count = load_filter_options()
+    # ── Search Bar (no DB queries — just UI inputs) ─────────────────────
+    s1, s2, s3, s4 = st.columns([3, 1.5, 1.5, 1])
 
-    # ── Filter Bar ──────────────────────────────────────────────────────
-    f1, f2, f3, f4 = st.columns([1.5, 1.5, 3, 1])
-
-    with f1:
-        selected_make = st.selectbox("Make / Brand", ["All"] + makes, key="si_make")
-
-    with f2:
-        selected_sentiment = st.selectbox("Sentiment", ["All"] + sentiments, key="si_sentiment")
-
-    with f3:
+    with s1:
         search_text = st.text_input(
             "Search WO#, Contact, or Media Outlet",
-            placeholder="e.g. 1261373 or Motor Trend",
+            placeholder="e.g. 1261373, Motor Trend, John Smith",
             key="si_search",
         )
 
-    with f4:
+    with s2:
+        make_input = st.text_input(
+            "Filter by Make",
+            placeholder="e.g. Volvo, Ford",
+            key="si_make",
+        )
+
+    with s3:
+        selected_sentiment = st.selectbox(
+            "Sentiment",
+            ["All", "positive", "neutral", "negative"],
+            key="si_sentiment",
+        )
+
+    with s4:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Refresh", key="si_refresh"):
-            st.cache_data.clear()
-            st.rerun()
+        search_clicked = st.button("Search", type="primary", key="si_go")
 
-    # ── Run search ──────────────────────────────────────────────────────
-    make_filter = selected_make if selected_make != "All" else ''
+    # ── Only query when user has provided input ─────────────────────────
+    make_filter = make_input.strip() if make_input else ''
     sentiment_filter = selected_sentiment if selected_sentiment != "All" else ''
+    has_input = search_text or make_filter or sentiment_filter
 
-    has_filters = make_filter or sentiment_filter or search_text
+    # Store search state so results persist after clicking a grid row
+    if search_clicked and has_input:
+        st.session_state['si_last_search'] = (make_filter, sentiment_filter, search_text.strip())
 
-    if not has_filters:
-        st.markdown("---")
-        m1, m2 = st.columns([1, 3])
-        with m1:
-            st.metric("Total Analyzed Clips", total_count)
-        with m2:
-            st.info("Use the filters above to search clips, or select a Make/Brand to browse. "
-                    "You can also search by WO number, contact name, or media outlet.")
+    last_search = st.session_state.get('si_last_search')
+
+    if not last_search:
+        st.markdown("")
+        st.info(
+            "Enter a **WO number**, **contact name**, or **media outlet** above and click **Search** "
+            "to find clips with enhanced sentiment analysis.  \n"
+            "You can also filter by **Make** (e.g. Volvo) or **Sentiment**."
+        )
         return
 
-    with st.spinner("Searching clips..."):
-        results = search_clips(make_filter, sentiment_filter, search_text)
+    # ── Run the search ──────────────────────────────────────────────────
+    mf, sf, st_text = last_search
+
+    with st.spinner("Searching..."):
+        results = search_clips(mf, sf, st_text)
 
     if not results:
-        st.warning("No clips match your search. Try different filters.")
+        st.warning("No clips match your search. Try different terms.")
         return
 
     # ── Build DataFrame ─────────────────────────────────────────────────
@@ -93,7 +103,7 @@ def display_strategic_intelligence_tab(search_clips, load_filter_options, fetch_
     with m4:
         st.metric("Negative", int((df['overall_sentiment'].str.lower() == 'negative').sum()))
 
-    # ── Results Table (AgGrid) ──────────────────────────────────────────
+    # ── Results Table ───────────────────────────────────────────────────
     display_df = df[['wo_number', 'make', 'model', 'contact',
                       'media_outlet', 'published_date', 'overall_sentiment']].copy()
     display_df.columns = ['WO #', 'Make', 'Model', 'Contact',
@@ -138,7 +148,6 @@ def display_strategic_intelligence_tab(search_clips, load_filter_options, fetch_
     if not has_selection:
         return
 
-    # Get the selected WO and look up the clip id
     if hasattr(selected_rows, 'iloc'):
         sel = selected_rows.iloc[0].to_dict()
     else:
@@ -150,7 +159,6 @@ def display_strategic_intelligence_tab(search_clips, load_filter_options, fetch_
         st.error(f"Could not locate clip data for WO {selected_wo}")
         return
 
-    # Stage 2: fetch the heavy sentiment payload for this one clip
     with st.spinner(f"Loading analysis for WO {selected_wo}..."):
         detail = fetch_detail(clip_record['id'])
 
@@ -160,8 +168,6 @@ def display_strategic_intelligence_tab(search_clips, load_filter_options, fetch_
         return
 
     enhanced = json.loads(raw_data) if isinstance(raw_data, str) else raw_data
-
-    # ── Render Full Analysis ────────────────────────────────────────────
     _render_analysis(clip_record, enhanced)
 
 
@@ -173,28 +179,22 @@ def _render_analysis(clip: dict, data: dict):
     """Render the complete analysis view for a selected clip."""
     st.markdown("---")
 
-    # ── Clip Info Header ────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        contact = clip.get('contact') or 'Unknown'
-        st.markdown(f"**Media Contact**  \n{contact}")
+        st.markdown(f"**Media Contact**  \n{clip.get('contact') or 'Unknown'}")
     with c2:
         st.markdown(f"**Publication**  \n{clip.get('media_outlet') or 'N/A'}")
     with c3:
         st.markdown(f"**Vehicle**  \n{clip.get('make', '')} {clip.get('model', '')}")
     with c4:
-        date_val = clip.get('published_date') or 'N/A'
-        st.markdown(f"**Date**  \n{date_val}")
+        st.markdown(f"**Date**  \n{clip.get('published_date') or 'N/A'}")
 
-    # ── Executive Summary ───────────────────────────────────────────────
     if data.get('summary'):
         st.markdown("")
         st.info(f"**Executive Summary:** {data['summary']}")
 
-    # ── Scores Row ──────────────────────────────────────────────────────
     _render_scores(data)
 
-    # ── Tabbed Detail Sections ──────────────────────────────────────────
     tab_overview, tab_features, tab_brand, tab_competitive, tab_raw = st.tabs([
         "Overview", "Key Features", "Brand & Purchase",
         "Competitive", "Raw Data",
@@ -211,7 +211,6 @@ def _render_analysis(clip: dict, data: dict):
     with tab_raw:
         st.json(data)
 
-    # ── Action Bar ──────────────────────────────────────────────────────
     st.markdown("---")
     a1, a2, _ = st.columns([1, 1, 4])
     with a1:
@@ -224,17 +223,14 @@ def _render_analysis(clip: dict, data: dict):
 
 
 def _render_scores(data: dict):
-    """Render the 4-column scores metrics row."""
     scores = [
         ('overall_score', 'Overall Score'),
         ('relevance_score', 'Relevance'),
         ('marketing_impact_score', 'Marketing Impact'),
         ('brand_alignment', 'Brand Alignment'),
     ]
-    has_any = any(k in data for k, _ in scores)
-    if not has_any:
+    if not any(k in data for k, _ in scores):
         return
-
     cols = st.columns(4)
     for i, (key, label) in enumerate(scores):
         with cols[i]:
@@ -247,7 +243,6 @@ def _render_scores(data: dict):
 
 
 def _sentiment_color(sentiment: str) -> str:
-    """Return emoji indicator for a sentiment string."""
     s = str(sentiment).lower()
     if 'positive' in s:
         return '🟢'
@@ -257,8 +252,6 @@ def _sentiment_color(sentiment: str) -> str:
 
 
 def _render_overview(data: dict):
-    """Render sentiment classification and pros/cons."""
-    # Sentiment Classification
     sent = data.get('sentiment_classification', {})
     if sent:
         st.markdown("#### Sentiment Classification")
@@ -273,15 +266,13 @@ def _render_overview(data: dict):
         with c3:
             rationale = sent.get('rationale', '')
             if rationale:
-                st.markdown(f"**Rationale**")
+                st.markdown("**Rationale**")
                 st.markdown(f"> {rationale}")
 
-    # Recommendation
     if data.get('recommendation'):
         st.markdown("")
         st.warning(f"**Recommendation:** {data['recommendation']}")
 
-    # Pros / Cons side-by-side
     pros = data.get('pros', [])
     cons = data.get('cons', [])
     if pros or cons:
@@ -289,21 +280,18 @@ def _render_overview(data: dict):
         st.markdown("#### Pros & Cons")
         pc1, pc2 = st.columns(2)
         with pc1:
-            if pros:
-                for p in pros:
-                    st.success(f"{p}")
-            else:
+            for p in (pros or []):
+                st.success(f"{p}")
+            if not pros:
                 st.caption("No pros identified")
         with pc2:
-            if cons:
-                for c in cons:
-                    st.warning(f"{c}")
-            else:
+            for c in (cons or []):
+                st.warning(f"{c}")
+            if not cons:
                 st.caption("No cons identified")
 
 
 def _render_features(data: dict):
-    """Render key features mentioned with quotes."""
     features = data.get('key_features_mentioned', [])
     if not features:
         st.info("No key features identified in this clip.")
@@ -336,14 +324,11 @@ def _render_features(data: dict):
 
 
 def _render_brand_purchase(data: dict):
-    """Render brand attributes and purchase drivers."""
-    # Brand Attributes
     attrs = data.get('brand_attributes_identified', data.get('brand_attributes_captured', []))
     if attrs:
         st.markdown("#### Brand Attributes")
         if isinstance(attrs, list) and attrs:
             if isinstance(attrs[0], dict):
-                # Structured: {attribute, sentiment, evidence}
                 for attr in attrs:
                     name = attr.get('attribute', str(attr))
                     sentiment = attr.get('sentiment', '')
@@ -353,14 +338,12 @@ def _render_brand_purchase(data: dict):
                     if evidence:
                         st.markdown(f'  > *"{evidence}"*')
             else:
-                # Simple list of strings
                 cols = st.columns(min(len(attrs), 3))
                 for i, attr in enumerate(attrs):
                     with cols[i % 3]:
                         st.info(f"**{attr}**")
         st.markdown("---")
 
-    # Purchase Drivers
     drivers = data.get('purchase_drivers', [])
     if drivers:
         st.markdown("#### Purchase Drivers")
@@ -392,11 +375,9 @@ def _render_brand_purchase(data: dict):
 
 
 def _render_competitive(data: dict):
-    """Render competitive context."""
     competitive = data.get('competitive_context', {})
 
     if isinstance(competitive, dict) and competitive:
-        # Direct Comparisons
         comparisons = competitive.get('direct_comparisons', [])
         if comparisons:
             st.markdown("#### Direct Comparisons")
@@ -409,13 +390,11 @@ def _render_competitive(data: dict):
                     st.markdown(f"- {comp}")
                 st.markdown("")
 
-        # Market Positioning
         positioning = competitive.get('market_positioning', '')
         if positioning:
             st.markdown("#### Market Positioning")
             st.success(positioning)
 
-        # Any other competitive fields
         other_keys = set(competitive.keys()) - {'direct_comparisons', 'market_positioning'}
         for key in sorted(other_keys):
             value = competitive[key]
@@ -430,7 +409,6 @@ def _render_competitive(data: dict):
     elif isinstance(competitive, str) and competitive:
         st.info(competitive)
 
-    # Fallback: competitors_mentioned at root level
     elif 'competitors_mentioned' in data:
         st.markdown("#### Competitors Mentioned")
         for comp in data['competitors_mentioned']:

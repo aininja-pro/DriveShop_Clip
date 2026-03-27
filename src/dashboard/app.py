@@ -6200,9 +6200,9 @@ with analysis_tab:
     try:
         db = get_cached_database()
 
-        # Search clips by filters — only runs when user applies filters
+        # All queries are deferred — nothing runs until user searches
         @st.cache_data(ttl=300, show_spinner=False)
-        def search_sentiment_clips(make_filter: str = '', sentiment_filter: str = '', search_text: str = ''):
+        def _si_search(make_filter: str = '', sentiment_filter: str = '', search_text: str = ''):
             query = (
                 db.supabase
                 .table('clips')
@@ -6222,18 +6222,8 @@ with analysis_tab:
             result = query.order('published_date', desc=True).limit(200).execute()
             return result.data if result.data else []
 
-        # Lightweight query for filter dropdowns
         @st.cache_data(ttl=600, show_spinner=False)
-        def load_filter_options():
-            result = db.supabase.table('clips').select('make, overall_sentiment').not_.is_('sentiment_data_enhanced', 'null').execute()
-            makes = sorted(set(r['make'] for r in result.data if r.get('make'))) if result.data else []
-            sentiments = sorted(set(r['overall_sentiment'] for r in result.data if r.get('overall_sentiment'))) if result.data else []
-            total = len(result.data) if result.data else 0
-            return makes, sentiments, total
-
-        # On-demand detail for a single clip
-        @st.cache_data(ttl=600, show_spinner=False)
-        def load_clip_detail(clip_id: str):
+        def _si_detail(clip_id: str):
             result = (
                 db.supabase
                 .table('clips')
@@ -6244,7 +6234,7 @@ with analysis_tab:
             )
             return result.data[0] if result.data else {}
 
-        display_strategic_intelligence_tab(search_sentiment_clips, load_filter_options, load_clip_detail)
+        display_strategic_intelligence_tab(_si_search, _si_detail)
 
     except Exception as e:
         st.error(f"Error loading Strategic Intelligence: {e}")
