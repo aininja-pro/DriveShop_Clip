@@ -4453,9 +4453,13 @@ with bulk_review_tab:
             st.metric("📋 Pending Review", pending_count)
         
         with col2:
+            @st.cache_data(ttl=60, show_spinner=False)
+            def _cached_approved_count():
+                db2 = get_cached_database()
+                result = db2.supabase.table('clips').select('id', count='exact').eq('status', 'approved').in_('workflow_stage', ['found', 'sentiment_analyzed']).execute()
+                return result.count or 0
             try:
-                approved_queue_clips = db.get_approved_queue_clips()
-                approved_count = len(approved_queue_clips)
+                approved_count = _cached_approved_count()
             except:
                 approved_count = 0
             st.metric("✅ Approved Queue", approved_count)
@@ -5562,7 +5566,11 @@ with rejected_tab:
             
             # Get run info for display
             if (current_run_failed_clips or current_run_skipped_clips) and latest_run_id:
-                run_info = db.get_processing_run_info(latest_run_id)
+                @st.cache_data(ttl=300, show_spinner=False)
+                def _cached_run_info(run_id):
+                    db2 = get_cached_database()
+                    return db2.get_processing_run_info(run_id)
+                run_info = _cached_run_info(latest_run_id)
                 
                 if run_info:
                     run_name = run_info.get('run_name', 'Unknown')
