@@ -6200,21 +6200,38 @@ with analysis_tab:
     try:
         db = get_cached_database()
 
-        # Stage 1: lightweight metadata (no sentiment JSON blobs)
+        # Search clips by filters — only runs when user applies filters
         @st.cache_data(ttl=300, show_spinner=False)
-        def load_sentiment_clip_index():
-            result = (
+        def search_sentiment_clips(make_filter: str = '', sentiment_filter: str = '', search_text: str = ''):
+            query = (
                 db.supabase
                 .table('clips')
                 .select('id, wo_number, make, model, contact, media_outlet, overall_sentiment, published_date, clip_url')
                 .not_.is_('sentiment_data_enhanced', 'null')
-                .order('published_date', desc=True)
-                .limit(1000)
-                .execute()
             )
+            if make_filter:
+                query = query.eq('make', make_filter)
+            if sentiment_filter:
+                query = query.eq('overall_sentiment', sentiment_filter)
+            if search_text:
+                query = query.or_(
+                    f"wo_number.ilike.%{search_text}%,"
+                    f"contact.ilike.%{search_text}%,"
+                    f"media_outlet.ilike.%{search_text}%"
+                )
+            result = query.order('published_date', desc=True).limit(200).execute()
             return result.data if result.data else []
 
-        # Stage 2: on-demand detail for a single clip
+        # Lightweight query for filter dropdowns
+        @st.cache_data(ttl=600, show_spinner=False)
+        def load_filter_options():
+            result = db.supabase.table('clips').select('make, overall_sentiment').not_.is_('sentiment_data_enhanced', 'null').execute()
+            makes = sorted(set(r['make'] for r in result.data if r.get('make'))) if result.data else []
+            sentiments = sorted(set(r['overall_sentiment'] for r in result.data if r.get('overall_sentiment'))) if result.data else []
+            total = len(result.data) if result.data else 0
+            return makes, sentiments, total
+
+        # On-demand detail for a single clip
         @st.cache_data(ttl=600, show_spinner=False)
         def load_clip_detail(clip_id: str):
             result = (
@@ -6227,9 +6244,7 @@ with analysis_tab:
             )
             return result.data[0] if result.data else {}
 
-        with st.spinner('Loading Strategic Intelligence...'):
-            clip_index = load_sentiment_clip_index()
-        display_strategic_intelligence_tab(clip_index, load_clip_detail)
+        display_strategic_intelligence_tab(search_sentiment_clips, load_filter_options, load_clip_detail)
 
     except Exception as e:
         st.error(f"Error loading Strategic Intelligence: {e}")

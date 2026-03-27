@@ -1,5 +1,6 @@
 """
-Strategic Intelligence Dashboard - Searchable, two-stage loaded sentiment analysis viewer.
+Strategic Intelligence Dashboard - Search-driven sentiment analysis viewer.
+Loads filter options instantly, queries clips only when user searches/filters.
 """
 import json
 import pandas as pd
@@ -10,13 +11,13 @@ from src.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-def display_strategic_intelligence_tab(clip_index: list, fetch_detail):
+def display_strategic_intelligence_tab(search_clips, load_filter_options, fetch_detail):
     """
-    Display the Strategic Intelligence tab with filterable clip table
-    and on-demand sentiment analysis detail.
+    Display the Strategic Intelligence tab with search-driven clip loading.
 
     Args:
-        clip_index: List of clip metadata dicts (no sentiment JSON).
+        search_clips: Callable(make, sentiment, search_text) -> list of clip dicts.
+        load_filter_options: Callable() -> (makes_list, sentiments_list, total_count).
         fetch_detail: Callable(clip_id) -> dict with sentiment_data_enhanced.
     """
     # ── Header ──────────────────────────────────────────────────────────
@@ -28,75 +29,73 @@ def display_strategic_intelligence_tab(clip_index: list, fetch_detail):
     )
     st.markdown("---")
 
-    if not clip_index:
-        st.info("No clips with enhanced sentiment analysis found. "
-                "Approve clips and run sentiment analysis to populate this dashboard.")
-        return
-
-    # ── Build DataFrame ─────────────────────────────────────────────────
-    df = pd.DataFrame(clip_index)
-    df['published_date'] = pd.to_datetime(df['published_date'], errors='coerce')
-
-    # ── Refresh button (top-right) ──────────────────────────────────────
-    _, refresh_col = st.columns([5, 1])
-    with refresh_col:
-        if st.button("Refresh", key="si_refresh"):
-            st.cache_data.clear()
-            st.rerun()
+    # ── Load filter options (lightweight) ───────────────────────────────
+    makes, sentiments, total_count = load_filter_options()
 
     # ── Filter Bar ──────────────────────────────────────────────────────
-    f1, f2, f3 = st.columns([1.5, 1.5, 3])
+    f1, f2, f3, f4 = st.columns([1.5, 1.5, 3, 1])
 
     with f1:
-        makes = sorted(df['make'].dropna().unique().tolist())
         selected_make = st.selectbox("Make / Brand", ["All"] + makes, key="si_make")
 
     with f2:
-        sentiments = ["All", "positive", "neutral", "negative"]
-        selected_sentiment = st.selectbox("Sentiment", sentiments, key="si_sentiment")
+        selected_sentiment = st.selectbox("Sentiment", ["All"] + sentiments, key="si_sentiment")
 
     with f3:
         search_text = st.text_input(
             "Search WO#, Contact, or Media Outlet",
-            placeholder="e.g. 126-1373",
+            placeholder="e.g. 1261373 or Motor Trend",
             key="si_search",
         )
 
-    # Apply filters
-    filtered = df.copy()
-    if selected_make != "All":
-        filtered = filtered[filtered['make'] == selected_make]
-    if selected_sentiment != "All":
-        filtered = filtered[filtered['overall_sentiment'].str.lower() == selected_sentiment.lower()]
-    if search_text:
-        q = search_text.lower()
-        mask = (
-            filtered['wo_number'].astype(str).str.lower().str.contains(q, na=False)
-            | filtered['contact'].astype(str).str.lower().str.contains(q, na=False)
-            | filtered['media_outlet'].astype(str).str.lower().str.contains(q, na=False)
-        )
-        filtered = filtered[mask]
+    with f4:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Refresh", key="si_refresh"):
+            st.cache_data.clear()
+            st.rerun()
 
-    # ── Summary Metrics ─────────────────────────────────────────────────
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        st.metric("Total Clips", len(filtered))
-    with m2:
-        st.metric("Positive", int((filtered['overall_sentiment'].str.lower() == 'positive').sum()))
-    with m3:
-        st.metric("Neutral", int((filtered['overall_sentiment'].str.lower() == 'neutral').sum()))
-    with m4:
-        st.metric("Negative", int((filtered['overall_sentiment'].str.lower() == 'negative').sum()))
+    # ── Run search ──────────────────────────────────────────────────────
+    make_filter = selected_make if selected_make != "All" else ''
+    sentiment_filter = selected_sentiment if selected_sentiment != "All" else ''
 
-    st.markdown("---")
+    has_filters = make_filter or sentiment_filter or search_text
 
-    # ── Results Table (AgGrid) ──────────────────────────────────────────
-    if filtered.empty:
-        st.warning("No clips match your filters.")
+    if not has_filters:
+        st.markdown("---")
+        m1, m2 = st.columns([1, 3])
+        with m1:
+            st.metric("Total Analyzed Clips", total_count)
+        with m2:
+            st.info("Use the filters above to search clips, or select a Make/Brand to browse. "
+                    "You can also search by WO number, contact name, or media outlet.")
         return
 
-    display_df = filtered[['wo_number', 'make', 'model', 'contact',
-                            'media_outlet', 'published_date', 'overall_sentiment']].copy()
+    with st.spinner("Searching clips..."):
+        results = search_clips(make_filter, sentiment_filter, search_text)
+
+    if not results:
+        st.warning("No clips match your search. Try different filters.")
+        return
+
+    # ── Build DataFrame ─────────────────────────────────────────────────
+    df = pd.DataFrame(results)
+    df['published_date'] = pd.to_datetime(df['published_date'], errors='coerce')
+
+    # ── Summary Metrics ─────────────────────────────────────────────────
+    st.markdown("---")
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Results", len(df))
+    with m2:
+        st.metric("Positive", int((df['overall_sentiment'].str.lower() == 'positive').sum()))
+    with m3:
+        st.metric("Neutral", int((df['overall_sentiment'].str.lower() == 'neutral').sum()))
+    with m4:
+        st.metric("Negative", int((df['overall_sentiment'].str.lower() == 'negative').sum()))
+
+    # ── Results Table (AgGrid) ──────────────────────────────────────────
+    display_df = df[['wo_number', 'make', 'model', 'contact',
+                      'media_outlet', 'published_date', 'overall_sentiment']].copy()
     display_df.columns = ['WO #', 'Make', 'Model', 'Contact',
                            'Media Outlet', 'Published Date', 'Sentiment']
     display_df['Published Date'] = display_df['Published Date'].dt.strftime('%Y-%m-%d')
@@ -139,14 +138,14 @@ def display_strategic_intelligence_tab(clip_index: list, fetch_detail):
     if not has_selection:
         return
 
-    # Get the selected WO and look up the clip id from the index
+    # Get the selected WO and look up the clip id
     if hasattr(selected_rows, 'iloc'):
         sel = selected_rows.iloc[0].to_dict()
     else:
         sel = selected_rows[0]
 
     selected_wo = sel.get('WO #', '')
-    clip_record = next((c for c in clip_index if c.get('wo_number') == selected_wo), None)
+    clip_record = next((c for c in results if c.get('wo_number') == selected_wo), None)
     if not clip_record:
         st.error(f"Could not locate clip data for WO {selected_wo}")
         return
