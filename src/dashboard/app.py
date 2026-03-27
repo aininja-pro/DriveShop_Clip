@@ -4927,63 +4927,80 @@ with approved_queue_tab:
                             try:
                                 clips_to_export = []
                                 
-                                # Gather full clip data for export
+                                # Build lookup dicts for O(1) access instead of O(n) linear search per row
+                                clips_by_id = {clip['id']: clip for clip in clips_data if clip.get('id')}
+                                clips_by_wo = {str(clip['wo_number']): clip for clip in clips_data if clip.get('wo_number')}
+
                                 for row in selected_rows:
                                     clip_id = row.get('id')
                                     if clip_id:
-                                        # Get full clip data from database using ID
-                                        clip_data = next((clip for clip in clips_data if clip['id'] == clip_id), None)
+                                        clip_data = clips_by_id.get(clip_id)
                                         if clip_data:
                                             clips_to_export.append(clip_data)
                                     else:
-                                        # Fallback to WO number if ID not available
                                         wo_number = str(row.get('WO #', ''))
                                         if wo_number:
-                                            clip_data = next((clip for clip in clips_data if str(clip['wo_number']) == wo_number), None)
+                                            clip_data = clips_by_wo.get(wo_number)
                                             if clip_data:
                                                 clips_to_export.append(clip_data)
                                 
+                                # Fields the client wants from enhanced sentiment
+                                SENTIMENT_EXPORT_FIELDS = {
+                                    'sentiment_classification', 'key_features_mentioned', 'brand_attributes_captured',
+                                    'purchase_drivers', 'competitive_context', 'trim_level_mentioned', 'trim_impact_score',
+                                    'trim_highlights', 'vehicle_identifier', 'content_type', 'overall_sentiment',
+                                    'relevance_score', 'summary', 'brand_alignment'
+                                }
+
+                                def _parse_sentiment_json(raw):
+                                    """Parse sentiment_data_enhanced from string or dict."""
+                                    if not raw:
+                                        return {}
+                                    try:
+                                        return json.loads(raw) if isinstance(raw, str) else raw
+                                    except (json.JSONDecodeError, TypeError):
+                                        return {}
+
+                                def _failed_sentiment(make='', model=''):
+                                    """Placeholder sentiment for clips that failed analysis."""
+                                    return {
+                                        "sentiment_classification": {"overall": "neutral", "confidence": 0.0, "rationale": "Analysis failed"},
+                                        "key_features_mentioned": [],
+                                        "brand_attributes_captured": [],
+                                        "purchase_drivers": [],
+                                        "competitive_context": {"direct_comparisons": [], "market_positioning": ""},
+                                        "trim_level_mentioned": False,
+                                        "trim_impact_score": 0.0,
+                                        "trim_highlights": None,
+                                        "vehicle_identifier": f"{make} {model}".strip(),
+                                        "content_type": "Web Article",
+                                        "overall_sentiment": "neutral",
+                                        "relevance_score": 5,
+                                        "summary": "Enhanced sentiment analysis failed for this clip",
+                                        "brand_alignment": False
+                                    }
+
                                 if clips_to_export:
                                     # Create FMS export data with all fields including sentiment
                                     fms_export_data = []
                                     export_timestamp = datetime.now().isoformat()
-                                    
+
                                     # Get export data from clips_export view with client field names
                                     clip_ids = [clip['id'] for clip in clips_to_export if clip.get('id')]
-                                    
+
                                     if clip_ids:
                                         # Query the export view for these specific clips to get original flat fields
                                         export_result = db.supabase.table('clips_export').select('*').in_('activity_id', [clip['activity_id'] for clip in clips_to_export if clip.get('activity_id')]).execute()
                                         
                                         if export_result.data:
-                                            # Get enhanced sentiment data for the same clips
-                                            # NOTE: Use activity_id as lookup key since clips_export view doesn't include wo_number
                                             clips_result = db.supabase.table('clips').select('activity_id, sentiment_data_enhanced').in_('id', clip_ids).execute()
 
-                                            # Create a lookup for enhanced sentiment data by activity_id
                                             enhanced_data_lookup = {}
                                             if clips_result.data:
                                                 for clip_data in clips_result.data:
-                                                    enhanced_sentiment = {}
-                                                    if clip_data.get('sentiment_data_enhanced'):
-                                                        try:
-                                                            if isinstance(clip_data['sentiment_data_enhanced'], str):
-                                                                enhanced_sentiment = json.loads(clip_data['sentiment_data_enhanced'])
-                                                            else:
-                                                                enhanced_sentiment = clip_data['sentiment_data_enhanced']
-                                                        except (json.JSONDecodeError, TypeError):
-                                                            enhanced_sentiment = {}
-
-                                                    # Filter to only include the fields specified by client
-                                                    allowed_fields = {
-                                                        'sentiment_classification', 'key_features_mentioned', 'brand_attributes_captured',
-                                                        'purchase_drivers', 'competitive_context', 'trim_level_mentioned', 'trim_impact_score',
-                                                        'trim_highlights', 'vehicle_identifier', 'content_type', 'overall_sentiment',
-                                                        'relevance_score', 'summary', 'brand_alignment'
-                                                    }
-
-                                                    filtered_sentiment = {k: v for k, v in enhanced_sentiment.items() if k in allowed_fields}
-                                                    enhanced_data_lookup[clip_data.get('activity_id')] = filtered_sentiment
+                                                    parsed = _parse_sentiment_json(clip_data.get('sentiment_data_enhanced'))
+                                                    filtered = {k: v for k, v in parsed.items() if k in SENTIMENT_EXPORT_FIELDS}
+                                                    enhanced_data_lookup[clip_data.get('activity_id')] = filtered
 
                                             # Create lookup from clips_to_export for media_outlet (VIEW doesn't have this column)
                                             media_outlet_lookup = {clip['activity_id']: clip.get('media_outlet') for clip in clips_to_export if clip.get('activity_id')}
@@ -4992,75 +5009,24 @@ with approved_queue_tab:
                                             for export_record in export_result.data:
                                                 activity_id = export_record.get('activity_id')
 
-                                                # Fix publication field using clips_to_export lookup
-                                                if 'publication' not in export_record or not export_record.get('publication'):
-                                                    if activity_id in media_outlet_lookup:
-                                                        export_record['publication'] = media_outlet_lookup[activity_id]
+                                                if not export_record.get('publication') and activity_id in media_outlet_lookup:
+                                                    export_record['publication'] = media_outlet_lookup[activity_id]
 
                                                 if activity_id in enhanced_data_lookup:
                                                     export_record['sentiment_data_enhanced'] = enhanced_data_lookup[activity_id]
                                                 else:
-                                                    # Add empty enhanced sentiment for clips that failed analysis
-                                                    export_record['sentiment_data_enhanced'] = {
-                                                        "sentiment_classification": {"overall": "neutral", "confidence": 0.0, "rationale": "Analysis failed"},
-                                                        "key_features_mentioned": [],
-                                                        "brand_attributes_captured": [],
-                                                        "purchase_drivers": [],
-                                                        "competitive_context": {"direct_comparisons": [], "market_positioning": ""},
-                                                        "trim_level_mentioned": False,
-                                                        "trim_impact_score": 0.0,
-                                                        "trim_highlights": None,
-                                                        "vehicle_identifier": f"{export_record.get('make', '')} {export_record.get('model', '')}".strip(),
-                                                        "content_type": "Web Article",
-                                                        "overall_sentiment": "neutral",
-                                                        "relevance_score": 5,
-                                                        "summary": "Enhanced sentiment analysis failed for this clip",
-                                                        "brand_alignment": False
-                                                    }
+                                                    export_record['sentiment_data_enhanced'] = _failed_sentiment(
+                                                        export_record.get('make', ''), export_record.get('model', '')
+                                                    )
                                                 fms_export_data.append(export_record)
                                         else:
                                             # Fallback to manual mapping if view query fails
                                             for clip in clips_to_export:
-                                                # Parse the enhanced sentiment data
-                                                enhanced_sentiment = {}
-                                                if clip.get('sentiment_data_enhanced'):
-                                                    try:
-                                                        if isinstance(clip['sentiment_data_enhanced'], str):
-                                                            enhanced_sentiment = json.loads(clip['sentiment_data_enhanced'])
-                                                        else:
-                                                            enhanced_sentiment = clip['sentiment_data_enhanced']
-                                                    except (json.JSONDecodeError, TypeError):
-                                                        enhanced_sentiment = {}
-                                                
-                                                # Filter to only include the fields specified by client
-                                                allowed_fields = {
-                                                    'sentiment_classification', 'key_features_mentioned', 'brand_attributes_captured',
-                                                    'purchase_drivers', 'competitive_context', 'trim_level_mentioned', 'trim_impact_score',
-                                                    'trim_highlights', 'vehicle_identifier', 'content_type', 'overall_sentiment',
-                                                    'relevance_score', 'summary', 'brand_alignment'
-                                                }
-                                                
-                                                filtered_sentiment = {k: v for k, v in enhanced_sentiment.items() if k in allowed_fields}
-                                                
-                                                # Create export record with original flat fields PLUS enhanced sentiment
-                                                # Use placeholder data if enhanced sentiment failed
+                                                parsed = _parse_sentiment_json(clip.get('sentiment_data_enhanced'))
+                                                filtered_sentiment = {k: v for k, v in parsed.items() if k in SENTIMENT_EXPORT_FIELDS}
+
                                                 if not filtered_sentiment:
-                                                    filtered_sentiment = {
-                                                        "sentiment_classification": {"overall": "neutral", "confidence": 0.0, "rationale": "Analysis failed"},
-                                                        "key_features_mentioned": [],
-                                                        "brand_attributes_captured": [],
-                                                        "purchase_drivers": [],
-                                                        "competitive_context": {"direct_comparisons": [], "market_positioning": ""},
-                                                        "trim_level_mentioned": False,
-                                                        "trim_impact_score": 0.0,
-                                                        "trim_highlights": None,
-                                                        "vehicle_identifier": f"{clip.get('make', '')} {clip.get('model', '')}".strip(),
-                                                        "content_type": "Web Article",
-                                                        "overall_sentiment": "neutral", 
-                                                        "relevance_score": 5,
-                                                        "summary": "Enhanced sentiment analysis failed for this clip",
-                                                        "brand_alignment": False
-                                                    }
+                                                    filtered_sentiment = _failed_sentiment(clip.get('make', ''), clip.get('model', ''))
                                                 
                                                 export_record = {
                                                     # Client-requested fields with their preferred names (original flat structure)
