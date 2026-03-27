@@ -521,20 +521,21 @@ def _generate_pdf(clip: dict, data: dict) -> bytes:
     features = data.get('key_features_mentioned', [])
     if features:
         _pdf_section_header(pdf, f"Key Features ({len(features)})")
-        for feat in features:
+        for i, feat in enumerate(features):
             name = feat.get('feature', 'Unknown')
             sentiment = feat.get('sentiment', 'neutral')
-            quote = feat.get('quote', '')
+            quote = _clean_text(feat.get('quote', ''))
 
             pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(0, 6, f"  {name} ({sentiment})", new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(0, 6, f"{i+1}. {name} ({sentiment})")
             if quote:
                 pdf.set_font("Helvetica", "I", 9)
                 pdf.set_text_color(80, 80, 80)
-                pdf.cell(5)  # indent
-                pdf.multi_cell(0, 5, _clean_text(f'"{quote}"'))
+                pdf.set_x(15)
+                pdf.multi_cell(180, 5, f'"{quote}"')
                 pdf.set_text_color(0, 0, 0)
-        pdf.ln(4)
+            pdf.ln(2)
+        pdf.ln(2)
 
     # ── Brand Attributes ────────────────────────────────────────────────
     attrs = data.get('brand_attributes_identified', data.get('brand_attributes_captured', []))
@@ -554,24 +555,25 @@ def _generate_pdf(clip: dict, data: dict) -> bytes:
     drivers = data.get('purchase_drivers', [])
     if drivers:
         _pdf_section_header(pdf, f"Purchase Drivers ({len(drivers)})")
-        for driver in drivers:
+        for i, driver in enumerate(drivers):
             reason = driver.get('reason', 'Unknown')
             sentiment = driver.get('sentiment', 'neutral')
             strength = driver.get('strength', '')
-            quote = driver.get('quote', '')
+            quote = _clean_text(driver.get('quote', ''))
 
             pdf.set_font("Helvetica", "B", 10)
-            label = f"  {reason} ({sentiment})"
+            label = f"{reason} ({sentiment})"
             if strength:
-                label += f" - {strength}"
-            pdf.cell(0, 6, label, new_x="LMARGIN", new_y="NEXT")
+                label += f" | {strength}"
+            pdf.multi_cell(0, 6, label)
             if quote:
                 pdf.set_font("Helvetica", "I", 9)
                 pdf.set_text_color(80, 80, 80)
-                pdf.cell(5)
-                pdf.multi_cell(0, 5, _clean_text(f'"{quote}"'))
+                pdf.set_x(15)  # indent
+                pdf.multi_cell(180, 5, f'"{quote}"')
                 pdf.set_text_color(0, 0, 0)
-        pdf.ln(4)
+            pdf.ln(2)
+        pdf.ln(2)
 
     # ── Competitive Context ─────────────────────────────────────────────
     competitive = data.get('competitive_context', {})
@@ -583,10 +585,10 @@ def _generate_pdf(clip: dict, data: dict) -> bytes:
         if comparisons:
             pdf.set_font("Helvetica", "B", 10)
             pdf.cell(0, 6, "Direct Comparisons:", new_x="LMARGIN", new_y="NEXT")
-            pdf.set_font("Helvetica", "", 10)
+            pdf.set_font("Helvetica", "", 9)
             for comp in comparisons:
-                pdf.cell(5)
-                pdf.multi_cell(0, 5, _clean_text(f"  {comp}"))
+                pdf.set_x(15)
+                pdf.multi_cell(180, 5, _clean_text(str(comp)))
 
         positioning = competitive.get('market_positioning', '')
         if positioning:
